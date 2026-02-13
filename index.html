@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+content="width=device-width,
+initial-scale=1,
+maximum-scale=1,
+user-scalable=no,
+viewport-fit=cover">
+
+<title>Mansion Prototype v4</title>
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background:#000;
+  overflow:hidden;
+}
+
+canvas{
+  display:block;
+}
+
+#rotateBlock{
+  position:fixed;
+  inset:0;
+  background:#000;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:22px;
+  z-index:99;
+}
+</style>
+</head>
+<body>
+
+<div id="rotateBlock">
+横向きにしてください
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let W,H;
+let isLandscape=false;
+
+function setupScreen(){
+  W = window.innerWidth;
+  H = window.innerHeight;
+
+  canvas.width = W;
+  canvas.height = H;
+
+  isLandscape = W > H;
+
+  document.getElementById("rotateBlock").style.display =
+    isLandscape ? "none" : "flex";
+
+  // スティック位置再設定（横専用）
+  stickBase.x = 120;
+  stickBase.y = H - 120;
+}
+window.addEventListener("resize", setupScreen);
+setupScreen();
+
+/* ===== ワールド ===== */
+const worldSize = 30;
+const tile = 60;
+
+let player = {x:5,y:5,speed:0.12};
+let enemy = {x:25,y:25,speed:0.07};
+let aiActive=true;
+
+/* ===== 障害物 ===== */
+let obstacles=[];
+function generateObstacles(){
+  obstacles=[];
+  for(let i=0;i<25;i++){
+    obstacles.push({
+      x:Math.floor(Math.random()*worldSize),
+      y:Math.floor(Math.random()*worldSize)
+    });
+  }
+}
+generateObstacles();
+
+/* ===== スティック ===== */
+const stickBase = {x:120,y:120};
+const stickRadius=60;
+
+let stick={
+  active:false,
+  dx:0,
+  dy:0
+};
+
+canvas.addEventListener("touchstart",e=>{
+  if(!isLandscape) return;
+
+  const t=e.touches[0];
+  const dx=t.clientX-stickBase.x;
+  const dy=t.clientY-stickBase.y;
+  if(Math.hypot(dx,dy)<stickRadius+20){
+    stick.active=true;
+  }
+});
+
+canvas.addEventListener("touchmove",e=>{
+  if(!stick.active) return;
+
+  const t=e.touches[0];
+  let dx=t.clientX-stickBase.x;
+  let dy=t.clientY-stickBase.y;
+  const len=Math.hypot(dx,dy);
+
+  if(len>stickRadius){
+    dx=dx/len*stickRadius;
+    dy=dy/len*stickRadius;
+  }
+  stick.dx=dx;
+  stick.dy=dy;
+});
+
+canvas.addEventListener("touchend",()=>{
+  stick.active=false;
+  stick.dx=0;
+  stick.dy=0;
+});
+
+/* ===== 更新 ===== */
+function update(){
+
+  if(!isLandscape) return;
+
+  if(stick.active){
+    const len=Math.hypot(stick.dx,stick.dy);
+    if(len>5){
+      player.x += (stick.dx/stickRadius)*player.speed;
+      player.y += (stick.dy/stickRadius)*player.speed;
+
+      // ワールド外防止
+      player.x=Math.max(0,Math.min(worldSize-1,player.x));
+      player.y=Math.max(0,Math.min(worldSize-1,player.y));
+    }
+  }
+
+  if(aiActive){
+    const dx=player.x-enemy.x;
+    const dy=player.y-enemy.y;
+    const dist=Math.hypot(dx,dy);
+    if(dist>0.1){
+      enemy.x+=dx/dist*enemy.speed;
+      enemy.y+=dy/dist*enemy.speed;
+    }
+  }
+}
+
+/* ===== 描画 ===== */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  if(!isLandscape) return;
+
+  // 床
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,W,H);
+
+  // プレイヤー
+  ctx.fillStyle="cyan";
+  ctx.beginPath();
+  ctx.arc(W/2,H/2,20,0,Math.PI*2);
+  ctx.fill();
+
+  // 鬼
+  ctx.fillStyle="red";
+  ctx.beginPath();
+  ctx.arc(W/2+(enemy.x-player.x)*40,
+          H/2+(enemy.y-player.y)*40,
+          20,0,Math.PI*2);
+  ctx.fill();
+
+  // スティック描画
+  ctx.globalAlpha=0.4;
+  ctx.beginPath();
+  ctx.arc(stickBase.x,stickBase.y,stickRadius,0,Math.PI*2);
+  ctx.strokeStyle="white";
+  ctx.lineWidth=3;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(stickBase.x+stick.dx,
+          stickBase.y+stick.dy,
+          30,0,Math.PI*2);
+  ctx.fillStyle="white";
+  ctx.fill();
+  ctx.globalAlpha=1;
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+</script>
+</body>
+</html>
