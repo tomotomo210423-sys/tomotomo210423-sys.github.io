@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debate Arena X</title>
+
+<link rel="stylesheet" href="style.css">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+</head>
+
+<body>
+
+<div id="startScreen">
+    <h1>Debate Arena X</h1>
+    <input type="text" id="playerName" placeholder="名前を入力">
+    <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="normal">Normal</option>
+        <option value="hard">Hard</option>
+    </select>
+    <button id="startBtn">START</button>
+</div>
+
+<div id="gameScreen" class="hidden">
+    <div class="status">
+        <div>あなた HP: <span id="playerHP">100</span></div>
+        <div>AI HP: <span id="aiHP">100</span></div>
+        <div>支持率: <span id="support">50</span>%</div>
+    </div>
+
+    <div id="chatBox"></div>
+
+    <div class="inputArea">
+        <input type="text" id="playerInput">
+        <button id="sendBtn">送信</button>
+    </div>
+</div>
+
+<script src="aiEngine.js"></script>
+<script src="game.js"></script>
+
+</body>
+</html>
