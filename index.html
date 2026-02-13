@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>廃洋館チェイス v1.1</title>
+<style>
+:root { --bg:#06060a; --accent:#ffd166; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: #eee; font-family: system-ui, sans-serif; user-select: none; -webkit-user-select: none; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* UI */
+#portraitOverlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; color: #fff; font-size: 18px; z-index: 500; font-weight: bold; }
+#startScreen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(0,0,0,0.8), rgba(0,0,0,0.95)); z-index: 400; overflow-y: auto; }
+.panel { width: 92%; max-width: 600px; background: rgba(255,255,255,0.05); padding: 24px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); }
+h1 { margin: 0 0 12px 0; text-align: center; color: var(--accent); font-size: 24px; }
+.section-title { font-size: 14px; color: #aaa; margin: 16px 0 8px 0; border-bottom: 1px solid #333; padding-bottom: 4px; }
+
+.btn-group { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.btn { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; cursor: pointer; text-align: center; font-size: 14px; min-width: 30%; }
+.btn.selected { border-color: var(--accent); background: rgba(255, 209, 102, 0.1); box-shadow: 0 0 0 2px rgba(255,209,102,0.3); font-weight: bold; }
+.btn small { display: block; font-size: 11px; color: #888; margin-top: 4px; font-weight: normal; }
+
+.start-btn { width: 100%; padding: 14px; border-radius: 8px; border: none; background: var(--accent); color: #000; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 20px; }
+.start-btn:active { opacity: 0.8; }
+
+/* HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 200; display: none; }
+#stickBase { position: absolute; left: 24px; bottom: 24px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.1); pointer-events: auto; display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.2); }
+#stickKnob { width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.8); }
+#actionBtn { position: absolute; right: 24px; bottom: 24px; width: 90px; height: 90px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; cursor: pointer; color: #fff; font-size: 18px; }
+#actionBtn:active { background: rgba(255,255,255,0.3); }
+
+#topBar { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+.bar-item { background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+
+#resultScreen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); z-index: 300; flex-direction: column; text-align: center; }
+#resultTitle { font-size: 32px; margin-bottom: 24px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="portraitOverlay">横画面でプレイしてください</div>
+
+<div id="startScreen">
+  <div class="panel">
+    <h1>廃洋館チェイス v1.1</h1>
+    
+    <div class="section-title">陣営選択</div>
+    <div class="btn-group" id="factionGroup">
+      <div class="btn selected" data-val="runner">逃走者<br><small>パズルを解いて逃げ切れ</small></div>
+      <div class="btn" data-val="chaser">追跡者<br><small>5分以内に3人捕まえろ</small></div>
+    </div>
+
+    <div class="section-title">キャラクター選択</div>
+    <div class="btn-group" id="charGroup">
+      </div>
+
+    <div class="section-title">難易度 (部屋数 / 暗さ)</div>
+    <div class="btn-group" id="diffGroup">
+      <div class="btn" data-val="easy">Easy<br><small>5部屋</small></div>
+      <div class="btn selected" data-val="normal">Normal<br><small>7部屋</small></div>
+      <div class="btn" data-val="hard">Hard<br><small>10部屋 / 暗闇+</small></div>
+    </div>
+
+    <button class="start-btn" id="startBtn">ゲーム開始 (タップで音声ON)</button>
+  </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="hud">
+  <div id="stickBase"><div id="stickKnob"></div></div>
+  <div id="actionBtn" id="actionBtn">ACT</div>
+  <div id="topBar">
+    <div class="bar-item">⏳ <span id="timeUI">05:00</span></div>
+    <div class="bar-item">🧩 残り: <span id="puzzleUI">0</span></div>
+    <div class="bar-item">👥 生存: <span id="aliveUI">3</span>/3</div>
+  </div>
+</div>
+
+<div id="resultScreen">
+  <div id="resultTitle"></div>
+  <button class="start-btn" style="width:200px" onclick="location.reload()">タイトルへ戻る</button>
+</div>
+
+<script>
+/**
+ * 廃洋館チェイス v1.1 - 単一ファイル完全版
+ * 仕様に基づくロジック、バグ修正、AI、陣営選択機能を追加
+ */
+
+/* =========================================
+   設定・定数
+========================================= */
+const CHARS = {
+  runner: [
+    { id: 'explorer', name: '探索者', desc: '青コート/パズル速度+', color: '#3498db', speed: 1.0, puzzleSpeed: 1.2 },
+    { id: 'agile', name: '敏捷者', desc: '赤スカーフ/移動速度+', color: '#e74c3c', speed: 1.15, puzzleSpeed: 1.0 },
+    { id: 'protector', name: '保護者', desc: '白マント/1回捕獲無効', color: '#ecf0f1', speed: 1.0, puzzleSpeed: 1.0, shield: 1 }
+  ],
+  chaser: [
+    { id: 'hunter', name: '紅衣の狩人', desc: '高速追跡', color: '#c0392b', speed: 1.1, sight: 1.0 },
+    { id: 'watcher', name: '深淵の監視者', desc: '索敵範囲+', color: '#2c3e50', speed: 0.95, sight: 1.5 },
+    { id: 'ruler', name: '鎖縛の統治者', desc: 'ドアロック使用', color: '#8e44ad', speed: 1.0, sight: 1.0 }
+  ]
+};
+
+const TILE_SIZE = 32;
+let canvas = document.getElementById('gameCanvas');
+let ctx = canvas.getContext('2d');
+let cw = canvas.width = window.innerWidth;
+let ch = canvas.height = window.innerHeight;
+
+let gameState = {
+  running: false,
+  faction: 'runner',
+  charId: 'explorer',
+  difficulty: 'normal',
+  timeLeft: 5 * 60 * 1000,
+  darknessAlpha: 0.55
+};
+
+let input = { vx: 0, vy: 0, act: false };
+let map = null;
+let actors = [];
+let puzzles = [];
+let camera = { x: 0, y: 0 };
+let myPlayer = null; // プレイヤーが操作するキャラ
+
+/* =========================================
+   UI イベント設定
+========================================= */
+function setupUISelection(groupId, stateKey, onChange) {
+  const group = document.getElementById(groupId);
+  group.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn');
+    if (!btn) return;
+    group.querySelectorAll('.btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    gameState[stateKey] = btn.dataset.val;
+    if (onChange) onChange();
+  });
+}
+
+function updateCharSelection() {
+  const container = document.getElementById('charGroup');
+  container.innerHTML = CHARS[gameState.faction].map((c, i) => 
+    `<div class="btn ${i===0?'selected':''}" data-val="${c.id}">${c.name}<br><small>${c.desc}</small></div>`
+  ).join('');
+  gameState.charId = CHARS[gameState.faction][0].id;
+}
+
+setupUISelection('factionGroup', 'faction', updateCharSelection);
+setupUISelection('diffGroup', 'difficulty');
+document.getElementById('charGroup').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn');
+  if (!btn) return;
+  document.querySelectorAll('#charGroup .btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  gameState.charId = btn.dataset.val;
+});
+
+// 初期化
+updateCharSelection();
+
+window.addEventListener('resize', () => {
+  cw = canvas.width = window.innerWidth;
+  ch = canvas.height = window.innerHeight;
+  document.getElementById('portraitOverlay').style.display = (cw > ch) ? 'none' : 'flex';
+});
+document.getElementById('portraitOverlay').style.display = (cw > ch) ? 'none' : 'flex';
+
+/* =========================================
+   オーディオ (Web Audio API)
+========================================= */
+const AudioSys = (() => {
+  let actx = null;
+  function init() {
+    if (actx) return;
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  function playBeep(freq, type, dur, vol=0.1) {
+    if (!actx) return;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    osc.connect(gain); gain.connect(actx.destination);
+    gain.gain.setValueAtTime(vol, actx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + dur);
+    osc.start(); osc.stop(actx.currentTime + dur);
+  }
+  return {
+    init,
+    step: () => playBeep(Math.random()*50+200, 'square', 0.1, 0.02),
+    act: () => playBeep(600, 'sine', 0.1, 0.1),
+    solve: () => { playBeep(440,'sine',0.2,0.1); setTimeout(()=>playBeep(880,'sine',0.4,0.1), 150); },
+    catch: () => playBeep(100, 'sawtooth', 0.8, 0.3)
+  };
+})();
+
+/* =========================================
+   入力 (仮想ジョイスティック)
+========================================= */
+const stickBase = document.getElementById('stickBase');
+const stickKnob = document.getElementById('stickKnob');
+let pointerId = null;
+
+stickBase.addEventListener('pointerdown', e => {
+  pointerId = e.pointerId; stickBase.setPointerCapture(pointerId); handleStick(e);
+});
+stickBase.addEventListener('pointermove', e => { if (e.pointerId === pointerId) handleStick(e); });
+stickBase.addEventListener('pointerup', e => resetStick());
+stickBase.addEventListener('pointercancel', e => resetStick());
+
+function handleStick(e) {
+  const rect = stickBase.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+  const dx = e.clientX - cx, dy = e.clientY - cy;
+  const dist = Math.hypot(dx, dy);
+  const max = 35;
+  const nx = dist > max ? (dx/dist)*max : dx;
+  const ny = dist > max ? (dy/dist)*max : dy;
+  stickKnob.style.transform = `translate(${nx}px, ${ny}px)`;
+  input.vx = nx / max; input.vy = ny / max;
+}
+function resetStick() {
+  pointerId = null; stickKnob.style.transform = `translate(0,0)`; input.vx = 0; input.vy = 0;
+}
+
+const actBtn = document.getElementById('actionBtn');
+actBtn.addEventListener('pointerdown', () => { input.act = true; AudioSys.act(); });
+actBtn.addEventListener('pointerup', () => { input.act = false; });
+
+/* =========================================
+   マップ生成 (疑似アイソメトリック対応のグリッド)
+========================================= */
+class MapGen {
+  constructor(diff) {
+    this.rooms = diff === 'easy' ? 5 : diff === 'normal' ? 7 : 10;
+    this.cells = 30; // 30x30 グリッド
+    this.grid = Array(this.cells).fill(0).map(() => Array(this.cells).fill(1)); // 1=壁, 0=床
+    this.roomCenters = [];
+    this.generate();
+  }
+  generate() {
+    let cx = 15, cy = 15;
+    this.carve(cx, cy);
+    this.roomCenters.push({x:cx, y:cy});
+    
+    for(let i=1; i<this.rooms; i++) {
+      const dir = [[0,-2],[0,2],[-2,0],[2,0]][Math.floor(Math.random()*4)];
+      cx = Math.max(2, Math.min(this.cells-3, cx + dir[0]*3));
+      cy = Math.max(2, Math.min(this.cells-3, cy + dir[1]*3));
+      this.carve(cx, cy);
+      
+      // 通路をつなぐ
+      const prev = this.roomCenters[i-1];
+      this.carvePath(prev.x, prev.y, cx, cy);
+      this.roomCenters.push({x:cx, y:cy});
+    }
+  }
+  carve(x, y) {
+    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) this.grid[y+j][x+i] = 0;
+  }
+  carvePath(x1, y1, x2, y2) {
+    let x = x1, y = y1;
+    while(x !== x2) { this.grid[y][x] = 0; x += Math.sign(x2 - x); }
+    while(y !== y2) { this.grid[y][x] = 0; y += Math.sign(y2 - y); }
+  }
+  isWall(x, y) {
+    const gx = Math.floor(x), gy = Math.floor(y);
+    if(gx<0 || gy<0 || gx>=this.cells || gy>=this.cells) return true;
+    return this.grid[gy][gx] === 1;
+  }
+}
+
+// アイソメトリック変換関数
+function toScreen(wx, wy) {
+  const sx = (wx - wy) * (TILE_SIZE);
+  const sy = (wx + wy) * (TILE_SIZE / 2);
+  return { x: sx - camera.x + cw/2, y: sy - camera.y + ch/2 };
+}
+
+/* =========================================
+   アクター (逃走者・追跡者共通)
+========================================= */
+class Actor {
+  constructor(x, y, faction, typeInfo, isPlayer) {
+    this.x = x; this.y = y;
+    this.faction = faction;
+    this.info = typeInfo;
+    this.isPlayer = isPlayer;
+    
+    this.speed = (faction === 'runner' ? 0.08 : 0.075) * typeInfo.speed;
+    this.state = 'alive'; // runner: alive, caught
+    this.shield = typeInfo.shield || 0;
+    this.facing = 0;
+    this.flashLight = true;
+    this.animTimer = 0;
+  }
+
+  update(dt) {
+    if (this.state !== 'alive') return;
+    
+    let moveX = 0, moveY = 0;
+    let acting = false;
+
+    // --- 入力・AIロジック ---
+    if (this.isPlayer) {
+      moveX = input.vx; moveY = input.vy;
+      acting = input.act;
+      if (acting) input.act = false; // 1回押し判定
+    } else {
+      // AI処理
+      if (this.faction === 'runner') {
+        // 近づいてくる追跡者を避ける
+        const chaser = actors.find(a => a.faction === 'chaser');
+        const distToChaser = Math.hypot(chaser.x - this.x, chaser.y - this.y);
+        
+        if (distToChaser < 6) {
+          moveX = this.x - chaser.x; moveY = this.y - chaser.y; // 逃げる
+        } else {
+          // 未解決のパズルを探す
+          const p = puzzles.find(p => p.progress < 100);
+          if (p) {
+            moveX = p.x - this.x; moveY = p.y - this.y;
+            if (Math.hypot(moveX, moveY) < 1.0) acting = true; // パズルを解く
+          }
+        }
+      } else {
+        // 追跡者AI：一番近い生きている逃走者を追う
+        let target = null; let minDist = 999;
+        actors.forEach(a => {
+          if (a.faction === 'runner' && a.state === 'alive') {
+            const d = Math.hypot(a.x - this.x, a.y - this.y);
+            if (d < minDist) { minDist = d; target = a; }
+          }
+        });
+        if (target) {
+          moveX = target.x - this.x; moveY = target.y - this.y;
+        }
+      }
+      
+      // 正規化
+      const len = Math.hypot(moveX, moveY);
+      if (len > 0) { moveX /= len; moveY /= len; }
+    }
+
+    // --- 移動と衝突判定 ---
+    if (Math.abs(moveX) > 0.1 || Math.abs(moveY) > 0.1) {
+      this.facing = Math.atan2(moveY, moveX);
+      const nx = this.x + moveX * this.speed * dt;
+      const ny = this.y + moveY * this.speed * dt;
+      
+      // 壁ずり判定（X, Y独立）
+      if (!map.isWall(nx, this.y)) this.x = nx;
+      if (!map.isWall(this.x, ny)) this.y = ny;
+      
+      this.animTimer += dt;
+      if (this.animTimer > 10 && this.isPlayer) { AudioSys.step(); this.animTimer = 0; }
+    }
+
+    // --- アクション (逃走者:パズル進行、懐中電灯ON/OFF) ---
+    if (this.faction === 'runner' && acting) {
+      let solvedAny = false;
+      for (let p of puzzles) {
+        if (p.progress < 100 && Math.hypot(this.x - p.x, this.y - p.y) < 1.5) {
+          p.progress += 25 * this.info.puzzleSpeed;
+          solvedAny = true;
+          if (p.progress >= 100) { p.progress = 100; AudioSys.solve(); }
+        }
+      }
+      if (!solvedAny && this.isPlayer) {
+        this.flashLight = !this.flashLight; // パズルがない場所でACTならライト切替
+      }
+    }
+
+    // --- 捕獲判定 (追跡者が逃走者に触れたか) ---
+    if (this.faction === 'chaser') {
+      actors.forEach(r => {
+        if (r.faction === 'runner' && r.state === 'alive') {
+          if (Math.hypot(r.x - this.x, r.y - this.y) < 0.8) {
+            if (r.shield > 0) {
+              r.shield--;
+              // ノックバック
+              r.x += Math.cos(this.facing) * 2; r.y += Math.sin(this.facing) * 2;
+            } else {
+              r.state = 'caught';
+              if (r.isPlayer || this.isPlayer) AudioSys.catch();
+            }
+          }
+        }
+      });
+    }
+  }
+
+  draw() {
+    if (this.state !== 'alive') return;
+    const s = toScreen(this.x, this.y);
+    
+    // 影
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(s.x, s.y, 14, 7, 0, 0, Math.PI*2); ctx.fill();
+
+    // 本体
+    ctx.fillStyle = this.info.color;
+    // 簡易的な肩の揺れアニメーション
+    const bounce = (Math.abs(input.vx)>0 || Math.abs(input.vy)>0) ? Math.sin(Date.now()/100)*3 : 0;
+    
+    // ボディ
+    ctx.fillRect(s.x - 10, s.y - 24 - bounce, 20, 24);
+    
+    // プレイヤーマーカー
+    if (this.isPlayer) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.moveTo(s.x, s.y - 35 - bounce); ctx.lineTo(s.x-5, s.y - 42 - bounce); ctx.lineTo(s.x+5, s.y - 42 - bounce); ctx.fill();
+    }
+    
+    // シールドエフェクト (保護者)
+    if (this.shield > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.x, s.y - 12 - bounce, 18, 0, Math.PI*2); ctx.stroke();
+    }
+  }
+}
+
+/* =========================================
+   メインゲームループ
+========================================= */
+let lastTime = 0;
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  AudioSys.init();
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  
+  // 初期化
+  gameState.difficulty = document.querySelector('#diffGroup .selected').dataset.val;
+  gameState.darknessAlpha = gameState.difficulty === 'hard' ? 0.65 : 0.55;
+  map = new MapGen(gameState.difficulty);
+  
+  actors = [];
+  puzzles = [];
+  
+  // 役職アサイン
+  const rCenters = [...map.roomCenters];
+  
+  // 逃走者スポーン (プレイヤー1 + AI2 or AI3)
+  const runnerInfo = CHARS.runner;
+  for(let i=0; i<3; i++) {
+    const isP = (gameState.faction === 'runner' && runnerInfo[i].id === gameState.charId);
+    const pos = rCenters[i % rCenters.length];
+    actors.push(new Actor(pos.x, pos.y, 'runner', runnerInfo[i], isP));
+  }
+  
+  // 追跡者スポーン (AI1 or プレイヤー1)
+  const chaserInfo = CHARS.chaser;
+  const cType = chaserInfo.find(c => c.id === gameState.charId) || chaserInfo[0]; // プレイヤーが追跡者ならそのキャラ、違えばデフォルトHunter
+  const isC = (gameState.faction === 'chaser');
+  const cPos = rCenters[rCenters.length-1]; // 一番遠い部屋
+  actors.push(new Actor(cPos.x, cPos.y, 'chaser', cType, isC));
+
+  myPlayer = actors.find(a => a.isPlayer);
+
+  // パズル配置 (部屋の数-2個)
+  const pCount = Math.max(1, map.rooms - 2);
+  for(let i=0; i<pCount; i++) {
+    puzzles.push({ x: rCenters[i].x, y: rCenters[i].y, progress: 0 });
+  }
+
+  gameState.running = true;
+  gameState.timeLeft = 5 * 60 * 1000;
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+});
+
+function loop(now) {
+  if (!gameState.running) return;
+  const dt = Math.min(now - lastTime, 32) / 16.6; // 60fps基準
+  lastTime = now;
+
+  // --- 更新 ---
+  gameState.timeLeft -= dt * 16.6;
+  actors.forEach(a => a.update(dt));
+
+  // --- カメラ追従 ---
+  const tScreen = toScreen(myPlayer.x, myPlayer.y);
+  // 現状の計算済みScreen座標から逆算して滑らかに追従 (簡易補間)
+  camera.x += (toScreen(myPlayer.x, myPlayer.y).x + camera.x - cw/2 - camera.x) * 0.1;
+  camera.y += (toScreen(myPlayer.x, myPlayer.y).y + camera.y - ch/2 - camera.y) * 0.1;
+
+  // --- 描画 ---
+  ctx.fillStyle = '#06060a';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // マップ描画 (タイル表示範囲のカリング)
+  for (let y = 0; y < map.cells; y++) {
+    for (let x = 0; x < map.cells; x++) {
+      if (map.grid[y][x] === 0) {
+        const s = toScreen(x, y);
+        if(s.x < -100 || s.x > cw+100 || s.y < -100 || s.y > ch+100) continue;
+        
+        ctx.fillStyle = ((x+y)%2===0) ? '#1c1e22' : '#181a1d';
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y - TILE_SIZE/2);
+        ctx.lineTo(s.x + TILE_SIZE, s.y);
+        ctx.lineTo(s.x, s.y + TILE_SIZE/2);
+        ctx.lineTo(s.x - TILE_SIZE, s.y);
+        ctx.fill();
+      }
+    }
+  }
+
+  // パズル描画
+  puzzles.forEach(p => {
+    const s = toScreen(p.x, p.y);
+    ctx.fillStyle = p.progress >= 100 ? '#2ecc71' : '#e67e22';
+    ctx.fillRect(s.x - 10, s.y - 15, 20, 20);
+    // プログレスバー
+    if (p.progress < 100) {
+      ctx.fillStyle = '#000'; ctx.fillRect(s.x - 15, s.y - 25, 30, 6);
+      ctx.fillStyle = '#f1c40f'; ctx.fillRect(s.x - 14, s.y - 24, 28 * (p.progress/100), 4);
+    }
+  });
+
+  // キャラクター描画 (Y座標順でソートして奥から描画)
+  [...actors].sort((a,b) => a.y - b.y).forEach(a => a.draw());
+
+  // --- 視界 (暗闇) オーバーレイ ---
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(0, 0, 0, ${gameState.darknessAlpha})`;
+  ctx.fillRect(0, 0, cw, ch);
+
+  ctx.globalCompositeOperation = 'destination-out';
+  const myS = toScreen(myPlayer.x, myPlayer.y);
+  
+  // 自分の周囲
+  const gradient = ctx.createRadialGradient(myS.x, myS.y, 20, myS.x, myS.y, 160);
+  gradient.addColorStop(0, 'rgba(0,0,0,1)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath(); ctx.arc(myS.x, myS.y, 160, 0, Math.PI*2); ctx.fill();
+
+  // 懐中電灯 (逃走者のみ)
+  if (myPlayer.faction === 'runner' && myPlayer.flashLight) {
+    const angle = myPlayer.facing;
+    const coneGrad = ctx.createRadialGradient(myS.x, myS.y, 0, myS.x, myS.y, 350);
+    coneGrad.addColorStop(0, 'rgba(0,0,0,0.8)');
+    coneGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = coneGrad;
+    ctx.beginPath();
+    ctx.moveTo(myS.x, myS.y);
+    ctx.arc(myS.x, myS.y, 350, angle - 0.4, angle + 0.4);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // --- UI更新 ---
+  const puzzlesLeft = puzzles.filter(p => p.progress < 100).length;
+  const aliveCount = actors.filter(a => a.faction === 'runner' && a.state === 'alive').length;
+  
+  const m = Math.max(0, Math.floor(gameState.timeLeft / 60000));
+  const s = Math.max(0, Math.floor((gameState.timeLeft % 60000) / 1000));
+  document.getElementById('timeUI').textContent = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+  document.getElementById('puzzleUI').textContent = puzzlesLeft;
+  document.getElementById('aliveUI').textContent = aliveCount;
+
+  // --- 勝敗判定 ---
+  let result = null;
+  if (puzzlesLeft === 0) result = "逃走者の勝利！ (パズル全解除)";
+  else if (aliveCount === 0) result = "追跡者の勝利！ (逃走者全滅)";
+  else if (gameState.timeLeft <= 0) result = "追跡者の勝利！ (タイムアップ)";
+
+  if (result) {
+    gameState.running = false;
+    document.getElementById('resultTitle').innerText = result;
+    document.getElementById('resultScreen').style.display = 'flex';
+    document.getElementById('hud').style.display = 'none';
+  } else {
+    requestAnimationFrame(loop);
+  }
+}
+</script>
+</body>
+</html>
