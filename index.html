@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Mansion Prototype v3</title>
+<style>
+body{margin:0;overflow:hidden;background:#000;}
+canvas{display:block;}
+#ui{
+ position:absolute;
+ top:10px;
+ left:10px;
+ color:white;
+ font-family:sans-serif;
+}
+button{margin-right:5px;}
+</style>
+</head>
+<body>
+
+<div id="ui">
+<button onclick="toggleAI()">鬼AI停止</button>
+<button onclick="resetGame()">リセット</button>
+<span id="status">パズル未解除</span>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+function resize(){
+ canvas.width=window.innerWidth;
+ canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+const worldSize=20;
+const tile=64;
+
+let camera={x:0,y:0};
+
+let player={x:3,y:3,speed:0.1};
+let enemy={x:15,y:15,speed:0.07};
+let aiActive=true;
+
+let obstacles=[];
+function generateObstacles(){
+ obstacles=[];
+ for(let i=0;i<20;i++){
+   obstacles.push({
+     x:Math.floor(Math.random()*worldSize),
+     y:Math.floor(Math.random()*worldSize)
+   });
+ }
+}
+generateObstacles();
+
+let puzzle={x:10,y:10,active:false,solved:false};
+
+let triangles=[
+ {angle:Math.random()*360},
+ {angle:Math.random()*360},
+ {angle:Math.random()*360}
+];
+const correctAngle=0;
+
+// ===== スティック（固定表示）=====
+const stick={
+ baseX:120,
+ baseY:canvas.height-120,
+ radius:60,
+ knob:30,
+ dx:0,
+ dy:0,
+ active:false
+};
+
+canvas.addEventListener("touchstart",e=>{
+ const t=e.touches[0];
+ const dist=Math.hypot(t.clientX-stick.baseX,t.clientY-stick.baseY);
+ if(dist<stick.radius){
+   stick.active=true;
+ }
+});
+
+canvas.addEventListener("touchmove",e=>{
+ if(!stick.active)return;
+ const t=e.touches[0];
+ let dx=t.clientX-stick.baseX;
+ let dy=t.clientY-stick.baseY;
+ const len=Math.hypot(dx,dy);
+ if(len>stick.radius){
+   dx=dx/len*stick.radius;
+   dy=dy/len*stick.radius;
+ }
+ stick.dx=dx;
+ stick.dy=dy;
+});
+
+canvas.addEventListener("touchend",()=>{
+ stick.active=false;
+ stick.dx=0;
+ stick.dy=0;
+});
+
+function toggleAI(){aiActive=!aiActive;}
+
+function resetGame(){
+ player.x=3;player.y=3;
+ enemy.x=15;enemy.y=15;
+ puzzle.solved=false;
+ document.getElementById("status").innerText="パズル未解除";
+}
+
+// ===== アイソ変換 =====
+function iso(x,y){
+ return{
+  x:(x-y)*tile/2 - camera.x + canvas.width/2,
+  y:(x+y)*tile/4 - camera.y + canvas.height/3
+ };
+}
+
+// ===== 当たり判定 =====
+function isBlocked(nx,ny){
+ if(nx<0||ny<0||nx>worldSize-1||ny>worldSize-1) return true;
+ for(let o of obstacles){
+   if(Math.floor(o.x)===Math.floor(nx)&&
+      Math.floor(o.y)===Math.floor(ny))
+      return true;
+ }
+ return false;
+}
+
+// ===== 更新 =====
+function update(){
+
+ camera.x=(player.x-player.y)*tile/2;
+ camera.y=(player.x+player.y)*tile/4;
+
+ // プレイヤー移動
+ if(stick.active){
+   const len=Math.hypot(stick.dx,stick.dy);
+   if(len>5){
+     let nx=player.x+(stick.dx/len)*player.speed;
+     let ny=player.y+(stick.dy/len)*player.speed;
+     if(!isBlocked(nx,ny)){
+       player.x=nx;
+       player.y=ny;
+     }
+   }
+ }
+
+ // 鬼
+ if(aiActive){
+   const dx=player.x-enemy.x;
+   const dy=player.y-enemy.y;
+   const dist=Math.hypot(dx,dy);
+   let nx=enemy.x+(dx/dist)*enemy.speed;
+   let ny=enemy.y+(dy/dist)*enemy.speed;
+   if(!isBlocked(nx,ny)){
+     enemy.x=nx;
+     enemy.y=ny;
+   }
+ }
+
+ // 捕獲
+ if(Math.hypot(player.x-enemy.x,player.y-enemy.y)<0.5){
+   document.getElementById("status").innerText="捕まった！";
+ }
+
+ // パズル接触
+ if(!puzzle.solved &&
+    Math.hypot(player.x-puzzle.x,player.y-puzzle.y)<0.8){
+      puzzle.active=true;
+ }
+}
+
+// ===== 三角形パズル =====
+canvas.addEventListener("click",()=>{
+ if(puzzle.active){
+   triangles.forEach(t=>t.angle+=90);
+   if(triangles.every(t=>Math.abs(t.angle%360-correctAngle)<1)){
+     puzzle.active=false;
+     puzzle.solved=true;
+     document.getElementById("status").innerText="パズル解除成功！";
+   }
+ }
+});
+
+function drawPuzzle(){
+ ctx.fillStyle="rgba(0,0,0,0.85)";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ triangles.forEach((t,i)=>{
+   ctx.save();
+   ctx.translate(canvas.width/2-120+120*i,canvas.height/2);
+   ctx.rotate(t.angle*Math.PI/180);
+   ctx.fillStyle="white";
+   ctx.beginPath();
+   ctx.moveTo(0,-30);
+   ctx.lineTo(-30,30);
+   ctx.lineTo(30,30);
+   ctx.closePath();
+   ctx.fill();
+   ctx.restore();
+ });
+}
+
+// ===== 描画 =====
+function draw(){
+
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ for(let x=0;x<worldSize;x++){
+   for(let y=0;y<worldSize;y++){
+     const p=iso(x,y);
+     ctx.fillStyle="#1c1c1c";
+     ctx.fillRect(p.x,p.y,tile/2,tile/4);
+   }
+ }
+
+ // 障害物
+ obstacles.forEach(o=>{
+   const p=iso(o.x,o.y);
+   ctx.fillStyle="#444";
+   ctx.fillRect(p.x,p.y-32,32,32);
+ });
+
+ // パズル台
+ if(!puzzle.solved){
+   const p=iso(puzzle.x,puzzle.y);
+   ctx.fillStyle="gold";
+   ctx.fillRect(p.x,p.y-20,20,20);
+ }
+
+ // プレイヤー（軽いデザイン）
+ let pp=iso(player.x,player.y);
+ ctx.fillStyle="cyan";
+ ctx.fillRect(pp.x-10,pp.y-30,20,30);
+ ctx.fillStyle="white";
+ ctx.fillRect(pp.x-4,pp.y-25,8,8);
+
+ // 鬼
+ let ep=iso(enemy.x,enemy.y);
+ ctx.fillStyle="darkred";
+ ctx.fillRect(ep.x-12,ep.y-34,24,34);
+ ctx.fillStyle="red";
+ ctx.fillRect(ep.x-5,ep.y-28,10,10);
+
+ // スティック常時表示
+ ctx.globalAlpha=0.3;
+ ctx.beginPath();
+ ctx.arc(stick.baseX,stick.baseY,stick.radius,0,Math.PI*2);
+ ctx.strokeStyle="white";
+ ctx.lineWidth=4;
+ ctx.stroke();
+
+ ctx.beginPath();
+ ctx.arc(stick.baseX+stick.dx,stick.baseY+stick.dy,stick.knob,0,Math.PI*2);
+ ctx.fillStyle="white";
+ ctx.fill();
+ ctx.globalAlpha=1;
+
+ if(puzzle.active){
+   drawPuzzle();
+ }
+}
+
+function loop(){
+ update();
+ draw();
+ requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
