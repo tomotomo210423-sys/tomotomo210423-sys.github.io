@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TETRIVADER</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    touch-action: none;
+    font-family: 'Courier New', Courier, monospace;
+    user-select: none;
+  }
+  #gameboy {
+    width: 100%;
+    max-width: 400px;
+    height: 100vh;
+    max-height: 850px;
+    background-color: #d8d8d8;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 5px 5px 20px rgba(0,0,0,0.8);
+    position: relative;
+    overflow: hidden;
+  }
+  #screen-container {
+    flex: 1;
+    background-color: #444;
+    margin: 20px 20px 10px 20px;
+    border-radius: 10px 10px 40px 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 15px;
+    position: relative;
+    border: 3px solid #777;
+    box-shadow: inset 2px 2px 10px rgba(0,0,0,0.5);
+  }
+  canvas {
+    background-color: #000;
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 1 / 2;
+    image-rendering: pixelated;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+  }
+  #ui-layer {
+    position: absolute;
+    top: 15px; left: 15px; right: 15px; bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    background: rgba(0,0,0,0.85);
+    z-index: 10;
+    text-align: center;
+  }
+  #ui-layer h1 { color: #0f0; margin: 0 0 10px 0; font-size: 28px; text-shadow: 2px 2px #000; }
+  #ui-layer p { font-size: 13px; line-height: 1.5; margin-bottom: 20px; }
+  .mode-btn {
+    margin: 8px;
+    padding: 12px 30px;
+    font-size: 18px;
+    font-weight: bold;
+    font-family: inherit;
+    border: 2px solid #fff;
+    background: #222;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  .mode-btn:active { background: #555; }
+
+#controls {
+height: 280px;
+position: relative;
+background: #d8d8d8;
+}
+#dpad {
+position: absolute;
+left: 30px;
+top: 50px;
+width: 120px;
+height: 120px;
+}
+.d-btn {
+position: absolute;
+background-color: #333;
+border-radius: 4px;
+box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5);
+}
+.d-btn:active { background-color: #111; }
+#btn-up { top: 0; left: 40px; width: 40px; height: 40px; border-radius: 5px 5px 0 0; }
+#btn-down { bottom: 0; left: 40px; width: 40px; height: 40px; border-radius: 0 0 5px 5px; }
+#btn-left { top: 40px; left: 0; width: 40px; height: 40px; border-radius: 5px 0 0 5px; }
+#btn-right { top: 40px; right: 0; width: 40px; height: 40px; border-radius: 0 5px 5px 0; }
+.d-center { top: 40px; left: 40px; width: 40px; height: 40px; background-color: #333; position: absolute; z-index: 0; }
+
+#action-buttons {
+position: absolute;
+right: 20px;
+top: 70px;
+width: 140px;
+height: 100px;
+transform: rotate(-15deg);
+}
+.a-btn {
+position: absolute;
+width: 55px;
+height: 55px;
+background-color: #b00;
+border-radius: 50%;
+color: #faa;
+font-weight: bold;
+font-size: 20px;
+text-align: center;
+line-height: 55px;
+box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4);
+}
+.a-btn:active { background-color: #800; transform: translateY(2px); box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 1px 1px 2px rgba(0,0,0,0.4); }
+#btn-b { left: 0; bottom: 0; }
+#btn-a { right: 0; top: 0; }
+.btn-label { position: absolute; font-size: 14px; color: #555; font-weight: bold; }
+#label-b { left: 20px; bottom: -25px; }
+#label-a { right: 20px; top: -25px; }
+</style>
+
+</head>
+<body>
+
+<div id="gameboy">
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="200" height="400"></canvas>
+    <div id="ui-layer">
+      <h1>TETRIVADER</h1>
+      <p>
+        ◀ ▶ : 自機の移動<br>
+        Aボタン : ショット<br>
+        Bボタン : ブロック落下加速<br><br>
+        迫るブロックを撃ち落とせ！<br>
+        撃ち漏らしたブロックは下に積もるが、<br>
+        横一列に揃えれば消去できるぞ！
+      </p>
+      <button class="mode-btn" onclick="startGame('normal')">NORMAL</button>
+      <button class="mode-btn" onclick="startGame('hard')">HARD</button>
+    </div>
+  </div>
+  <div id="controls">
+    <div id="dpad">
+      <div class="d-center"></div>
+      <div class="d-btn" id="btn-up"></div>
+      <div class="d-btn" id="btn-down"></div>
+      <div class="d-btn" id="btn-left"></div>
+      <div class="d-btn" id="btn-right"></div>
+    </div>
+    <div id="action-buttons">
+      <div class="a-btn" id="btn-b">B</div>
+      <div class="btn-label" id="label-b">B</div>
+      <div class="a-btn" id="btn-a">A</div>
+      <div class="btn-label" id="label-a">A</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Audio System (SFC風電子音) ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+let bgmInterval;
+let bgmStep = 0;
+const bgmNotes = [110.00, 110.00, 146.83, 164.81];
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playSound(type) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+
+  if (type === 'shoot') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.1);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+  } else if (type === 'hit') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(20, now + 0.15);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.15);
+    osc.start(now); osc.stop(now + 0.15);
+  } else if (type === 'line') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.setValueAtTime(880, now + 0.1);
+    osc.frequency.setValueAtTime(1760, now + 0.2);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.4);
+    osc.start(now); osc.stop(now + 0.4);
+  } else if (type === 'gameover') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.linearRampToValueAtTime(40, now + 1);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.linearRampToValueAtTime(0, now + 1);
+    osc.start(now); osc.stop(now + 1);
+  }
+}
+
+function startBGM() {
+  stopBGM();
+  bgmInterval = setInterval(() => {
+    if (!isPlaying || !audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(bgmNotes[bgmStep], audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    bgmStep = (bgmStep + 1) % bgmNotes.length;
+  }, 250);
+}
+
+function stopBGM() {
+  if (bgmInterval) clearInterval(bgmInterval);
+}
+
+// --- Game Logic ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const cols = 10, rows = 20, cellSize = 20;
+
+const MINOS = [
+  [[1,1,1,1]], // I
+  [[1,0,0],[1,1,1]], // J
+  [[0,0,1],[1,1,1]], // L
+  [[1,1],[1,1]], // O
+  [[0,1,1],[1,1,0]], // S
+  [[0,1,0],[1,1,1]], // T
+  [[1,1,0],[0,1,1]] // Z
+];
+const COLORS = ['#0ff', '#00f', '#f80', '#ff0', '#0f0', '#808', '#f00'];
+
+let board, player, bullets, currentMino, score, mode;
+let isPlaying = false;
+let dropCounter = 0;
+let lastTime = 0;
+let keys = { left: false, right: false, shoot: false, b: false };
+
+function startGame(selectedMode) {
+  initAudio();
+  mode = selectedMode;
+  board = Array(rows).fill().map(() => Array(cols).fill(0));
+  player = { px: 4.5, y: 19, cooldown: 0 };
+  bullets = [];
+  score = 0;
+  isPlaying = true;
+  dropCounter = 0;
+  document.getElementById('ui-layer').style.display = 'none';
+  spawnMino();
+  startBGM();
+  lastTime = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function gameOver() {
+  isPlaying = false;
+  stopBGM();
+  playSound('gameover');
+  const ui = document.getElementById('ui-layer');
+  ui.style.display = 'flex';
+  ui.innerHTML = `<h1 style="color:#f00;">GAME OVER</h1><p style="font-size:20px; font-weight:bold;">SCORE: ${score}</p>
+    <button class="mode-btn" onclick="startGame('normal')">RETRY NORMAL</button>
+    <button class="mode-btn" onclick="startGame('hard')">RETRY HARD</button>`;
+}
+
+function spawnMino() {
+  const type = Math.floor(Math.random() * MINOS.length);
+  const shape = MINOS[type].map(row => [...row]);
+  currentMino = {
+    shape: shape,
+    x: Math.floor(cols / 2) - Math.floor(shape[0].length / 2),
+    y: 0,
+    color: COLORS[type]
+  };
+  if (checkCollision(currentMino.x, currentMino.y, currentMino.shape)) {
+    gameOver();
+  }
+}
+
+function checkCollision(mx, my, shape) {
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (shape[r][c]) {
+        let nx = mx + c;
+        let ny = my + r;
+        if (nx < 0 || nx >= cols || ny >= rows) return true;
+        if (ny >= 0 && board[ny][nx]) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function lockMino() {
+  let shape = currentMino.shape;
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (shape[r][c]) {
+        let nx = currentMino.x + c;
+        let ny = currentMino.y + r;
+        if (ny >= 0) board[ny][nx] = currentMino.color;
+      }
+    }
+  }
+  clearLines();
+  spawnMino();
+}
+
+function clearLines() {
+  let linesCleared = 0;
+  for (let r = rows - 1; r >= 0; r--) {
+    let isFull = true;
+    for (let c = 0; c < cols; c++) {
+      if (!board[r][c]) { isFull = false; break; }
+    }
+    if (isFull) {
+      board.splice(r, 1);
+      board.unshift(Array(cols).fill(0));
+      linesCleared++;
+      r++;
+    }
+  }
+  if (linesCleared > 0) {
+    playSound('line');
+    score += linesCleared * 100;
+  }
+}
+
+function update(deltaTime) {
+  // Player movement
+  if (keys.left) player.px -= 0.15;
+  if (keys.right) player.px += 0.15;
+  player.px = Math.max(0, Math.min(cols - 1, player.px));
+
+  // Shooting
+  if (keys.shoot && player.cooldown <= 0) {
+    bullets.push({ x: player.px + 0.5, y: player.y });
+    player.cooldown = 12;
+    playSound('shoot');
+  }
+  if (player.cooldown > 0) player.cooldown--;
+
+  // Bullets vs Mino & Board
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].y -= 0.6;
+    let bx = bullets[i].x;
+    let by = bullets[i].y;
+    let gridX = Math.floor(bx);
+    let gridY = Math.floor(by);
+    let hit = false;
+
+    // Check fixed board
+    if (gridY >= 0 && gridY < rows && gridX >= 0 && gridX < cols && board[gridY][gridX]) {
+      board[gridY][gridX] = 0;
+      hit = true;
+      score += 5;
+      playSound('hit');
+    }
+
+    // Check current falling mino
+    if (!hit && currentMino) {
+      let mx = currentMino.x, my = currentMino.y;
+      let localX = gridX - mx, localY = gridY - my;
+      if (localY >= 0 && localY < currentMino.shape.length && localX >= 0 && localX < currentMino.shape[0].length) {
+        if (currentMino.shape[localY][localX]) {
+          currentMino.shape[localY][localX] = 0;
+          hit = true;
+          score += 10;
+          playSound('hit');
+          
+          // Check if mino is fully destroyed
+          let isEmpty = true;
+          for (let r = 0; r < currentMino.shape.length; r++) {
+            for (let c = 0; c < currentMino.shape[r].length; c++) {
+              if (currentMino.shape[r][c]) isEmpty = false;
+            }
+          }
+          if (isEmpty) { score += 50; spawnMino(); }
+        }
+      }
+    }
+
+    if (hit || by < 0) bullets.splice(i, 1);
+  }
+
+  // Mino Falling
+  let baseSpeed = mode === 'hard' ? 250 : 500;
+  let currentSpeed = Math.max(80, baseSpeed - Math.floor(score / 500) * 40);
+  let dropInterval = keys.b ? 50 : currentSpeed;
+
+  dropCounter += deltaTime;
+  if (dropCounter > dropInterval) {
+    if (currentMino) {
+      currentMino.y++;
+      if (checkCollision(currentMino.x, currentMino.y, currentMino.shape)) {
+        currentMino.y--;
+        lockMino();
+      }
+    }
+    dropCounter = 0;
+  }
+
+  // Check Game Over (Player crushed by board)
+  let pLeft = Math.floor(player.px + 0.1);
+  let pRight = Math.floor(player.px + 0.9);
+  if (board[19][pLeft] || board[19][pRight]) {
+    gameOver();
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw Board
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (board[r][c]) drawBlock(c, r, board[r][c]);
+    }
+  }
+
+  // Draw Current Mino
+  if (currentMino) {
+    let shape = currentMino.shape;
+    for (let r = 0; r < shape.length; r++) {
+      for (let c = 0; c < shape[r].length; c++) {
+        if (shape[r][c]) drawBlock(currentMino.x + c, currentMino.y + r, currentMino.color);
+      }
+    }
+  }
+
+  // Draw Bullets
+  ctx.fillStyle = '#ff0';
+  for (let b of bullets) {
+    ctx.fillRect(b.x * cellSize - 2, b.y * cellSize - 8, 4, 12);
+  }
+
+  // Draw Player
+  let px = player.px * cellSize;
+  let py = player.y * cellSize;
+  ctx.fillStyle = '#aaa';
+  ctx.fillRect(px, py + 10, cellSize, 10);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(px + 6, py, 8, 10);
+
+  // Draw Score
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px monospace';
+  ctx.fillText('SCORE:' + score, 5, 15);
+}
+
+function drawBlock(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillRect(x * cellSize, y * cellSize, cellSize, 4);
+  ctx.fillRect(x * cellSize, y * cellSize, 4, cellSize);
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x * cellSize, (y + 1) * cellSize - 4, cellSize, 4);
+  ctx.fillRect((x + 1) * cellSize - 4, y * cellSize, 4, cellSize);
+}
+
+function gameLoop(time) {
+  if (!isPlaying) return;
+  let deltaTime = time - lastTime;
+  lastTime = time;
+  update(deltaTime);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// --- Input Handling ---
+function setupButton(id, keyProp) {
+  const el = document.getElementById(id);
+  const press = (e) => { e.preventDefault(); keys[keyProp] = true; initAudio(); };
+  const release = (e) => { e.preventDefault(); keys[keyProp] = false; };
+  el.addEventListener('touchstart', press, {passive: false});
+  el.addEventListener('touchend', release, {passive: false});
+  el.addEventListener('mousedown', press);
+  el.addEventListener('mouseup', release);
+  el.addEventListener('mouseleave', release);
+}
+
+setupButton('btn-left', 'left');
+setupButton('btn-right', 'right');
+setupButton('btn-a', 'shoot');
+setupButton('btn-b', 'b');
+
+// PC向けキーボード操作
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); }
+  if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
+  if (e.key === 'z' || e.key === ' ') { keys.shoot = true; initAudio(); }
+  if (e.key === 'x' || e.key === 'ArrowDown') { keys.b = true; initAudio(); }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft') keys.left = false;
+  if (e.key === 'ArrowRight') keys.right = false;
+  if (e.key === 'z' || e.key === ' ') keys.shoot = false;
+  if (e.key === 'x' || e.key === 'ArrowDown') keys.b = false;
+});
+</script>
+
+</body>
+</html>
