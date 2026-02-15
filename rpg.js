@@ -32,8 +32,11 @@ const RPG = {
   },
   saveGame() {
     let sObj = { p: JSON.parse(JSON.stringify(this.p)), dungeons: JSON.parse(JSON.stringify(this.dungeons)), chests: JSON.parse(JSON.stringify(this.chests)), customBosses: JSON.parse(JSON.stringify(this.customBosses)) };
-    if (this.st === 'dungeon') { sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY; sObj.p.areaX = this.p.worldAx; sObj.p.areaY = this.p.worldAy; }
-    else if (this.st === 'townMap') { sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY; }
+    // バグ修正：町や闘技場でセーブしても正しくワールドの座標が保存されるように改善
+    if (this.st !== 'map' && this.p.worldX !== undefined) {
+      sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY;
+      if (this.st === 'dungeon') { sObj.p.areaX = this.p.worldAx; sObj.p.areaY = this.p.worldAy; }
+    }
     localStorage.setItem(`4in1_rpg_slot${this.saveSlot}`, JSON.stringify(sObj));
   },
   genMap() {
@@ -53,6 +56,7 @@ const RPG = {
     if (ax === 0 && ay === 0) { this.map[3][3] = 8; this.map[3][2] = 8; this.map[2][3] = 8; this.map[2][2] = 8; }
   },
   genTownMap() {
+    this.worldMap = this.map.map(r => [...r]); // ★バグ修正：町に入る前に世界地図を記憶する！
     this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { if (r === 0 || r === 14 || c === 0 || c === 9) this.map[r][c] = 1; else this.map[r][c] = 15; } }
     this.map[14][4] = 15; this.map[14][5] = 15; this.map[3][4] = 16; this.map[3][5] = 16; this.map[8][2] = 17; this.map[8][7] = 18; this.map[11][5] = 19;
@@ -80,9 +84,7 @@ const RPG = {
   exitDungeon() { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); },
   calcStats() { return { atk: this.p.atk + this.p.customWep.atk, def: this.p.def + this.p.customArm.def, spd: this.p.spd }; },
   
-  startArenaBattle(slot) {
-    this.isArena = true; this.battle('custom', slot); activeApp = this;
-  },
+  startArenaBattle(slot) { this.isArena = true; this.battle('custom', slot); activeApp = this; },
 
   update() {
     this.anim++; if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
@@ -330,7 +332,7 @@ const RPG = {
       ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText(this.st==='menu'?'A:決定 SELECT:戻る':'A:決定 B:戻る', 50, 245); resetShake(); return;
     }
 
-    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap' || this.st === 'town') {
+    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') {
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 10; c++) {
           let v = this.map[r][c];
