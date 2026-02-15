@@ -1,4 +1,4 @@
-// === CUSTOM ARENA SYSTEM (FULL FEATURES UPDATE) ===
+// === CUSTOM ARENA SYSTEM (FULL FEATURES UPDATE & BUG FIX) ===
 const Arena = {
   st: 'arenaMenu', mIdx: 0, selectedSlot: 0, editBoss: null, nameStr: '', nameCursor: 0, menuCursor: 0,
   numTarget: '', numStr: '', numCursor: 0, numKeys: ['1','2','3','4','5','6','7','8','9','DEL','0','OK'],
@@ -13,6 +13,7 @@ const Arena = {
         origBattle.call(this, bossType, monsterType);
         if (bossType === 'custom') {
           const b = RPG.customBosses[monsterType];
+          // 古いボスのデータでもエラーが起きないようにフォールバック（初期値）を設定
           this.en.spr = b.sprData || sprs.boss;
           this.en.c = Arena.colors[b.colorId || 7] || '#0ff';
           this.en.spells = b.spells || [];
@@ -37,7 +38,14 @@ const Arena = {
       if (keysDown.a) {
         if (RPG.customBosses[this.selectedSlot]) {
           if (this.mIdx === 0) { RPG.startArenaBattle(this.selectedSlot); } 
-          else if (this.mIdx === 1) { this.editBoss = JSON.parse(JSON.stringify(RPG.customBosses[this.selectedSlot])); this.st = 'bossEdit'; this.mIdx = 0; playSnd('jmp'); }
+          else if (this.mIdx === 1) { 
+            this.editBoss = JSON.parse(JSON.stringify(RPG.customBosses[this.selectedSlot])); 
+            // ★バグ修正：古いカスタムボスだった場合は、ここで新しいデータを追加してあげる
+            if (!this.editBoss.sprData) this.editBoss.sprData = sprs.boss;
+            if (this.editBoss.colorId === undefined) this.editBoss.colorId = 7;
+            if (!this.editBoss.spells) this.editBoss.spells = [];
+            this.st = 'bossEdit'; this.mIdx = 0; playSnd('jmp'); 
+          }
           else if (this.mIdx === 2) { RPG.customBosses[this.selectedSlot] = null; RPG.saveGame(); this.st = 'arenaMenu'; this.mIdx = this.selectedSlot; playSnd('hit'); }
           else if (this.mIdx === 3) { this.st = 'arenaMenu'; this.mIdx = this.selectedSlot; }
         } else {
@@ -189,6 +197,7 @@ const Arena = {
         if (i === this.nameCursor && this.menuCursor === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x-2, y-10, 14, 14); ctx.fillStyle = '#fff'; } else { ctx.fillStyle = '#aaa'; }
         ctx.fillText(chars[i], x, y);
       }
+      
       ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 240, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 240, 70, 22);
       ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 40, 256);
       
