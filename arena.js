@@ -16,7 +16,7 @@ const Arena = {
     this.st = 'arenaMenu';
     this.mIdx = 0;
     
-    // ★ファイルの独立性を保つため、ここでRPGの戦闘を裏側から拡張します
+    // RPGの戦闘システムに見た目変更機能を裏側から追加
     if (!this.hooked) {
       const origBattle = RPG.battle;
       RPG.battle = function(bossType, monsterType = 'slime') {
@@ -110,6 +110,8 @@ const Arena = {
         if (keysDown.a) { this.editBoss.name = this.nameStr; this.st = 'bossEdit'; playSnd('combo'); }
         if (keysDown.b) { this.st = 'bossEdit'; }
       }
+      // サブ操作（SELECTでも決定可能）
+      if (keys.select) { this.editBoss.name = this.nameStr; this.st = 'bossEdit'; playSnd('combo'); }
     }
   },
   
@@ -172,9 +174,9 @@ const Arena = {
         ctx.fillText(chars[i], x, y);
       }
       
-      // ボタンUI
+      // ボタンUIの描画
       ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 240, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 240, 70, 22);
-      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 30, 256);
+      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 40, 256);
       
       const okEn = this.nameStr.length > 0;
       ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 240, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 240, 70, 22);
