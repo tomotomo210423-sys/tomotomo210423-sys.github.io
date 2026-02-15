@@ -1,4 +1,4 @@
-// === MICRO QUEST - BESTIARY & LIGHTWEIGHT UPDATE ===
+// === MICRO QUEST - BUG FIX & STABLE UPDATE ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
@@ -132,7 +132,10 @@ const RPG = {
       }
     }
 
-    if (this.st === 'battle' || this.st === 'magic' || this.st === 'battleProcessing') {
+    // ★バグ修正: battleProcessing中（演出中）はすべてのキー操作を完全にブロックする
+    if (this.st === 'battleProcessing') return; 
+
+    if (this.st === 'battle' || this.st === 'magic') {
       if (this.st === 'magic') {
         if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); } if (keysDown.down) { this.mIdx = Math.min(this.p.knownSpells.length, this.mIdx + 1); playSnd('sel'); }
         if (keysDown.a) { if (this.mIdx < this.p.knownSpells.length) { this.executeTurn('magic', this.mIdx); } else { this.st = 'battle'; this.mIdx = 0; } }
@@ -209,8 +212,9 @@ const RPG = {
   },
   winBattle() {
     addParticle(100, 120, '#ff0', 'explosion');
-    // 図鑑に登録
+    if (!this.p.bestiary) this.p.bestiary = [];
     if (this.en.monsterType !== 'boss' && this.en.monsterType !== 'custom' && !this.p.bestiary.includes(this.en.monsterType)) { this.p.bestiary.push(this.en.monsterType); }
+    
     if (this.en.n === '魔王') { this.p.story = 4; this.msgBox("魔王を倒した！\n世界に平和が戻った！"); this.map[13][8] = 0; BGM.play('rpg_field'); }
     else if (this.en.monsterType === 'custom') { this.p.exp += this.en.exp; this.p.gld += this.en.gld; this.isArena = false; BGM.play('rpg_town'); this.msgBox(`見事な戦いぶりだ！\n${this.en.gld}Gと経験値を得た！`, 'customMenu'); }
     else if (this.en.monsterType === 'boss') {
@@ -220,9 +224,12 @@ const RPG = {
       if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`魔物を退治した！\nLvUP! ${this.en.gld}G獲得`); } else this.msgBox(`魔物を退治した！\n${this.en.gld}G獲得`);
     } else {
       this.p.exp += this.en.exp; this.p.gld += this.en.gld;
-      if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`勝利！ LvUP！\n${this.en.gld}G獲得`); } else { this.st = this.dungeon ? 'dungeon' : 'map'; BGM.play(this.dungeon?'rpg_dungeon':'rpg_field'); }
+      // ★バグ修正: レベルアップしなくても必ずメッセージを挟むように変更
+      if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`勝利！ LvUP！\n${this.en.gld}G獲得`); } 
+      else { BGM.play(this.dungeon ? 'rpg_dungeon' : 'rpg_field'); this.msgBox(`勝利！\n${this.en.gld}G獲得`); }
     }
   },
+  levelUp() { this.p.lv++; this.p.mhp += 15; this.p.mmp += 8; this.p.atk += 3; this.p.def += 2; this.p.spd += 2; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; this.p.exp = 0; playSnd('combo'); },
   
   draw() {
     applyShake(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
@@ -261,10 +268,7 @@ const RPG = {
           for (let i = st; i < en; i++) {
             let mData = this.monsterTypes[this.p.bestiary[i]]; if(!mData) continue;
             ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`${this.mIdx === i ? '>' : ' '} ${mData.name}`, 20, y);
-            if (this.mIdx === i) {
-              drawSprite(120, 100, mData.c, mData.spr, 4);
-              ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText(`HP: ${mData.hp}`, 120, 150); ctx.fillText(`ATK:${mData.atk}`, 120, 165); ctx.fillText(`DEF:${mData.def}`, 120, 180); ctx.fillText(`SPD:${mData.spd}`, 120, 195);
-            } y += 22;
+            if (this.mIdx === i) { drawSprite(120, 100, mData.c, mData.spr, 4); ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText(`HP: ${mData.hp}`, 120, 150); ctx.fillText(`ATK:${mData.atk}`, 120, 165); ctx.fillText(`DEF:${mData.def}`, 120, 180); ctx.fillText(`SPD:${mData.spd}`, 120, 195); } y += 22;
           }
         }
       } else if (this.st === 'equipMenu') {
@@ -334,7 +338,7 @@ const RPG = {
       
       if (this.st === 'battle' || this.st === 'battleProcessing') {
         const s = this.calcStats(); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`HP:${this.p.hp}/${this.p.mhp} MP:${this.p.mp}/${this.p.mmp}`, 15, 205);
-        if (this.mIdx >= 0) {
+        if (this.st !== 'battleProcessing' && this.mIdx >= 0) {
           ctx.fillStyle = this.mIdx === 0 ? '#0f0' : '#888'; ctx.fillRect(15, 225, 80, 25); ctx.fillStyle = this.mIdx === 0 ? '#000' : '#444'; ctx.font = 'bold 11px monospace'; ctx.fillText('たたかう', 23, 242);
           ctx.fillStyle = this.mIdx === 1 ? '#0f0' : '#888'; ctx.fillRect(105, 225, 80, 25); ctx.fillStyle = this.mIdx === 1 ? '#000' : '#444'; ctx.fillText('まほう', 125, 242);
           ctx.fillStyle = this.mIdx === 2 ? '#0f0' : '#888'; ctx.fillRect(15, 255, 80, 25); ctx.fillStyle = this.mIdx === 2 ? '#000' : '#444'; ctx.fillText('にげる', 30, 272);
