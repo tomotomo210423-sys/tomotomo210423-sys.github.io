@@ -1,89 +1,61 @@
-// === MICRO QUEST - LIGHTWEIGHT UPDATE ===
+// === MICRO QUEST - BESTIARY & LIGHTWEIGHT UPDATE ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
-  spells: [
-    {name: 'ファイア', mp: 5, dmg: 15, desc: '火の攻撃', type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, desc: '雷の攻撃', type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, desc: '氷の攻撃', type: 'atk'},
-    {name: 'ヒール', mp: 10, dmg: -30, desc: 'HPを回復', type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, desc: '毎ターンダメージ', type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, desc: '攻撃＆回復', type: 'drain'}
-  ],
-  monsterTypes: {
-    slime: {name: 'スライム', spr: sprs.slime, c: '#0a0', hp: 15, atk: 3, def: 1, spd: 3, exp: 15, gld: 8, spells: []},
-    bat: {name: '大コウモリ', spr: sprs.enemyNew, c: '#80f', hp: 20, atk: 5, def: 1, spd: 8, exp: 20, gld: 12, spells: [5]},
-    skeleton: {name: 'スケルトン', spr: sprs.skull, c: '#aaa', hp: 35, atk: 7, def: 3, spd: 6, exp: 30, gld: 20, spells: []},
-    mage: {name: 'ダークメイジ', spr: sprs.mage, c: '#60c', hp: 25, atk: 10, def: 2, spd: 5, exp: 35, gld: 25, spells: [0, 1, 4]},
-    golem: {name: 'ゴーレム', spr: sprs.boss, c: '#884', hp: 80, atk: 15, def: 10, spd: 2, exp: 100, gld: 80, spells: []},
-    dragon: {name: 'ドラゴン', spr: sprs.dragon, c: '#f00', hp: 120, atk: 25, def: 8, spd: 15, exp: 200, gld: 150, spells: [0, 1]}
-  },
+  spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
+  monsterTypes: { slime: {name: 'スライム', spr: sprs.slime, c: '#0a0', hp: 15, atk: 3, def: 1, spd: 3, exp: 15, gld: 8, spells: []}, bat: {name: 'コウモリ', spr: sprs.enemyNew, c: '#80f', hp: 20, atk: 5, def: 1, spd: 8, exp: 20, gld: 12, spells: [5]}, skeleton: {name: '骨戦士', spr: sprs.skull, c: '#aaa', hp: 35, atk: 7, def: 3, spd: 6, exp: 30, gld: 20, spells: []}, mage: {name: '魔道士', spr: sprs.mage, c: '#60c', hp: 25, atk: 10, def: 2, spd: 5, exp: 35, gld: 25, spells: [0, 1, 4]}, golem: {name: 'ゴーレム', spr: sprs.boss, c: '#884', hp: 80, atk: 15, def: 10, spd: 2, exp: 100, gld: 80, spells: []}, dragon: {name: 'ドラゴン', spr: sprs.dragon, c: '#f00', hp: 120, atk: 25, def: 8, spd: 15, exp: 200, gld: 150, spells: [0, 1]} },
   encounterTable: { '1,1': ['slime'], '2,1': ['slime', 'bat'], '1,0': ['bat', 'skeleton', 'mage'], '0,1': ['skeleton', 'mage', 'golem'], '0,0': ['mage', 'golem', 'dragon'], '2,2': ['skeleton', 'dragon'] },
 
   init() { this.st = 'title'; this.mIdx = 0; this.anim = 0; BGM.play('rpg_field'); },
   loadSave(slot) {
     const sd = JSON.parse(localStorage.getItem(`4in1_rpg_slot${slot}`));
     if (sd) {
-      this.p = JSON.parse(JSON.stringify(sd.p)); this.dungeons = JSON.parse(JSON.stringify(sd.dungeons)); this.chests = JSON.parse(JSON.stringify(sd.chests));
-      this.customBosses = sd.customBosses ? JSON.parse(JSON.stringify(sd.customBosses)) : Array(10).fill(null);
-      if (this.p.spd === undefined) this.p.spd = 5 + (this.p.lv * 2);
-      if (!this.p.knownSpells) this.p.knownSpells = []; if (!this.p.customWep) this.p.customWep = {atk: 0, lv: 0}; if (!this.p.customArm) this.p.customArm = {def: 0, lv: 0};
+      this.p = sd.p; this.dungeons = sd.dungeons; this.chests = sd.chests; this.customBosses = sd.customBosses || Array(10).fill(null);
+      if(!this.p.bestiary) this.p.bestiary = []; if(!this.p.knownSpells) this.p.knownSpells = []; if(!this.p.customWep) this.p.customWep = {atk: 0, lv: 0}; if(!this.p.customArm) this.p.customArm = {def: 0, lv: 0};
     } else {
-      this.p = { x: 4, y: 8, areaX: 1, areaY: 1, story: 0, hp: 30, mhp: 30, mp: 15, mmp: 15, atk: 5, def: 3, spd: 5, gld: 0, lv: 1, exp: 0, knownSpells: [], customWep: {atk: 0, lv: 0}, customArm: {def: 0, lv: 0} };
-      this.dungeons = [{cleared: false, boss: 'golem'}, {cleared: false, boss: 'dragon'}, {cleared: false, boss: 'dragon'}]; this.chests = [{ax: 2, ay: 1, x: 2, y: 2, opened: false}, {ax: 0, ay: 1, x: 8, y: 12, opened: false}];
-      this.customBosses = Array(10).fill(null);
+      this.p = { x: 4, y: 8, areaX: 1, areaY: 1, story: 0, hp: 30, mhp: 30, mp: 15, mmp: 15, atk: 5, def: 3, spd: 5, gld: 0, lv: 1, exp: 0, knownSpells: [], customWep: {atk: 0, lv: 0}, customArm: {def: 0, lv: 0}, bestiary: [] };
+      this.dungeons = [{cleared: false, boss: 'golem'}, {cleared: false, boss: 'dragon'}, {cleared: false, boss: 'dragon'}]; this.chests = [{ax: 2, ay: 1, x: 2, y: 2, opened: false}, {ax: 0, ay: 1, x: 8, y: 12, opened: false}]; this.customBosses = Array(10).fill(null);
     }
     this.saveSlot = slot; this.st = 'map'; this.genMap(); BGM.play('rpg_field');
   },
   saveGame() {
-    let sObj = { p: JSON.parse(JSON.stringify(this.p)), dungeons: JSON.parse(JSON.stringify(this.dungeons)), chests: JSON.parse(JSON.stringify(this.chests)), customBosses: JSON.parse(JSON.stringify(this.customBosses)) };
-    // バグ修正：町や闘技場でセーブしても正しくワールドの座標が保存されるように改善
-    if (this.st !== 'map' && this.p.worldX !== undefined) {
-      sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY;
-      if (this.st === 'dungeon') { sObj.p.areaX = this.p.worldAx; sObj.p.areaY = this.p.worldAy; }
-    }
+    let sObj = { p: this.p, dungeons: this.dungeons, chests: this.chests, customBosses: this.customBosses };
+    if (this.st !== 'map' && this.p.worldX !== undefined) { sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY; if (this.st === 'dungeon') { sObj.p.areaX = this.p.worldAx; sObj.p.areaY = this.p.worldAy; } }
     localStorage.setItem(`4in1_rpg_slot${this.saveSlot}`, JSON.stringify(sObj));
   },
   genMap() {
     this.map = Array(15).fill().map(() => Array(10).fill(0));
     let ax = this.p.areaX, ay = this.p.areaY, seed = ax * 10 + ay + 100; let rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-    for (let r = 0; r < 15; r++) {
-      for (let c = 0; c < 10; c++) {
+    for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) {
         let v = rand(); if (v < 0.15) this.map[r][c] = 1; else if (v < 0.25) this.map[r][c] = 2;
-        if ((ax === 0 && c === 0) || (ax === 2 && c === 9) || (ay === 0 && r === 0) || (ay === 2 && r === 14)) this.map[r][c] = 3;
-        if (ay === 2 && this.map[r][c] === 0) this.map[r][c] = 9;
-      }
-    }
-    if (ax === 1 && ay === 1) { this.map[7][4] = 4; this.map[7][5] = 4; }
-    if (ax === 2 && ay === 1) { this.map[5][5] = 5; }
-    if (ax === 1 && ay === 0) { this.map[3][4] = 6; }
-    if (ax === 0 && ay === 1) { this.map[8][2] = 7; }
-    if (ax === 0 && ay === 0) { this.map[3][3] = 8; this.map[3][2] = 8; this.map[2][3] = 8; this.map[2][2] = 8; }
+        if ((ax===0 && c===0)||(ax===2 && c===9)||(ay===0 && r===0)||(ay===2 && r===14)) this.map[r][c] = 3;
+        if (ay===2 && this.map[r][c]===0) this.map[r][c] = 9;
+    } }
+    if (ax===1 && ay===1) { this.map[7][4] = 4; this.map[7][5] = 4; } if (ax===2 && ay===1) { this.map[5][5] = 5; } if (ax===1 && ay===0) { this.map[3][4] = 6; }
+    if (ax===0 && ay===1) { this.map[8][2] = 7; } if (ax===0 && ay===0) { this.map[3][3]=8; this.map[3][2]=8; this.map[2][3]=8; this.map[2][2]=8; }
   },
   genTownMap() {
-    this.worldMap = this.map.map(r => [...r]); // ★バグ修正：町に入る前に世界地図を記憶する！
-    this.map = Array(15).fill().map(() => Array(10).fill(0));
-    for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { if (r === 0 || r === 14 || c === 0 || c === 9) this.map[r][c] = 1; else this.map[r][c] = 15; } }
-    this.map[14][4] = 15; this.map[14][5] = 15; this.map[3][4] = 16; this.map[3][5] = 16; this.map[8][2] = 17; this.map[8][7] = 18; this.map[11][5] = 19;
+    this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
+    for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
+    this.map[14][4]=15; this.map[14][5]=15; this.map[3][4]=16; this.map[3][5]=16; this.map[8][2]=17; this.map[8][7]=18; this.map[11][5]=19;
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.x = 4; this.p.y = 13;
   },
   genDungeonMap(type) {
-    for (let r = 0; r < 15; r++) {
-      for (let c = 0; c < 10; c++) {
-        if (type === 'cave') this.map[r][c] = (r === 0 || r === 14 || c === 0 || c === 9 || Math.random() < 0.25) ? 10 : 11;
-        else if (type === 'tower') this.map[r][c] = (r === 0 || r === 14 || c === 0 || c === 9 || (r % 3 === 0 && Math.random() < 0.4)) ? 12 : 11;
-        else this.map[r][c] = (r === 0 || r === 14 || c === 0 || c === 9 || Math.random() < 0.2) ? 13 : 11;
-      }
-    }
-    this.map[13][5] = 14; this.p.x = 5; this.p.y = 13;
-    let gx = Math.floor(Math.random()*8)+1; let gy = Math.floor(Math.random()*8)+1; this.map[gy][gx] = 20;
+    for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) {
+        if (type==='cave') this.map[r][c] = (r===0||r===14||c===0||c===9||Math.random()<0.25)?10:11;
+        else if (type==='tower') this.map[r][c] = (r===0||r===14||c===0||c===9||(r%3===0&&Math.random()<0.4))?12:11;
+        else this.map[r][c] = (r===0||r===14||c===0||c===9||Math.random()<0.2)?13:11;
+    } }
+    this.map[13][5] = 14; this.p.x = 5; this.p.y = 13; this.map[Math.floor(Math.random()*8)+1][Math.floor(Math.random()*8)+1] = 20;
   },
   msgBox(t, nextSt = null) { this.msg = t; this.msgNextSt = nextSt; this.st = 'msg'; playSnd('sel'); },
-  setBattleText(text) { this.battleText = text; this.battleWaitTimer = 60; },
   enterDungeon(idx, type) {
     if (this.dungeons[idx] && this.dungeons[idx].cleared) { this.msgBox("魔物は討伐済みだ。"); return; }
     this.st = 'dungeon'; this.dungeon = {idx: idx, floor: 1, maxFloor: 3, type: type};
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.worldAx = this.p.areaX; this.p.worldAy = this.p.areaY; this.worldMap = this.map.map(r => [...r]);
-    this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox(`${['洞窟', '塔', '遺跡'][idx]}に入った！\nF1`);
+    this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox(`ダンジョンに入った！\nF1`);
   },
   exitDungeon() { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); },
   calcStats() { return { atk: this.p.atk + this.p.customWep.atk, def: this.p.def + this.p.customArm.def, spd: this.p.spd }; },
-  
   startArenaBattle(slot) { this.isArena = true; this.battle('custom', slot); activeApp = this; },
 
   update() {
@@ -94,85 +66,67 @@ const RPG = {
       if (this.st === 'menu') { this.st = this.dungeon ? 'dungeon' : this.map[0][0]===1? 'townMap' : 'map'; return; }
     }
     
-    if (this.st === 'title' || this.st === 'saveSelect' || this.st === 'menu' || this.st === 'equipMenu' || this.st === 'spellMenu' || this.st === 'customMenu') {
+    if (this.st==='title'||this.st==='saveSelect'||this.st==='menu'||this.st==='equipMenu'||this.st==='spellMenu'||this.st==='customMenu'||this.st==='bestiary') {
       if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); }
-      if (keysDown.down) { this.mIdx = Math.min(this.st==='customMenu'?3:3, this.mIdx + 1); playSnd('sel'); }
+      if (keysDown.down) { 
+        let max = this.st==='menu'?4 : this.st==='bestiary'?Math.max(0,this.p.bestiary.length-1) : 3;
+        this.mIdx = Math.min(max, this.mIdx + 1); playSnd('sel'); 
+      }
       if (keysDown.a) {
         if (this.st === 'title') { if (this.mIdx === 0) { this.st = 'saveSelect'; this.mIdx = 0; } else { activeApp = Menu; Menu.init(); } playSnd('jmp'); }
         else if (this.st === 'saveSelect') { if (this.mIdx < 3) { this.loadSave(this.mIdx + 1); playSnd('jmp'); } else { this.st = 'title'; this.mIdx = 0; } }
         else if (this.st === 'menu') {
           if (this.mIdx === 0) { this.st = 'equipMenu'; playSnd('jmp'); } else if (this.mIdx === 1) { this.st = 'spellMenu'; this.mIdx = 0; playSnd('jmp'); }
-          else if (this.mIdx === 2) { this.saveGame(); this.msgBox("セーブしました！"); } else if (this.mIdx === 3) { this.st = 'title'; this.mIdx = 0; }
+          else if (this.mIdx === 2) { this.st = 'bestiary'; this.mIdx = 0; playSnd('jmp'); }
+          else if (this.mIdx === 3) { this.saveGame(); this.msgBox("セーブしました！"); } else if (this.mIdx === 4) { this.st = 'title'; this.mIdx = 0; }
         }
         else if (this.st === 'customMenu') {
-          if (this.mIdx === 0) { let cost = 100 + this.p.customWep.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox(`武器を強化した！\n(ATK+5)`); } else playSnd('hit'); }
-          else if (this.mIdx === 1) { let cost = 100 + this.p.customArm.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox(`防具を強化した！\n(DEF+3)`); } else playSnd('hit'); }
+          if (this.mIdx === 0) { let cost = 100 + this.p.customWep.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox(`武器を強化した！`); } else playSnd('hit'); }
+          else if (this.mIdx === 1) { let cost = 100 + this.p.customArm.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox(`防具を強化した！`); } else playSnd('hit'); }
           else if (this.mIdx === 2) { activeApp = Arena; Arena.init(); playSnd('sel'); } 
           else if (this.mIdx === 3) { this.st = 'townMap'; this.mIdx = 0; }
         }
       }
       if (keysDown.b) {
         if (this.st === 'saveSelect' && this.mIdx < 3) { if (localStorage.getItem(`4in1_rpg_slot${this.mIdx+1}`)) { this.deleteSave(this.mIdx+1); playSnd('hit'); } }
-        if (this.st === 'equipMenu' || this.st === 'spellMenu') { this.st = 'menu'; this.mIdx = 0; }
+        if (this.st==='equipMenu' || this.st==='spellMenu' || this.st==='bestiary') { this.st = 'menu'; this.mIdx = 0; }
         if (this.st === 'customMenu') { this.st = 'townMap'; this.mIdx = 0; }
       } return;
     }
 
-    if (this.st === 'msg') {
-      if (keysDown.a) { 
-        if (this.msgNextSt) { this.st = this.msgNextSt; this.msgNextSt = null; }
-        else { this.st = this.dungeon ? 'dungeon' : this.map[0][0]===1 ? 'townMap' : 'map'; } 
-      } return; 
-    }
+    if (this.st === 'msg') { if (keysDown.a) { if (this.msgNextSt) { this.st = this.msgNextSt; this.msgNextSt = null; } else { this.st = this.dungeon ? 'dungeon' : this.map[0][0]===1 ? 'townMap' : 'map'; } } return; }
 
     if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') {
       if (keysDown.a) {
-        let curTile = this.map[this.p.y][this.p.x];
+        let t = this.map[this.p.y][this.p.x];
         if (this.st === 'map') {
-          if (curTile === 4) { this.st = 'townMap'; this.genTownMap(); BGM.play('rpg_town'); return; }
-          else if (curTile === 5) { this.enterDungeon(0, 'cave'); return; }
-          else if (curTile === 6) { if (this.p.story >= 1) this.enterDungeon(1, 'tower'); else this.msgBox("封鎖されている。"); return; }
-          else if (curTile === 7) { if (this.p.story >= 2) this.enterDungeon(2, 'ruins'); else this.msgBox("封印されている。"); return; }
-          else if (curTile === 8) { if (this.p.story >= 3) { this.battle('boss', 'demon_king'); } else this.msgBox("今の力では到底敵わない…"); return; }
-          for (let chest of this.chests) { if (chest.ax === this.p.areaX && chest.ay === this.p.areaY && chest.x === this.p.x && chest.y === this.p.y && !chest.opened) { chest.opened = true; playSnd('combo'); this.p.gld += 100; this.msgBox("宝箱を開けた！\n100Gを手に入れた！"); return; } }
+          if (t===4) { this.st = 'townMap'; this.genTownMap(); BGM.play('rpg_town'); return; }
+          else if (t===5) { this.enterDungeon(0, 'cave'); return; } else if (t===6) { if (this.p.story >= 1) this.enterDungeon(1, 'tower'); else this.msgBox("封鎖されている。"); return; }
+          else if (t===7) { if (this.p.story >= 2) this.enterDungeon(2, 'ruins'); else this.msgBox("封印されている。"); return; }
+          else if (t===8) { if (this.p.story >= 3) { this.battle('boss', 'demon_king'); } else this.msgBox("今は敵わない…"); return; }
+          for (let ch of this.chests) { if (ch.ax===this.p.areaX && ch.ay===this.p.areaY && ch.x===this.p.x && ch.y===this.p.y && !ch.opened) { ch.opened = true; playSnd('combo'); this.p.gld += 100; this.msgBox("100Gを手に入れた！"); return; } }
         } else if (this.st === 'dungeon') {
-          if (curTile === 14) { if (this.dungeon.floor === 1) { this.exitDungeon(); } else { this.dungeon.floor--; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); } }
-          else if (curTile === 20) { if (this.dungeon.floor === this.dungeon.maxFloor) { this.battle('miniboss', this.dungeons[this.dungeon.idx].boss); } else { this.dungeon.floor++; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); } }
+          if (t===14) { if (this.dungeon.floor===1) this.exitDungeon(); else { this.dungeon.floor--; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); } }
+          else if (t===20) { if (this.dungeon.floor===this.dungeon.maxFloor) this.battle('miniboss', this.dungeons[this.dungeon.idx].boss); else { this.dungeon.floor++; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); } }
         } else if (this.st === 'townMap') {
-          const getAdj = () => [ this.map[this.p.y][this.p.x], this.p.y > 0 ? this.map[this.p.y - 1][this.p.x] : 0, this.p.y < 14 ? this.map[this.p.y + 1][this.p.x] : 0, this.p.x > 0 ? this.map[this.p.y][this.p.x - 1] : 0, this.p.x < 9 ? this.map[this.p.y][this.p.x + 1] : 0 ];
-          const adj = getAdj();
-          if (adj.includes(16)) {
-            if (this.p.story === 0) this.msgBox("王様「勇者よ！\n東の洞窟の魔物を\n討伐してくれ！」"); else if (this.p.story === 1) this.msgBox("王様「おお！次は\n北の塔へ向かうのじゃ！」"); else if (this.p.story === 2) this.msgBox("王様「西の遺跡の力を\n得たようだな。\nいざ、北西の魔王城へ！」"); else this.msgBox("王様「世界に平和が訪れた！\nありがとう勇者よ！」");
-          } else if (adj.includes(17)) {
-            if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); addParticle(100, 150, '#0f0', 'star'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りないようだ。");
-          } else if (adj.includes(18)) {
-            const unlearned = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x));
-            if (unlearned.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const learn = unlearned[Math.floor(Math.random()*unlearned.length)]; this.p.knownSpells.push(learn); playSnd('combo'); this.msgBox(`50Gで ${this.spells[learn].name} を\n習得した！`); } else this.msgBox("魔法の習得には\n50G必要だ。"); } else this.msgBox("全ての魔法を\n習得済みだ。");
-          } else if (adj.includes(19)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
+          const adj = [ this.map[this.p.y][this.p.x], this.p.y>0?this.map[this.p.y-1][this.p.x]:0, this.p.y<14?this.map[this.p.y+1][this.p.x]:0, this.p.x>0?this.map[this.p.y][this.p.x-1]:0, this.p.x<9?this.map[this.p.y][this.p.x+1]:0 ];
+          if (adj.includes(16)) { this.msgBox(this.p.story===0?"王様「東の洞窟へ行け！」":this.p.story===1?"王様「北の塔へ向かえ！」":this.p.story===2?"王様「北西の魔王城へ！」":"王様「世界に平和が！」"); }
+          else if (adj.includes(17)) { if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りない。"); }
+          else if (adj.includes(18)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox(`50Gで魔法を習得した！`); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
+          else if (adj.includes(19)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
         }
       }
-
       let nx = this.p.x, ny = this.p.y;
       if (keysDown.up) ny--; if (keysDown.down) ny++; if (keysDown.left) nx--; if (keysDown.right) nx++;
       if (nx !== this.p.x || ny !== this.p.y) {
         if (this.st === 'map') {
           if (nx < 0) { if (this.p.areaX > 0) { this.p.areaX--; this.p.x = 9; this.genMap(); playSnd('jmp'); } } else if (nx > 9) { if (this.p.areaX < 2) { this.p.areaX++; this.p.x = 0; this.genMap(); playSnd('jmp'); } }
           else if (ny < 0) { if (this.p.areaY > 0) { this.p.areaY--; this.p.y = 14; this.genMap(); playSnd('jmp'); } } else if (ny > 14) { if (this.p.areaY < 2) { this.p.areaY++; this.p.y = 0; this.genMap(); playSnd('jmp'); } }
-          else {
-            let tile = this.map[ny][nx];
-            if (tile !== 1 && tile !== 2 && tile !== 3) {
-              this.p.x = nx; this.p.y = ny; playSnd('sel');
-              if ((tile === 0 || tile === 9) && Math.random() < 0.12) { const key = `${this.p.areaX},${this.p.areaY}`; const enc = this.encounterTable[key] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); }
-            }
-          }
+          else { let t = this.map[ny][nx]; if (t!==1 && t!==2 && t!==3) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if ((t===0 || t===9) && Math.random() < 0.12) { const enc = this.encounterTable[`${this.p.areaX},${this.p.areaY}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } } }
         } else if (this.st === 'dungeon' || this.st === 'townMap') {
           if (this.st === 'townMap' && ny > 14) { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); }
           else if (ny >= 0 && ny < 15 && nx >= 0 && nx < 10) {
-            let tile = this.map[ny][nx];
-            if (tile !== 1 && tile !== 10 && tile !== 12 && tile !== 13 && tile !== 16 && tile !== 17 && tile !== 18 && tile !== 19) {
-              this.p.x = nx; this.p.y = ny; playSnd('sel');
-              if (this.st === 'dungeon' && Math.random() < 0.15) { const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); }
-            }
+            let t = this.map[ny][nx]; if (t!==1 && t!==10 && t!==12 && t!==13 && t!==16 && t!==17 && t!==18 && t!==19) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if (this.st === 'dungeon' && Math.random() < 0.15) { const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } }
           }
         }
       }
@@ -180,69 +134,56 @@ const RPG = {
 
     if (this.st === 'battle' || this.st === 'magic' || this.st === 'battleProcessing') {
       if (this.st === 'magic') {
-        if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); }
-        if (keysDown.down) { this.mIdx = Math.min(this.p.knownSpells.length, this.mIdx + 1); playSnd('sel'); }
+        if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); } if (keysDown.down) { this.mIdx = Math.min(this.p.knownSpells.length, this.mIdx + 1); playSnd('sel'); }
         if (keysDown.a) { if (this.mIdx < this.p.knownSpells.length) { this.executeTurn('magic', this.mIdx); } else { this.st = 'battle'; this.mIdx = 0; } }
         if (keysDown.b) { this.st = 'battle'; this.mIdx = 0; } return;
       }
-      if (keysDown.left || keysDown.right) { this.mIdx = this.mIdx === 0 ? 1 : 0; playSnd('sel'); }
-      if (keysDown.up || keysDown.down) { this.mIdx = this.mIdx < 2 ? this.mIdx + 2 : this.mIdx - 2; playSnd('sel'); }
-      if (keysDown.a) {
-        if (this.mIdx === 0) { this.executeTurn('atk'); } else if (this.mIdx === 1) { this.st = 'magic'; this.mIdx = 0; playSnd('sel'); } 
-        else if (this.mIdx === 2) { this.executeTurn('run'); }
-      }
+      if (keysDown.left || keysDown.right) { this.mIdx = this.mIdx === 0 ? 1 : 0; playSnd('sel'); } if (keysDown.up || keysDown.down) { this.mIdx = this.mIdx < 2 ? this.mIdx + 2 : this.mIdx - 2; playSnd('sel'); }
+      if (keysDown.a) { if (this.mIdx === 0) { this.executeTurn('atk'); } else if (this.mIdx === 1) { this.st = 'magic'; this.mIdx = 0; playSnd('sel'); } else if (this.mIdx === 2) { this.executeTurn('run'); } }
     }
   },
 
   executeTurn(act, spIdx = -1) {
     this.st = 'battleProcessing';
     let pSpd = this.p.spd * (0.8 + Math.random()*0.4); let eSpd = (this.en.spd || 5) * (0.8 + Math.random()*0.4);
-    let playerFirst = pSpd >= eSpd || act === 'run';
-    let step = 0; let sequence = [];
-    
+    let playerFirst = pSpd >= eSpd || act === 'run'; let step = 0; let sequence = [];
     const pAction = () => {
       if (this.p.hp <= 0 || this.en.hp <= 0) return nextStep();
       if (act === 'atk') {
         playSnd('jmp'); const s = this.calcStats(); let baseDmg = s.atk - this.en.def; let isCrit = Math.random() < 0.1; if (isCrit) baseDmg = s.atk * 1.5;
-        let d = Math.max(1, Math.floor(baseDmg * (0.8 + Math.random() * 0.4))); this.en.hp -= d;
-        this.setBattleText(`${isCrit?'クリティカル！\n':''}${this.en.n}に\n${d}のダメージ！`); screenShake(3); addParticle(100, 120, this.en.c, 'explosion'); setTimeout(nextStep, 1000);
+        let d = Math.max(1, Math.floor(baseDmg * (0.8 + Math.random() * 0.4))); this.en.hp -= d; this.battleText = `${isCrit?'CRITICAL!\n':''}${this.en.n}に\n${d}のダメージ！`; this.battleWaitTimer = 60; screenShake(3); addParticle(100, 120, this.en.c, 'explosion'); setTimeout(nextStep, 1000);
       } else if (act === 'magic') {
         const sp = this.spells[this.p.knownSpells[spIdx]];
         if (this.p.mp >= sp.mp) {
           this.p.mp -= sp.mp;
-          if (sp.type === 'atk') { let d = Math.max(1, Math.floor(sp.dmg * (0.8 + Math.random()*0.4))); this.en.hp -= d; this.setBattleText(`${sp.name}！\n${this.en.n}に${d}ダメージ！`); playSnd('combo'); addParticle(100, 120, '#f0f', 'explosion'); screenShake(5); } 
-          else if (sp.type === 'heal') { let heal = Math.abs(sp.dmg); this.p.hp = Math.min(this.p.mhp, this.p.hp + heal); this.setBattleText(`${sp.name}！\nHPが${heal}回復した！`); playSnd('combo'); addParticle(100, 200, '#0f0', 'star'); } 
-          else if (sp.type === 'poison') { this.en.poisoned = true; this.setBattleText(`${sp.name}！\n${this.en.n}は毒を浴びた！`); playSnd('combo'); } 
-          else if (sp.type === 'drain') { let d = Math.max(1, Math.floor(sp.dmg)); this.en.hp -= d; this.p.hp = Math.min(this.p.mhp, this.p.hp + Math.floor(d/2)); this.setBattleText(`${sp.name}！\n${d}ダメージ与え、回復した！`); playSnd('combo'); addParticle(100, 120, '#f0f', 'explosion'); screenShake(5); }
-          setTimeout(nextStep, 1000);
-        } else { this.setBattleText(`MPが足りない！`); playSnd('hit'); setTimeout(nextStep, 800); }
+          if (sp.type === 'atk') { let d = Math.max(1, Math.floor(sp.dmg * (0.8 + Math.random()*0.4))); this.en.hp -= d; this.battleText = `${sp.name}！\n${this.en.n}に${d}ダメージ！`; playSnd('combo'); addParticle(100, 120, '#f0f', 'explosion'); screenShake(5); } 
+          else if (sp.type === 'heal') { let heal = Math.abs(sp.dmg); this.p.hp = Math.min(this.p.mhp, this.p.hp + heal); this.battleText = `${sp.name}！\nHPが${heal}回復した！`; playSnd('combo'); addParticle(100, 200, '#0f0', 'star'); } 
+          else if (sp.type === 'poison') { this.en.poisoned = true; this.battleText = `${sp.name}！\n${this.en.n}は毒を浴びた！`; playSnd('combo'); } 
+          else if (sp.type === 'drain') { let d = Math.max(1, Math.floor(sp.dmg)); this.en.hp -= d; this.p.hp = Math.min(this.p.mhp, this.p.hp + Math.floor(d/2)); this.battleText = `${sp.name}！\n${d}ダメージ与え、回復した！`; playSnd('combo'); addParticle(100, 120, '#f0f', 'explosion'); screenShake(5); }
+          this.battleWaitTimer = 60; setTimeout(nextStep, 1000);
+        } else { this.battleText = `MPが足りない！`; this.battleWaitTimer = 60; playSnd('hit'); setTimeout(nextStep, 800); }
       } else if (act === 'run') {
-        if (this.en.monsterType === 'boss' || this.en.monsterType === 'custom') { this.setBattleText('ボスからは逃げられない！'); setTimeout(nextStep, 1000); } 
-        else { this.setBattleText('無事に逃げ切った！'); setTimeout(() => { if(this.isArena){this.isArena=false; activeApp=Arena; Arena.init(); } else if(this.dungeon){this.st='dungeon';BGM.play('rpg_dungeon');} else{this.st='map';BGM.play('rpg_field');} }, 800); return; }
+        if (this.en.monsterType === 'boss' || this.en.monsterType === 'custom') { this.battleText = '逃げられない！'; this.battleWaitTimer = 60; setTimeout(nextStep, 1000); } 
+        else { this.battleText = '逃げ切った！'; this.battleWaitTimer = 60; setTimeout(() => { if(this.isArena){this.isArena=false; activeApp=Arena; Arena.init(); } else if(this.dungeon){this.st='dungeon';BGM.play('rpg_dungeon');} else{this.st='map';BGM.play('rpg_field');} }, 800); return; }
       }
     };
-    
     const eAction = () => {
       if (this.p.hp <= 0 || this.en.hp <= 0) return nextStep();
       if (this.en.spells && this.en.spells.length > 0 && Math.random() < 0.3) {
         const sp = this.spells[this.en.spells[Math.floor(Math.random() * this.en.spells.length)]];
-        if (sp.type === 'atk' || sp.type === 'drain') { let d = Math.max(1, Math.floor(sp.dmg * 0.8)); this.p.hp -= d; this.setBattleText(`${this.en.n}の${sp.name}！\n${d}のダメージを受けた！`); playSnd('hit'); screenShake(4); } 
-        else if (sp.type === 'heal') { this.en.hp = Math.min(this.en.max, this.en.hp + Math.abs(sp.dmg)); this.setBattleText(`${this.en.n}の${sp.name}！\n敵のHPが回復した！`); playSnd('combo'); } 
-        else { this.setBattleText(`${this.en.n}の不気味な魔法！\nしかし効果はなかった。`); }
+        if (sp.type === 'atk' || sp.type === 'drain') { let d = Math.max(1, Math.floor(sp.dmg * 0.8)); this.p.hp -= d; this.battleText = `${this.en.n}の${sp.name}！\n${d}のダメージを受けた！`; playSnd('hit'); screenShake(4); } 
+        else if (sp.type === 'heal') { this.en.hp = Math.min(this.en.max, this.en.hp + Math.abs(sp.dmg)); this.battleText = `${this.en.n}の${sp.name}！\n敵のHPが回復した！`; playSnd('combo'); } else { this.battleText = `${this.en.n}の不気味な魔法！\n効果はなかった。`; }
       } else {
         const s = this.calcStats(); const d = Math.max(1, Math.floor(this.en.atk * (0.8+Math.random()*0.4)) - s.def); this.p.hp -= d;
-        this.setBattleText(`${this.en.n}の攻撃！\n${d}のダメージを受けた！`); playSnd('hit'); screenShake(4);
+        this.battleText = `${this.en.n}の攻撃！\n${d}のダメージを受けた！`; playSnd('hit'); screenShake(4);
       }
-      setTimeout(nextStep, 1000);
+      this.battleWaitTimer = 60; setTimeout(nextStep, 1000);
     };
-    
     const endAction = () => {
-      if (this.en.poisoned && this.en.hp > 0 && this.p.hp > 0) { this.en.hp -= 5; this.setBattleText(`毒のダメージ！\n${this.en.n}に5ダメージ！`); playSnd('hit'); setTimeout(() => checkEnd(), 800); } else { checkEnd(); }
+      if (this.en.poisoned && this.en.hp > 0 && this.p.hp > 0) { this.en.hp -= 5; this.battleText = `毒のダメージ！\n${this.en.n}に5ダメージ！`; this.battleWaitTimer = 60; playSnd('hit'); setTimeout(() => checkEnd(), 800); } else { checkEnd(); }
     };
-
     const checkEnd = () => { if (this.p.hp <= 0) { this.loseBattle(); } else if (this.en.hp <= 0) { this.winBattle(); } else { this.st = 'battle'; this.mIdx = 0; } };
-    
-    if (!playerFirst && act !== 'run') this.setBattleText(`${this.en.n}が素早い！\n先制攻撃！`);
+    if (!playerFirst && act !== 'run') { this.battleText = `${this.en.n}が素早い！\n先制攻撃！`; this.battleWaitTimer = 60; }
     sequence = playerFirst ? [pAction, eAction, endAction] : [eAction, pAction, endAction];
     const nextStep = () => { if (step < sequence.length) { let func = sequence[step]; step++; func(); } };
     if (!playerFirst && act !== 'run') setTimeout(nextStep, 1000); else nextStep();
@@ -252,7 +193,7 @@ const RPG = {
     this.st = 'battle'; this.mIdx = 0; this.battleText = ''; this.battleWaitTimer = 0; BGM.play(bossType ? 'rpg_boss' : 'rpg_battle');
     if (bossType === 'custom') {
       const b = this.customBosses[monsterType];
-      this.en = { n: b.name, hp: b.hp, atk: b.atk, def: b.def, spd: b.spd, max: b.hp, exp: Math.floor((b.hp+b.atk+b.def)*1.5), gld: Math.floor((b.hp+b.atk)*1.0), spr: sprs.boss, c: '#0ff', monsterType: 'custom', spells: [0,1,2,3,4,5], poisoned: false };
+      this.en = { n: b.name, hp: b.hp, atk: b.atk, def: b.def, spd: b.spd, max: b.hp, exp: Math.floor((b.hp+b.atk+b.def)*1.5), gld: Math.floor((b.hp+b.atk)*1.0), spr: sprs.boss, c: '#0ff', monsterType: 'custom', spells: b.spells||[], poisoned: false };
     } else if (bossType === 'boss') { this.en = { n: '魔王', hp: 200, atk: 25, def: 15, spd: 25, max: 200, exp: 0, gld: 0, spr: sprs.dragon, c: '#808', monsterType: 'boss', spells: [0, 1, 4, 5], poisoned: false }; } 
     else if (bossType === 'miniboss') { const mData = this.monsterTypes[monsterType]; this.en = { n: mData.name+'の主', hp: mData.hp*3, atk: mData.atk*1.5, def: mData.def*1.5, spd: mData.spd*1.2, max: mData.hp*3, exp: mData.exp*3, gld: mData.gld*3, spr: sprs.boss, c: '#c0c', monsterType: 'boss', spells: mData.spells, poisoned: false }; } 
     else { const l = this.p.lv; const mData = this.monsterTypes[monsterType] || this.monsterTypes['slime']; this.en = { n: mData.name, hp: mData.hp + l * 5, atk: mData.atk + l * 2, def: mData.def + l, spd: mData.spd, max: mData.hp + l * 5, exp: mData.exp, gld: mData.gld + l * 2, spr: mData.spr, c: mData.c, monsterType: monsterType, spells: mData.spells || [], poisoned: false }; }
@@ -268,8 +209,10 @@ const RPG = {
   },
   winBattle() {
     addParticle(100, 120, '#ff0', 'explosion');
+    // 図鑑に登録
+    if (this.en.monsterType !== 'boss' && this.en.monsterType !== 'custom' && !this.p.bestiary.includes(this.en.monsterType)) { this.p.bestiary.push(this.en.monsterType); }
     if (this.en.n === '魔王') { this.p.story = 4; this.msgBox("魔王を倒した！\n世界に平和が戻った！"); this.map[13][8] = 0; BGM.play('rpg_field'); }
-    else if (this.en.monsterType === 'custom') { this.p.exp += this.en.exp; this.p.gld += this.en.gld; this.isArena = false; BGM.play('rpg_town'); this.msgBox(`見事な戦いぶりだ！\n${this.en.gld}Gと莫大な経験値を得た！`, 'customMenu'); }
+    else if (this.en.monsterType === 'custom') { this.p.exp += this.en.exp; this.p.gld += this.en.gld; this.isArena = false; BGM.play('rpg_town'); this.msgBox(`見事な戦いぶりだ！\n${this.en.gld}Gと経験値を得た！`, 'customMenu'); }
     else if (this.en.monsterType === 'boss') {
       this.dungeons[this.dungeon.idx].cleared = true; this.p.exp += this.en.exp; this.p.gld += this.en.gld;
       if (this.dungeon.idx === 0 && this.p.story === 0) this.p.story = 1; if (this.dungeon.idx === 1 && this.p.story === 1) this.p.story = 2; if (this.dungeon.idx === 2 && this.p.story === 2) this.p.story = 3;
@@ -280,7 +223,6 @@ const RPG = {
       if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`勝利！ LvUP！\n${this.en.gld}G獲得`); } else { this.st = this.dungeon ? 'dungeon' : 'map'; BGM.play(this.dungeon?'rpg_dungeon':'rpg_field'); }
     }
   },
-  levelUp() { this.p.lv++; this.p.mhp += 15; this.p.mmp += 8; this.p.atk += 3; this.p.def += 2; this.p.spd += 2; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; this.p.exp = 0; playSnd('combo'); },
   
   draw() {
     applyShake(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
@@ -291,31 +233,40 @@ const RPG = {
       if (this.st === 'title') {
         ctx.fillStyle = this.mIdx === 0 ? '#0f0' : '#aaa'; ctx.font = 'bold 14px monospace'; ctx.fillText((this.mIdx === 0 ? '> ' : '  ') + 'はじめる', 60, 180);
         ctx.fillStyle = this.mIdx === 1 ? '#0f0' : '#aaa'; ctx.fillText((this.mIdx === 1 ? '> ' : '  ') + 'もどる', 60, 210);
-        ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓: 選択  A: 決定', 50, 270);
       } else {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('セーブデータ', 50, 30);
         for (let i = 0; i < 3; i++) {
           const sd = JSON.parse(localStorage.getItem(`4in1_rpg_slot${i + 1}`)); const sel = this.mIdx === i;
-          ctx.fillStyle = sel ? 'rgba(0,255,0,0.2)' : 'rgba(100,100,100,0.2)'; ctx.fillRect(15, 50 + i * 65, 170, 55); ctx.strokeStyle = sel ? '#0f0' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(15, 50 + i * 65, 170, 55); ctx.lineWidth = 1;
+          ctx.fillStyle = sel ? 'rgba(0,255,0,0.2)' : 'rgba(100,100,100,0.2)'; ctx.fillRect(15, 50 + i * 65, 170, 55); ctx.strokeStyle = sel ? '#0f0' : '#666'; ctx.strokeRect(15, 50 + i * 65, 170, 55);
           ctx.fillStyle = sel ? '#0f0' : '#aaa'; ctx.font = 'bold 12px monospace'; ctx.fillText(`スロット ${i + 1}`, 25, 70 + i * 65);
-          if (sd) {
-            ctx.fillStyle = sel ? '#fff' : '#888'; ctx.font = '9px monospace'; const dP = sd.p || sd;
-            ctx.fillText(`Lv${dP.lv} HP${dP.hp}/${dP.mhp} G:${dP.gld}`, 25, 85 + i * 65);
-            if (sel) { ctx.fillStyle = '#f00'; ctx.font = '8px monospace'; ctx.fillText('[B:削除]', 140, 98 + i * 65); }
-          } else { ctx.fillStyle = sel ? '#fff' : '#666'; ctx.font = '9px monospace'; ctx.fillText('データなし', 25, 85 + i * 65); }
+          if (sd) { ctx.fillStyle = sel ? '#fff' : '#888'; ctx.font = '9px monospace'; const dP = sd.p || sd; ctx.fillText(`Lv${dP.lv} HP${dP.hp}/${dP.mhp} G:${dP.gld}`, 25, 85 + i * 65); } else { ctx.fillStyle = sel ? '#fff' : '#666'; ctx.font = '9px monospace'; ctx.fillText('データなし', 25, 85 + i * 65); }
         }
         ctx.fillStyle = this.mIdx === 3 ? '#0f0' : '#aaa'; ctx.font = 'bold 12px monospace'; ctx.fillText((this.mIdx === 3 ? '> ' : '  ') + 'もどる', 65, 260);
       }
       resetShake(); return;
     }
     
-    if (this.st === 'menu' || this.st === 'equipMenu' || this.st === 'spellMenu' || this.st === 'customMenu') {
+    if (this.st === 'menu' || this.st === 'equipMenu' || this.st === 'spellMenu' || this.st === 'customMenu' || this.st === 'bestiary') {
       for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { ctx.fillStyle = '#222'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); } }
       ctx.fillStyle = 'rgba(0,0,0,0.95)'; ctx.fillRect(10, 45, 180, 210); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 45, 180, 210);
       if (this.st === 'menu') {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM MENU', 60, 70);
-        const mItems = ['ステータス', '魔法リスト', 'セーブする', 'タイトルへ'];
+        const mItems = ['ステータス', '魔法リスト', 'モンスター図鑑', 'セーブする', 'タイトルへ'];
         for (let i = 0; i < mItems.length; i++) { ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((this.mIdx === i ? '> ' : '  ') + mItems[i], 30, 105 + i * 25); }
+      } else if (this.st === 'bestiary') {
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('モンスター図鑑', 45, 70);
+        if (this.p.bestiary.length === 0) { ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('まだ情報がない', 50, 110); } 
+        else {
+          let st = Math.max(0, this.mIdx - 2); let en = Math.min(this.p.bestiary.length, st + 5); let y = 95;
+          for (let i = st; i < en; i++) {
+            let mData = this.monsterTypes[this.p.bestiary[i]]; if(!mData) continue;
+            ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`${this.mIdx === i ? '>' : ' '} ${mData.name}`, 20, y);
+            if (this.mIdx === i) {
+              drawSprite(120, 100, mData.c, mData.spr, 4);
+              ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText(`HP: ${mData.hp}`, 120, 150); ctx.fillText(`ATK:${mData.atk}`, 120, 165); ctx.fillText(`DEF:${mData.def}`, 120, 180); ctx.fillText(`SPD:${mData.spd}`, 120, 195);
+            } y += 22;
+          }
+        }
       } else if (this.st === 'equipMenu') {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('ステータス', 60, 70); const s = this.calcStats(); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; 
         ctx.fillText(`Lv: ${this.p.lv}  EXP: ${this.p.exp}`, 25, 95); ctx.fillText(`ATK: ${s.atk}   DEF: ${s.def}`, 25, 115); ctx.fillText(`SPD: ${s.spd}`, 25, 135);
@@ -329,7 +280,7 @@ const RPG = {
         const mItems = [`武器強化 (${wC}G)`, `防具強化 (${aC}G)`, '闘技場 (カスタムボス)', '工房を出る'];
         for (let i = 0; i < mItems.length; i++) { ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '10px monospace'; ctx.fillText((this.mIdx === i ? '> ' : '  ') + mItems[i], 20, 105 + i * 25); }
       }
-      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText(this.st==='menu'?'A:決定 SELECT:戻る':'A:決定 B:戻る', 50, 245); resetShake(); return;
+      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText(this.st==='menu'?'A:決定 SELECT:戻る':'B:戻る', 50, 245); resetShake(); return;
     }
 
     if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') {
