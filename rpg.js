@@ -67,10 +67,10 @@ const RPG = {
         else this.map[r][c] = (r === 0 || r === 14 || c === 0 || c === 9 || Math.random() < 0.2) ? 13 : 11;
       }
     }
-    this.map[13][5] = 14; // 上り階段 (外へ、または前の階へ)
+    this.map[13][5] = 14; // 上り階段
     this.p.x = 5; this.p.y = 13;
     let gx = Math.floor(Math.random()*8)+1; let gy = Math.floor(Math.random()*8)+1;
-    this.map[gy][gx] = 20; // 下り階段 (次の階へ、またはボスへ)
+    this.map[gy][gx] = 20; // 下り階段
   },
   msgBox(t) { this.msg = t; this.st = 'msg'; playSnd('sel'); },
   setBattleText(text) { this.battleText = text; this.battleTextTimer = 60; this.battleWaitTimer = 60; },
@@ -92,10 +92,8 @@ const RPG = {
     }
     
     if (this.st === 'title' || this.st === 'saveSelect' || this.st === 'menu' || this.st === 'equipMenu' || this.st === 'spellMenu' || this.st === 'customMenu') {
-      // メニュー系UI処理（前半）
       if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); }
       if (keysDown.down) { this.mIdx = Math.min(this.st==='saveSelect'?3:this.st==='menu'?3:5, this.mIdx + 1); playSnd('sel'); }
-      
       if (keysDown.a) {
         if (this.st === 'title') { if (this.mIdx === 0) { this.st = 'saveSelect'; this.mIdx = 0; } else { activeApp = Menu; Menu.init(); } playSnd('jmp'); }
         else if (this.st === 'saveSelect') { if (this.mIdx < 3) { this.loadSave(this.mIdx + 1); playSnd('jmp'); } else { this.st = 'title'; this.mIdx = 0; } }
@@ -104,16 +102,13 @@ const RPG = {
           else if (this.mIdx === 2) { this.saveGame(); this.msgBox("セーブしました！"); } else if (this.mIdx === 3) { this.st = 'title'; this.mIdx = 0; }
         }
         else if (this.st === 'customMenu') {
-          // カスタム工房
-          if (this.mIdx === 0) { // 武器強化
+          if (this.mIdx === 0) {
             let cost = 100 + this.p.customWep.lv * 50;
             if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox(`武器を強化した！\n(ATK+5)`); } else playSnd('hit');
-          } else if (this.mIdx === 1) { // 防具強化
+          } else if (this.mIdx === 1) {
             let cost = 100 + this.p.customArm.lv * 50;
             if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox(`防具を強化した！\n(DEF+3)`); } else playSnd('hit');
-          } else if (this.mIdx === 2) { // 闘技場（カスタムモンスター）
-            this.battle('custom'); // 後で実装
-          } else if (this.mIdx === 3) { this.st = 'townMap'; this.mIdx = 0; }
+          } else if (this.mIdx === 2) { this.battle('custom'); } else if (this.mIdx === 3) { this.st = 'townMap'; this.mIdx = 0; }
         }
       }
       if (keysDown.b) {
@@ -137,31 +132,35 @@ const RPG = {
           else if (curTile === 8) { if (this.p.story >= 3) { this.battle('boss', 'demon_king'); } else this.msgBox("今の力では到底敵わない…"); return; }
           for (let chest of this.chests) { if (chest.ax === this.p.areaX && chest.ay === this.p.areaY && chest.x === this.p.x && chest.y === this.p.y && !chest.opened) { chest.opened = true; playSnd('combo'); this.p.gld += 100; this.msgBox("宝箱を開けた！\n100Gを手に入れた！"); return; } }
         } else if (this.st === 'dungeon') {
-          if (curTile === 14) { // 上り階段
+          if (curTile === 14) {
             if (this.dungeon.floor === 1) { this.exitDungeon(); } else { this.dungeon.floor--; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); }
-          } else if (curTile === 20) { // 下り階段
+          } else if (curTile === 20) {
             if (this.dungeon.floor === this.dungeon.maxFloor) { this.battle('miniboss', this.dungeons[this.dungeon.idx].boss); }
             else { this.dungeon.floor++; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); }
           }
         } else if (this.st === 'townMap') {
-          // 町の施設との会話
-          if (Math.abs(this.p.x - 4) < 2 && this.p.y === 4) { // 王様
+          // ★ バグ修正：周囲のタイルをチェックして会話できるように改善
+          const getAdj = () => [
+            this.map[this.p.y][this.p.x],
+            this.p.y > 0 ? this.map[this.p.y - 1][this.p.x] : 0,
+            this.p.y < 14 ? this.map[this.p.y + 1][this.p.x] : 0,
+            this.p.x > 0 ? this.map[this.p.y][this.p.x - 1] : 0,
+            this.p.x < 9 ? this.map[this.p.y][this.p.x + 1] : 0
+          ];
+          const adj = getAdj();
+          if (adj.includes(16)) {
             if (this.p.story === 0) this.msgBox("王様「勇者よ！\n東の洞窟の魔物を\n討伐してくれ！」");
             else if (this.p.story === 1) this.msgBox("王様「おお！次は\n北の塔へ向かうのじゃ！」");
             else if (this.p.story === 2) this.msgBox("王様「西の遺跡の力を\n得たようだな。\nいざ、北西の魔王城へ！」");
             else this.msgBox("王様「世界に平和が訪れた！\nありがとう勇者よ！」");
-          } else if (this.p.x === 2 && this.p.y === 9) { // 宿屋
+          } else if (adj.includes(17)) {
             if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); addParticle(100, 150, '#0f0', 'star'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りないようだ。");
-          } else if (this.p.x === 7 && this.p.y === 9) { // 魔法屋 (ランダムで1つ習得)
+          } else if (adj.includes(18)) {
             const unlearned = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x));
             if (unlearned.length > 0) {
-              if (this.p.gld >= 50) {
-                this.p.gld -= 50; const learn = unlearned[Math.floor(Math.random()*unlearned.length)]; this.p.knownSpells.push(learn); playSnd('combo'); this.msgBox(`50Gで ${this.spells[learn].name} を\n習得した！`);
-              } else this.msgBox("魔法の習得には\n50G必要だ。");
+              if (this.p.gld >= 50) { this.p.gld -= 50; const learn = unlearned[Math.floor(Math.random()*unlearned.length)]; this.p.knownSpells.push(learn); playSnd('combo'); this.msgBox(`50Gで ${this.spells[learn].name} を\n習得した！`); } else this.msgBox("魔法の習得には\n50G必要だ。");
             } else this.msgBox("全ての魔法を\n習得済みだ。");
-          } else if (this.p.x === 5 && this.p.y === 12) { // カスタム工房
-            this.st = 'customMenu'; this.mIdx = 0; playSnd('sel');
-          }
+          } else if (adj.includes(19)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
         }
       }
 
@@ -178,29 +177,28 @@ const RPG = {
             if (tile !== 1 && tile !== 2 && tile !== 3) {
               this.p.x = nx; this.p.y = ny; playSnd('sel');
               if ((tile === 0 || tile === 9) && Math.random() < 0.12) {
-                const key = `${this.p.areaX},${this.p.areaY}`;
-                const enc = this.encounterTable[key] || ['slime'];
-                this.battle(false, enc[Math.floor(Math.random() * enc.length)]);
+                const key = `${this.p.areaX},${this.p.areaY}`; const enc = this.encounterTable[key] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]);
               }
             }
           }
         } else if (this.st === 'dungeon' || this.st === 'townMap') {
-          let tile = this.map[ny][nx];
-          if (tile !== 1 && tile !== 10 && tile !== 12 && tile !== 13) {
-            this.p.x = nx; this.p.y = ny; playSnd('sel');
-            if (this.st === 'dungeon' && Math.random() < 0.15) {
-              const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime'];
-              this.battle(false, enc[Math.floor(Math.random() * enc.length)]);
-            } else if (this.st === 'townMap' && ny > 14) {
-              // 町から出る
-              this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field');
+          // ★ バグ修正：町から出る時にエラーにならないよう境界条件を厳格化
+          if (this.st === 'townMap' && ny > 14) {
+            this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field');
+          } else if (ny >= 0 && ny < 15 && nx >= 0 && nx < 10) {
+            let tile = this.map[ny][nx];
+            // NPCや施設（16〜19）の上には乗れないようにブロック
+            if (tile !== 1 && tile !== 10 && tile !== 12 && tile !== 13 && tile !== 16 && tile !== 17 && tile !== 18 && tile !== 19) {
+              this.p.x = nx; this.p.y = ny; playSnd('sel');
+              if (this.st === 'dungeon' && Math.random() < 0.15) {
+                const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]);
+              }
             }
           }
         }
       }
     }
-        if (this.st === 'battle') {
-      // 毒状態のダメージ
+    if (this.st === 'battle') {
       if (this.en.poisoned && this.battleWaitTimer === 0 && this.mIdx >= 0) {
         this.en.hp -= 5; this.setBattleText(`毒のダメージ！\n${this.en.n}に5ダメージ！`); playSnd('hit');
         if (this.en.hp <= 0) setTimeout(() => this.winBattle(), 500); return;
@@ -255,7 +253,6 @@ const RPG = {
   battle(bossType, monsterType = 'slime') {
     this.st = 'battle'; this.mIdx = 0; this.battleText = ''; this.battleTextTimer = 0; this.battleWaitTimer = 0; BGM.play(bossType ? 'rpg_boss' : 'rpg_battle');
     if (bossType === 'custom') {
-      // 闘技場のカスタムボス（Lvに応じた強さ）
       const l = this.p.lv + 5;
       this.en = { n: '破壊闘神', hp: 100 + l * 15, atk: 15 + l * 3, def: 10 + l * 2, max: 100 + l * 15, exp: 500, gld: 500, spr: sprs.dragon, c: '#0ff', monsterType: 'boss', spells: [0, 1, 3] };
     } else if (bossType === 'boss') {
@@ -271,7 +268,6 @@ const RPG = {
   },
 
   enemyAttack() {
-    // 敵の魔法使用判定
     if (this.en.spells && this.en.spells.length > 0 && Math.random() < 0.3) {
       const spIdx = this.en.spells[Math.floor(Math.random() * this.en.spells.length)];
       const sp = this.spells[spIdx];
@@ -293,7 +289,7 @@ const RPG = {
         this.worldMap = null; this.genMap(); this.msgBox("死んでしまった。\n拠点へ戻された..."); BGM.play('rpg_field');
       }, 500);
     } else {
-      this.mIdx = 0; // コマンド復帰
+      this.mIdx = 0;
     }
   },
 
@@ -380,13 +376,13 @@ const RPG = {
           else if (v === 11) { ctx.fillStyle = '#555'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
           else if (v === 12) { ctx.fillStyle = '#777'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
           else if (v === 13) { ctx.fillStyle = '#654'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
-          else if (v === 14) { ctx.fillStyle = '#0f0'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText('<', c * 20 + 5, r * 20 + 60); } // 上り階段
-          else if (v === 15) { ctx.fillStyle = '#753'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#975'; ctx.fillRect(c*20, r*20+45, 20, 10); } // 町の床
-          else if (v === 16) { ctx.fillStyle = '#ccf'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#00f'; ctx.font = 'bold 10px monospace'; ctx.fillText('王', c * 20 + 5, r * 20 + 60); } // 城
-          else if (v === 17) { ctx.fillStyle = '#fcc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#f00'; ctx.font = 'bold 10px monospace'; ctx.fillText('宿', c * 20 + 5, r * 20 + 60); } // 宿
-          else if (v === 18) { ctx.fillStyle = '#cfc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#0a0'; ctx.font = 'bold 10px monospace'; ctx.fillText('魔', c * 20 + 5, r * 20 + 60); } // 魔法屋
-          else if (v === 19) { ctx.fillStyle = '#ffc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#a80'; ctx.font = 'bold 10px monospace'; ctx.fillText('工', c * 20 + 5, r * 20 + 60); } // 工房
-          else if (v === 20) { ctx.fillStyle = '#f00'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.fillText('>', c * 20 + 5, r * 20 + 60); } // 下り階段
+          else if (v === 14) { ctx.fillStyle = '#0f0'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText('<', c * 20 + 5, r * 20 + 60); }
+          else if (v === 15) { ctx.fillStyle = '#753'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#975'; ctx.fillRect(c*20, r*20+45, 20, 10); }
+          else if (v === 16) { ctx.fillStyle = '#ccf'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#00f'; ctx.font = 'bold 10px monospace'; ctx.fillText('王', c * 20 + 5, r * 20 + 60); }
+          else if (v === 17) { ctx.fillStyle = '#fcc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#f00'; ctx.font = 'bold 10px monospace'; ctx.fillText('宿', c * 20 + 5, r * 20 + 60); }
+          else if (v === 18) { ctx.fillStyle = '#cfc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#0a0'; ctx.font = 'bold 10px monospace'; ctx.fillText('魔', c * 20 + 5, r * 20 + 60); }
+          else if (v === 19) { ctx.fillStyle = '#ffc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#a80'; ctx.font = 'bold 10px monospace'; ctx.fillText('工', c * 20 + 5, r * 20 + 60); }
+          else if (v === 20) { ctx.fillStyle = '#f00'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.fillText('>', c * 20 + 5, r * 20 + 60); }
         }
       }
       for (let ch of this.chests) { if (!ch.opened && this.st === 'map' && ch.ax === this.p.areaX && ch.ay === this.p.areaY) { ctx.fillStyle = '#f90'; ctx.fillRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); ctx.strokeStyle = '#fc0'; ctx.strokeRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); } }
@@ -415,7 +411,7 @@ const RPG = {
       
       if (this.st === 'battle') {
         const s = this.calcStats(); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`HP:${this.p.hp}/${this.p.mhp} MP:${this.p.mp}/${this.p.mmp}`, 15, 205);
-        if (this.mIdx >= 0) { // 入力受付中
+        if (this.mIdx >= 0) {
           ctx.fillStyle = this.mIdx === 0 ? '#0f0' : '#888'; ctx.fillRect(15, 225, 80, 25); ctx.fillStyle = this.mIdx === 0 ? '#000' : '#444'; ctx.font = 'bold 11px monospace'; ctx.fillText('たたかう', 23, 242);
           ctx.fillStyle = this.mIdx === 1 ? '#0f0' : '#888'; ctx.fillRect(105, 225, 80, 25); ctx.fillStyle = this.mIdx === 1 ? '#000' : '#444'; ctx.fillText('まほう', 125, 242);
           ctx.fillStyle = this.mIdx === 2 ? '#0f0' : '#888'; ctx.fillRect(15, 255, 80, 25); ctx.fillStyle = this.mIdx === 2 ? '#000' : '#444'; ctx.fillText('にげる', 30, 272);
