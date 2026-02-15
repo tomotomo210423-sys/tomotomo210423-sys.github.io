@@ -199,3 +199,237 @@ const RPG = {
         }
       }
     }
+        if (this.st === 'battle') {
+      // 毒状態のダメージ
+      if (this.en.poisoned && this.battleWaitTimer === 0 && this.mIdx >= 0) {
+        this.en.hp -= 5; this.setBattleText(`毒のダメージ！\n${this.en.n}に5ダメージ！`); playSnd('hit');
+        if (this.en.hp <= 0) setTimeout(() => this.winBattle(), 500); return;
+      }
+      
+      if (keysDown.left || keysDown.right) { this.mIdx = this.mIdx === 0 ? 1 : 0; playSnd('sel'); }
+      if (keysDown.up || keysDown.down) { this.mIdx = this.mIdx < 2 ? this.mIdx + 2 : this.mIdx - 2; playSnd('sel'); }
+      if (keysDown.a) {
+        if (this.mIdx === 0) {
+          playSnd('jmp'); const s = this.calcStats();
+          let baseDmg = s.atk - this.en.def; let rand = 0.8 + Math.random() * 0.4; let isCrit = Math.random() < 0.1;
+          if (isCrit) { baseDmg = s.atk * 1.5; }
+          let d = Math.max(1, Math.floor(baseDmg * rand));
+          this.en.hp -= d; this.setBattleText(`${isCrit?'クリティカル！\n':''}${this.en.n}に\n${d}のダメージ！`); screenShake(3); addParticle(100, 120, this.en.c, 'explosion');
+          if (this.en.hp <= 0) setTimeout(() => this.winBattle(), 500); else setTimeout(() => this.enemyAttack(), 500);
+        } else if (this.mIdx === 1) { this.st = 'magic'; this.mIdx = 0; playSnd('sel'); } 
+        else if (this.mIdx === 2) {
+          if (this.en.monsterType === 'boss') { this.setBattleText('ボスからは逃げられない！'); setTimeout(() => this.enemyAttack(), 500); }
+          else { this.setBattleText('無事に逃げ切った！'); setTimeout(() => { if(this.dungeon) this.st='dungeon'; else this.st = 'map'; BGM.play(this.dungeon?'rpg_dungeon':'rpg_field'); }, 500); }
+        }
+      }
+    }
+    if (this.st === 'magic') {
+      if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); }
+      if (keysDown.down) { this.mIdx = Math.min(this.p.knownSpells.length, this.mIdx + 1); playSnd('sel'); }
+      if (keysDown.a) {
+        if (this.mIdx < this.p.knownSpells.length) {
+          const sp = this.spells[this.p.knownSpells[this.mIdx]];
+          if (this.p.mp >= sp.mp) {
+            this.p.mp -= sp.mp;
+            if (sp.type === 'atk') {
+              let d = Math.max(1, Math.floor((sp.dmg) * (0.8 + Math.random()*0.4)));
+              this.en.hp -= d; this.setBattleText(`${sp.name}！\n${this.en.n}に${d}ダメージ！`); playSnd('combo'); addParticle(100, 120, '#f0f', 'explosion'); screenShake(5);
+              if (this.en.hp <= 0) setTimeout(() => this.winBattle(), 500); else setTimeout(() => this.enemyAttack(), 500);
+            } else if (sp.type === 'heal') {
+              let heal = Math.abs(sp.dmg); this.p.hp = Math.min(this.p.mhp, this.p.hp + heal); this.setBattleText(`${sp.name}！\nHPが${heal}回復した！`); playSnd('combo'); addParticle(100, 200, '#0f0', 'star'); setTimeout(() => this.enemyAttack(), 500);
+            } else if (sp.type === 'poison') {
+              this.en.poisoned = true; this.setBattleText(`${sp.name}！\n${this.en.n}は毒を浴びた！`); playSnd('combo'); setTimeout(() => this.enemyAttack(), 500);
+            } else if (sp.type === 'drain') {
+              let d = Math.max(1, Math.floor(sp.dmg)); this.en.hp -= d; this.p.hp = Math.min(this.p.mhp, this.p.hp + Math.floor(d/2)); this.setBattleText(`${sp.name}！\n${d}ダメージ与え、回復した！`); playSnd('combo'); addParticle(100, 120, '#f0f', 'explosion'); screenShake(5);
+              if (this.en.hp <= 0) setTimeout(() => this.winBattle(), 500); else setTimeout(() => this.enemyAttack(), 500);
+            }
+            this.st = 'battle'; this.mIdx = -1; // ターン終了待ちフラグ
+          } else playSnd('hit');
+        } else { this.st = 'battle'; this.mIdx = 0; }
+      }
+      if (keysDown.b) { this.st = 'battle'; this.mIdx = 0; }
+    }
+    updateParticles();
+  },
+
+  battle(bossType, monsterType = 'slime') {
+    this.st = 'battle'; this.mIdx = 0; this.battleText = ''; this.battleTextTimer = 0; this.battleWaitTimer = 0; BGM.play(bossType ? 'rpg_boss' : 'rpg_battle');
+    if (bossType === 'custom') {
+      // 闘技場のカスタムボス（Lvに応じた強さ）
+      const l = this.p.lv + 5;
+      this.en = { n: '破壊闘神', hp: 100 + l * 15, atk: 15 + l * 3, def: 10 + l * 2, max: 100 + l * 15, exp: 500, gld: 500, spr: sprs.dragon, c: '#0ff', monsterType: 'boss', spells: [0, 1, 3] };
+    } else if (bossType === 'boss') {
+      this.en = { n: '魔王', hp: 200, atk: 25, def: 15, max: 200, exp: 0, gld: 0, spr: sprs.dragon, c: '#808', monsterType: 'boss', spells: [0, 1, 4, 5] };
+    } else if (bossType === 'miniboss') {
+      const mData = this.monsterTypes[monsterType];
+      this.en = { n: mData.name+'の主', hp: mData.hp*3, atk: mData.atk*1.5, def: mData.def*1.5, max: mData.hp*3, exp: mData.exp*3, gld: mData.gld*3, spr: sprs.boss, c: '#c0c', monsterType: 'boss', spells: mData.spells };
+    } else {
+      const l = this.p.lv; const mData = this.monsterTypes[monsterType] || this.monsterTypes['slime'];
+      this.en = { n: mData.name, hp: mData.hp + l * 5, atk: mData.atk + l * 2, def: mData.def + l, max: mData.hp + l * 5, exp: mData.exp, gld: mData.gld + l * 2, spr: mData.spr, c: mData.c, monsterType: monsterType, spells: mData.spells || [] };
+    }
+    playSnd('hit');
+  },
+
+  enemyAttack() {
+    // 敵の魔法使用判定
+    if (this.en.spells && this.en.spells.length > 0 && Math.random() < 0.3) {
+      const spIdx = this.en.spells[Math.floor(Math.random() * this.en.spells.length)];
+      const sp = this.spells[spIdx];
+      if (sp.type === 'atk' || sp.type === 'drain') {
+        let d = Math.max(1, Math.floor(sp.dmg * 0.8)); this.p.hp -= d; this.setBattleText(`${this.en.n}の${sp.name}！\n${d}のダメージを受けた！`); playSnd('hit'); screenShake(4);
+      } else if (sp.type === 'heal') {
+        this.en.hp = Math.min(this.en.max, this.en.hp + Math.abs(sp.dmg)); this.setBattleText(`${this.en.n}の${sp.name}！\n敵のHPが回復した！`); playSnd('combo');
+      } else {
+        this.setBattleText(`${this.en.n}の不気味な魔法！\nしかし効果はなかった。`);
+      }
+    } else {
+      const s = this.calcStats(); const d = Math.max(1, Math.floor(this.en.atk * (0.8+Math.random()*0.4)) - s.def); this.p.hp -= d;
+      this.setBattleText(`${this.en.n}の攻撃！\n${d}のダメージを受けた！`); playSnd('hit'); screenShake(4);
+    }
+    
+    if (this.p.hp <= 0) {
+      setTimeout(() => {
+        if (this.dungeon) this.exitDungeon(); this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; this.p.x = 4; this.p.y = 8; this.p.areaX = 1; this.p.areaY = 1; this.dungeon = null;
+        this.worldMap = null; this.genMap(); this.msgBox("死んでしまった。\n拠点へ戻された..."); BGM.play('rpg_field');
+      }, 500);
+    } else {
+      this.mIdx = 0; // コマンド復帰
+    }
+  },
+
+  winBattle() {
+    addParticle(100, 120, '#ff0', 'explosion');
+    if (this.en.n === '魔王') { this.p.story = 4; this.msgBox("魔王を倒した！\n世界に平和が戻った！"); this.map[13][8] = 0; BGM.play('rpg_field'); }
+    else if (this.en.n === '破壊闘神') { this.msgBox("見事な戦いぶりだ！\n500Gと莫大な経験値を得た！"); this.p.exp += 500; this.p.gld += 500; this.st = 'townMap'; BGM.play('rpg_town'); }
+    else if (this.en.monsterType === 'boss') {
+      this.dungeons[this.dungeon.idx].cleared = true; this.p.exp += this.en.exp; this.p.gld += this.en.gld;
+      if (this.dungeon.idx === 0 && this.p.story === 0) this.p.story = 1;
+      if (this.dungeon.idx === 1 && this.p.story === 1) this.p.story = 2;
+      if (this.dungeon.idx === 2 && this.p.story === 2) this.p.story = 3;
+      this.exitDungeon(); this.dungeon = null;
+      if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`魔物を退治した！\nLvUP! ${this.en.gld}G獲得`); } else this.msgBox(`魔物を退治した！\n${this.en.gld}G獲得`);
+    } else {
+      this.p.exp += this.en.exp; this.p.gld += this.en.gld;
+      if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`勝利！ LvUP！\n${this.en.gld}G獲得`); } else { this.st = this.dungeon ? 'dungeon' : 'map'; BGM.play(this.dungeon?'rpg_dungeon':'rpg_field'); }
+    }
+  },
+  levelUp() { this.p.lv++; this.p.mhp += 15; this.p.mmp += 8; this.p.atk += 3; this.p.def += 2; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; this.p.exp = 0; playSnd('combo'); },
+  
+  draw() {
+    applyShake(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
+    if (this.st === 'title' || this.st === 'saveSelect') {
+      const g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#001'); g.addColorStop(1, '#103'); ctx.fillStyle = g; ctx.fillRect(0, 0, 200, 300);
+      ctx.shadowBlur = 20; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 24px monospace'; ctx.fillText('MICRO', 65, 80); ctx.fillText('QUEST', 65, 110); ctx.shadowBlur = 0;
+      ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('～広大なる冒険～', 55, 135);
+      if (this.st === 'title') {
+        ctx.fillStyle = this.mIdx === 0 ? '#0f0' : '#aaa'; ctx.font = 'bold 14px monospace'; ctx.fillText((this.mIdx === 0 ? '> ' : '  ') + 'はじめる', 60, 180);
+        ctx.fillStyle = this.mIdx === 1 ? '#0f0' : '#aaa'; ctx.fillText((this.mIdx === 1 ? '> ' : '  ') + 'もどる', 60, 210);
+        ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓: 選択  A: 決定', 50, 270);
+      } else {
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('セーブデータ', 50, 30);
+        for (let i = 0; i < 3; i++) {
+          const sd = JSON.parse(localStorage.getItem(`4in1_rpg_slot${i + 1}`)); const sel = this.mIdx === i;
+          ctx.fillStyle = sel ? 'rgba(0,255,0,0.2)' : 'rgba(100,100,100,0.2)'; ctx.fillRect(15, 50 + i * 65, 170, 55); ctx.strokeStyle = sel ? '#0f0' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(15, 50 + i * 65, 170, 55); ctx.lineWidth = 1;
+          ctx.fillStyle = sel ? '#0f0' : '#aaa'; ctx.font = 'bold 12px monospace'; ctx.fillText(`スロット ${i + 1}`, 25, 70 + i * 65);
+          if (sd) {
+            ctx.fillStyle = sel ? '#fff' : '#888'; ctx.font = '9px monospace'; const dP = sd.p || sd;
+            ctx.fillText(`Lv${dP.lv} HP${dP.hp}/${dP.mhp} G:${dP.gld}`, 25, 85 + i * 65);
+            if (sel) { ctx.fillStyle = '#f00'; ctx.font = '8px monospace'; ctx.fillText('[B:削除]', 140, 98 + i * 65); }
+          } else { ctx.fillStyle = sel ? '#fff' : '#666'; ctx.font = '9px monospace'; ctx.fillText('データなし', 25, 85 + i * 65); }
+        }
+        ctx.fillStyle = this.mIdx === 3 ? '#0f0' : '#aaa'; ctx.font = 'bold 12px monospace'; ctx.fillText((this.mIdx === 3 ? '> ' : '  ') + 'もどる', 65, 260);
+      }
+      resetShake(); return;
+    }
+    
+    if (this.st === 'menu' || this.st === 'equipMenu' || this.st === 'spellMenu' || this.st === 'customMenu') {
+      for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { ctx.fillStyle = '#222'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); } }
+      ctx.fillStyle = 'rgba(0,0,0,0.95)'; ctx.fillRect(10, 50, 180, 200); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 50, 180, 200);
+      if (this.st === 'menu') {
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM MENU', 60, 75);
+        const mItems = ['ステータス', '魔法リスト', 'セーブする', 'タイトルへ'];
+        for (let i = 0; i < mItems.length; i++) { ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((this.mIdx === i ? '> ' : '  ') + mItems[i], 30, 110 + i * 25); }
+      } else if (this.st === 'equipMenu') {
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('ステータス', 60, 75); const s = this.calcStats(); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`Lv: ${this.p.lv}  EXP: ${this.p.exp}`, 30, 105); ctx.fillText(`ATK: ${s.atk}   DEF: ${s.def}`, 30, 125);
+        ctx.fillText('武器: CUSTOM WEP Lv.' + this.p.customWep.lv, 30, 155); ctx.fillText('防具: CUSTOM ARM Lv.' + this.p.customArm.lv, 30, 175);
+      } else if (this.st === 'spellMenu') {
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('習得魔法', 65, 75); ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+        if (this.p.knownSpells.length === 0) ctx.fillText('魔法を習得していない', 30, 120); else { let y = 105; for (let idx of this.p.knownSpells) { const sp = this.spells[idx]; ctx.fillStyle = sp.type==='heal'?'#0f0':sp.type==='poison'?'#a0f':'#fff'; ctx.fillText(`${sp.name} (MP${sp.mp})`, 30, y); ctx.fillStyle='#aaa'; ctx.font = '8px monospace'; ctx.fillText(sp.desc, 35, y + 12); ctx.font = '10px monospace'; y += 25; } }
+      } else if (this.st === 'customMenu') {
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('町外れの工房', 55, 75); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`所持金: ${this.p.gld}G`, 120, 75);
+        const wC = 100 + this.p.customWep.lv * 50; const aC = 100 + this.p.customArm.lv * 50;
+        const mItems = [`武器強化 (${wC}G)`, `防具強化 (${aC}G)`, '闘技場 (カスタムボス)', '工房を出る'];
+        for (let i = 0; i < mItems.length; i++) { ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '10px monospace'; ctx.fillText((this.mIdx === i ? '> ' : '  ') + mItems[i], 20, 110 + i * 25); }
+      }
+      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText(this.st==='menu'?'A:決定 SELECT:戻る':'B:戻る', 50, 235); resetShake(); return;
+    }
+
+    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap' || this.st === 'town') {
+      for (let r = 0; r < 15; r++) {
+        for (let c = 0; c < 10; c++) {
+          let v = this.map[r][c];
+          if (v === 0) { ctx.fillStyle = '#282'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#171'; ctx.fillRect(c*20+2, r*20+47, 4, 4); }
+          else if (v === 1) { ctx.fillStyle = '#151'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#040'; ctx.fillRect(c*20+10, r*20+45, 8, 16); }
+          else if (v === 2) { ctx.fillStyle = '#555'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#777'; ctx.beginPath(); ctx.moveTo(c*20+10,r*20+45); ctx.lineTo(c*20+20,r*20+65); ctx.lineTo(c*20,r*20+65); ctx.fill(); }
+          else if (v === 3) { ctx.fillStyle = '#00a'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#08f'; ctx.fillRect(c*20+5, r*20+55, 10, 2); }
+          else if (v === 4) { ctx.fillStyle = '#e90'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans'; ctx.fillText('町', c * 20 + 4, r * 20 + 59); }
+          else if (v >= 5 && v <= 7) { ctx.fillStyle = '#808'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans'; ctx.fillText('D', c * 20 + 5, r * 20 + 59); }
+          else if (v === 8) { ctx.fillStyle = '#f00'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
+          else if (v === 9) { ctx.fillStyle = '#ca6'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#dca'; ctx.fillRect(c*20+5, r*20+47, 3, 3); }
+          else if (v === 10) { ctx.fillStyle = '#333'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
+          else if (v === 11) { ctx.fillStyle = '#555'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
+          else if (v === 12) { ctx.fillStyle = '#777'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
+          else if (v === 13) { ctx.fillStyle = '#654'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); }
+          else if (v === 14) { ctx.fillStyle = '#0f0'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText('<', c * 20 + 5, r * 20 + 60); } // 上り階段
+          else if (v === 15) { ctx.fillStyle = '#753'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#975'; ctx.fillRect(c*20, r*20+45, 20, 10); } // 町の床
+          else if (v === 16) { ctx.fillStyle = '#ccf'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#00f'; ctx.font = 'bold 10px monospace'; ctx.fillText('王', c * 20 + 5, r * 20 + 60); } // 城
+          else if (v === 17) { ctx.fillStyle = '#fcc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#f00'; ctx.font = 'bold 10px monospace'; ctx.fillText('宿', c * 20 + 5, r * 20 + 60); } // 宿
+          else if (v === 18) { ctx.fillStyle = '#cfc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#0a0'; ctx.font = 'bold 10px monospace'; ctx.fillText('魔', c * 20 + 5, r * 20 + 60); } // 魔法屋
+          else if (v === 19) { ctx.fillStyle = '#ffc'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#a80'; ctx.font = 'bold 10px monospace'; ctx.fillText('工', c * 20 + 5, r * 20 + 60); } // 工房
+          else if (v === 20) { ctx.fillStyle = '#f00'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.fillText('>', c * 20 + 5, r * 20 + 60); } // 下り階段
+        }
+      }
+      for (let ch of this.chests) { if (!ch.opened && this.st === 'map' && ch.ax === this.p.areaX && ch.ay === this.p.areaY) { ctx.fillStyle = '#f90'; ctx.fillRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); ctx.strokeStyle = '#fc0'; ctx.strokeRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); } }
+      drawSprite(this.p.x * 20, this.p.y * 20 + 45 + Math.sin(this.anim * 0.1) * 1, '#ff0', sprs.mage);
+      
+      const s = this.calcStats(); ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 42); ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+      ctx.fillText(`Lv${this.p.lv} HP${this.p.hp}/${this.p.mhp} MP${this.p.mp}/${this.p.mmp}`, 3, 10); ctx.fillText(`ATK${s.atk} DEF${s.def} G${this.p.gld}`, 3, 20);
+      ctx.fillText(`武:C-WEP Lv${this.p.customWep.lv}`, 3, 30); ctx.fillText(`防:C-ARM Lv${this.p.customArm.lv}`, 3, 40);
+      if (this.st === 'dungeon') { ctx.fillStyle = '#0ff'; ctx.fillText(`[${this.dungeon.type.toUpperCase()}] F${this.dungeon.floor}/${this.dungeon.maxFloor}`, 110, 30); } 
+      else if (this.st === 'townMap') { ctx.fillStyle = '#0ff'; ctx.fillText(`[TOWN]`, 160, 30); }
+      else { ctx.fillStyle = '#ff0'; ctx.fillText(`[AREA ${this.p.areaX}-${this.p.areaY}]`, 140, 30); }
+    }
+
+    if (this.st === 'battle' || this.st === 'magic') {
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px monospace'; ctx.fillText(this.en.n, 15, 30);
+      ctx.fillStyle = '#f00'; ctx.fillRect(15, 38, 170, 8); ctx.fillStyle = '#0f0'; ctx.fillRect(15, 38, Math.max(0, 170 * (this.en.hp / this.en.max)), 8);
+      ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText(`${this.en.hp}/${this.en.max}`, 75, 45);
+      if (this.en.poisoned) { ctx.fillStyle = '#a0f'; ctx.fillText('POISON', 140, 45); }
+      drawSprite(70, 70 + Math.sin(this.anim * 0.1) * 2, this.en.c, this.en.spr, 12);
+      
+      if (this.battleTextTimer > 0) {
+        ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(5, 140, 190, 40); ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(5, 140, 190, 40); ctx.lineWidth = 1;
+        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; let l = this.battleText.split('\n'); for (let i = 0; i < l.length; i++) { ctx.fillText(l[i], 15, 155 + i * 15); }
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(5, 185, 190, 110); ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(5, 185, 190, 110); ctx.lineWidth = 1;
+      
+      if (this.st === 'battle') {
+        const s = this.calcStats(); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`HP:${this.p.hp}/${this.p.mhp} MP:${this.p.mp}/${this.p.mmp}`, 15, 205);
+        if (this.mIdx >= 0) { // 入力受付中
+          ctx.fillStyle = this.mIdx === 0 ? '#0f0' : '#888'; ctx.fillRect(15, 225, 80, 25); ctx.fillStyle = this.mIdx === 0 ? '#000' : '#444'; ctx.font = 'bold 11px monospace'; ctx.fillText('たたかう', 23, 242);
+          ctx.fillStyle = this.mIdx === 1 ? '#0f0' : '#888'; ctx.fillRect(105, 225, 80, 25); ctx.fillStyle = this.mIdx === 1 ? '#000' : '#444'; ctx.fillText('まほう', 125, 242);
+          ctx.fillStyle = this.mIdx === 2 ? '#0f0' : '#888'; ctx.fillRect(15, 255, 80, 25); ctx.fillStyle = this.mIdx === 2 ? '#000' : '#444'; ctx.fillText('にげる', 30, 272);
+        }
+      } else if (this.st === 'magic') {
+        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`MP:${this.p.mp}/${this.p.mmp}`, 15, 200); let y = 215;
+        for (let i = 0; i < this.p.knownSpells.length; i++) { const sp = this.spells[this.p.knownSpells[i]]; ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.fillText(`${this.mIdx === i ? '> ' : '  '}${sp.name}(${sp.mp})`, 15, y); y += 15; }
+        ctx.fillStyle = this.mIdx === this.p.knownSpells.length ? '#0f0' : '#aaa'; ctx.fillText(`${this.mIdx === this.p.knownSpells.length ? '> ' : '  '}もどる`, 15, y);
+      }
+    }
+    if (this.st === 'msg') {
+      ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(5, 185, 190, 70); ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(5, 185, 190, 70); ctx.lineWidth = 1;
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; let l = this.msg.split('\n'); for (let i = 0; i < l.length; i++) { ctx.fillText(l[i], 15, 205 + i * 18); } ctx.fillText('▼(A)', 155, 245);
+    }
+    drawParticles(); resetShake();
+  }
+};
