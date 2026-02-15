@@ -1,6 +1,7 @@
-// === MICRO QUEST - ROUTE A: 16x16 HD FULL COLOR UPDATE ===
+// === MICRO QUEST - SYMBOL ENCOUNTER UPDATE ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
+  fieldMonsters: [], fightingMonsterIdx: -1, // ★ シンボルエンカウント用の配列
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
   monsterTypes: { slime: {name: 'スライム', spr: sprs.slime, c: '#0a0', hp: 15, atk: 3, def: 1, spd: 3, exp: 15, gld: 8, spells: []}, bat: {name: 'コウモリ', spr: sprs.enemyNew, c: '#80f', hp: 20, atk: 5, def: 1, spd: 8, exp: 20, gld: 12, spells: [5]}, skeleton: {name: '骨戦士', spr: sprs.skull, c: '#aaa', hp: 35, atk: 7, def: 3, spd: 6, exp: 30, gld: 20, spells: []}, mage: {name: '魔道士', spr: sprs.mage, c: '#60c', hp: 25, atk: 10, def: 2, spd: 5, exp: 35, gld: 25, spells: [0, 1, 4]}, golem: {name: 'ゴーレム', spr: sprs.boss, c: '#884', hp: 80, atk: 15, def: 10, spd: 2, exp: 100, gld: 80, spells: []}, dragon: {name: 'ドラゴン', spr: sprs.dragon, c: '#f00', hp: 120, atk: 25, def: 8, spd: 15, exp: 200, gld: 150, spells: [0, 1]} },
   encounterTable: { '1,1': ['slime'], '2,1': ['slime', 'bat'], '1,0': ['bat', 'skeleton', 'mage'], '0,1': ['skeleton', 'mage', 'golem'], '0,0': ['mage', 'golem', 'dragon'], '2,2': ['skeleton', 'dragon'] },
@@ -26,6 +27,7 @@ const RPG = {
   },
   deleteSave(slot) { localStorage.removeItem('4in1_rpg_slot' + slot); },
 
+  // ★ シンボルエンカウント発生ロジック（フィールド用）
   genMap() {
     this.map = Array(15).fill().map(() => Array(10).fill(0));
     let ax = this.p.areaX, ay = this.p.areaY, seed = ax * 10 + ay + 100; let rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
@@ -36,26 +38,38 @@ const RPG = {
     } }
     if (ax===1 && ay===1) { this.map[7][4] = 4; this.map[7][5] = 4; } if (ax===2 && ay===1) { this.map[5][5] = 5; } if (ax===1 && ay===0) { this.map[3][4] = 6; }
     if (ax===0 && ay===1) { this.map[8][2] = 7; } if (ax===0 && ay===0) { this.map[3][3]=8; this.map[3][2]=8; this.map[2][3]=8; this.map[2][2]=8; }
+    
+    // フィールドにモンスターを配置
+    this.fieldMonsters = [];
+    let numMonsters = 4 + this.p.areaX + this.p.areaY;
+    for(let i = 0; i < numMonsters; i++) {
+       let rx = Math.floor(Math.random() * 10); let ry = Math.floor(Math.random() * 15);
+       if((this.map[ry][rx] === 0 || this.map[ry][rx] === 9) && (rx !== this.p.x || ry !== this.p.y)) {
+           const enc = this.encounterTable[`${this.p.areaX},${this.p.areaY}`] || ['slime'];
+           this.fieldMonsters.push({x: rx, y: ry, type: enc[Math.floor(Math.random() * enc.length)]});
+       }
+    }
   },
   
   genTownMap() {
     this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
-    this.map[14][4]=15; this.map[14][5]=15;
-    this.map[1][4]=21; this.map[1][5]=21;
+    this.map[14][4]=15; this.map[14][5]=15; this.map[1][4]=21; this.map[1][5]=21;
     this.map[8][2]=17; this.map[8][7]=18; this.map[11][5]=19;
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.x = 4; this.p.y = 13;
+    this.fieldMonsters = []; // 町にはモンスターは出ない
   },
 
   genCastleMap() {
     this.map = Array(15).fill().map(() => Array(10).fill(10));
     for (let r = 1; r < 14; r++) { for (let c = 2; c < 8; c++) { this.map[r][c] = 15; } }
     for (let r = 2; r < 14; r++) { this.map[r][4] = 22; this.map[r][5] = 22; }
-    this.map[14][4]=15; this.map[14][5]=15;
-    this.map[2][4]=16; this.map[2][5]=16;
+    this.map[14][4]=15; this.map[14][5]=15; this.map[2][4]=16; this.map[2][5]=16;
     this.p.x = 4; this.p.y = 13;
+    this.fieldMonsters = [];
   },
   
+  // ★ シンボルエンカウント発生ロジック（ダンジョン用）
   genDungeonMap(type) {
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) {
         if (type==='cave') this.map[r][c] = (r===0||r===14||c===0||c===9||Math.random()<0.25)?10:11;
@@ -63,6 +77,17 @@ const RPG = {
         else this.map[r][c] = (r===0||r===14||c===0||c===9||Math.random()<0.2)?13:11;
     } }
     this.map[13][5] = 14; this.p.x = 5; this.p.y = 13; this.map[Math.floor(Math.random()*8)+1][Math.floor(Math.random()*8)+1] = 20;
+    
+    // ダンジョンにモンスターを配置
+    this.fieldMonsters = [];
+    let numMonsters = 5 + this.dungeon.floor * 2;
+    for(let i = 0; i < numMonsters; i++) {
+       let rx = Math.floor(Math.random() * 10); let ry = Math.floor(Math.random() * 15);
+       if(this.map[ry][rx] === 11 && (rx !== this.p.x || ry !== this.p.y)) {
+           const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime'];
+           this.fieldMonsters.push({x: rx, y: ry, type: enc[Math.floor(Math.random() * enc.length)]});
+       }
+    }
   },
   
   msgBox(t, nextSt = null) { this.msg = t; this.msgNextSt = nextSt; this.st = 'msg'; playSnd('sel'); },
@@ -74,7 +99,7 @@ const RPG = {
     this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox(`ダンジョンに入った！\nF1`);
   },
   
-  exitDungeon() { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); },
+  exitDungeon() { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); this.fieldMonsters = []; this.genMap(); }, // フィールドの敵を再配置
   calcStats() { return { atk: this.p.atk + this.p.customWep.atk, def: this.p.def + this.p.customArm.def, spd: this.p.spd }; },
   startArenaBattle(slot) { this.isArena = true; this.battle('custom', slot); activeApp = this; },
 
@@ -138,6 +163,8 @@ const RPG = {
       
       let nx = this.p.x, ny = this.p.y;
       if (keysDown.up) ny--; if (keysDown.down) ny++; if (keysDown.left) nx--; if (keysDown.right) nx++;
+      
+      let movedThisTurn = false;
       if (nx !== this.p.x || ny !== this.p.y) {
         if (this.st === 'map') {
           if (nx < 0) { if (this.p.areaX > 0) { this.p.areaX--; this.p.x = 9; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } } 
@@ -146,21 +173,43 @@ const RPG = {
           else if (ny > 14) { if (this.p.areaY < 2) { this.p.areaY++; this.p.y = 0; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } }
           else { 
             let t = this.map[ny][nx]; 
-            if (t!==1 && t!==2 && t!==3) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if ((t===0 || t===9) && Math.random() < 0.12) { const enc = this.encounterTable[`${this.p.areaX},${this.p.areaY}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } } 
+            if (t!==1 && t!==2 && t!==3) { this.p.x = nx; this.p.y = ny; playSnd('sel'); movedThisTurn = true; } 
           }
         } else if (this.st === 'dungeon' || this.st === 'townMap' || this.st === 'castle') {
-          if (this.st === 'townMap' && ny > 14) { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); }
+          if (this.st === 'townMap' && ny > 14) { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); this.genMap(); }
           else if (this.st === 'castle' && ny > 14) { this.st = 'townMap'; this.genTownMap(); this.p.x = 4; this.p.y = 2; playSnd('jmp'); }
           else if (ny >= 0 && ny < 15 && nx >= 0 && nx < 10) {
             let t = this.map[ny][nx]; 
             if (this.st === 'townMap' && t === 21) { this.st = 'castle'; this.genCastleMap(); playSnd('jmp'); } 
             else if (this.st === 'castle') { if (t===15 || t===22) { this.p.x = nx; this.p.y = ny; playSnd('sel'); } }
             else if (t!==1 && t!==10 && t!==12 && t!==13 && t!==16 && t!==17 && t!==18 && t!==19 && t!==21) { 
-              this.p.x = nx; this.p.y = ny; playSnd('sel'); 
-              if (this.st === 'dungeon' && Math.random() < 0.15) { const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } 
+              this.p.x = nx; this.p.y = ny; playSnd('sel'); movedThisTurn = true;
             }
           }
         }
+      }
+      
+      // ★ 主人公が動いたら、モンスターも同時にランダム移動（シンボルエンカウント）
+      if (movedThisTurn && this.fieldMonsters.length > 0) {
+          for (let i = 0; i < this.fieldMonsters.length; i++) {
+              let m = this.fieldMonsters[i];
+              let dirs = [{dx:0,dy:-1}, {dx:0,dy:1}, {dx:-1,dy:0}, {dx:1,dy:0}];
+              let dir = dirs[Math.floor(Math.random() * dirs.length)];
+              let mx = m.x + dir.dx, my = m.y + dir.dy;
+              
+              if (mx >= 0 && mx < 10 && my >= 0 && my < 15) {
+                  let mt = this.map[my][mx];
+                  let mWalkable = (this.st === 'map' && (mt===0 || mt===9)) || (this.st === 'dungeon' && mt===11);
+                  let occupied = this.fieldMonsters.some(other => other.x === mx && other.y === my);
+                  if (mWalkable && !occupied) { m.x = mx; m.y = my; }
+              }
+              // ★ プレイヤーとぶつかったら戦闘開始！
+              if (m.x === this.p.x && m.y === this.p.y) {
+                  this.fightingMonsterIdx = i;
+                  this.battle(false, m.type);
+                  break; // 一度に1体ずつ
+              }
+          }
       }
     }
 
@@ -244,6 +293,12 @@ const RPG = {
     if (!this.p.bestiary) this.p.bestiary = [];
     if (this.en.monsterType !== 'boss' && this.en.monsterType !== 'custom' && !this.p.bestiary.includes(this.en.monsterType)) { this.p.bestiary.push(this.en.monsterType); }
     
+    // ★ 勝利したらシンボルエンカウントの敵をマップから消す
+    if (this.fightingMonsterIdx > -1) {
+        this.fieldMonsters.splice(this.fightingMonsterIdx, 1);
+        this.fightingMonsterIdx = -1;
+    }
+    
     if (this.en.n === '魔王') { this.p.story = 4; this.msgBox("魔王を倒した！\n世界に平和が戻った！"); this.map[13][8] = 0; BGM.play('rpg_field'); }
     else if (this.en.monsterType === 'custom') { this.p.exp += this.en.exp; this.p.gld += this.en.gld; this.isArena = false; BGM.play('rpg_town'); this.msgBox(`見事な戦いぶりだ！\n${this.en.gld}Gと経験値を得た！`, 'customMenu'); }
     else if (this.en.monsterType === 'boss') {
@@ -320,17 +375,16 @@ const RPG = {
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 10; c++) {
           let v = this.map[r][c]; let sx = c * 20, sy = r * 20 + 45;
-          // ★ 16x16 HD スプライトエンジンでマップを描画！
-          if (v === 0) drawSprite(sx, sy, '', sprs.grass, 2.5);
-          else if (v === 1) drawSprite(sx, sy, '', sprs.tree, 2.5);
-          else if (v === 2) drawSprite(sx, sy, '', sprs.mount, 2.5);
+          if (v === 0) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.grass, 2.5); }
+          else if (v === 1) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.tree, 2.5); }
+          else if (v === 2) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.mount, 2.5); }
           else if (v === 3) drawSprite(sx, sy, '', sprs.water, 2.5);
-          else if (v === 4) drawSprite(sx, sy, '', sprs.town, 2.5);
-          else if (v === 5) drawSprite(sx, sy, '', sprs.cave, 2.5);
-          else if (v === 6) drawSprite(sx, sy, '', sprs.tower, 2.5);
-          else if (v === 7) drawSprite(sx, sy, '', sprs.ruins, 2.5);
-          else if (v === 8) drawSprite(sx, sy, '', sprs.demon, 2.5);
-          else if (v === 9) { drawSprite(sx, sy, '', sprs.grass, 2.5); ctx.fillStyle = '#a80'; ctx.fillRect(sx+5, sy+5, 10, 10); } 
+          else if (v === 4) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.town, 2.5); }
+          else if (v === 5) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.cave, 2.5); }
+          else if (v === 6) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.tower, 2.5); }
+          else if (v === 7) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.ruins, 2.5); }
+          else if (v === 8) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.demon, 2.5); }
+          else if (v === 9) { ctx.fillStyle = '#141'; ctx.fillRect(sx, sy, 20, 20); drawSprite(sx, sy, '', sprs.grass, 2.5); ctx.fillStyle = '#a80'; ctx.fillRect(sx+5, sy+5, 10, 10); } 
           else if (v === 10 || v === 11 || v === 12 || v === 13) drawSprite(sx, sy, '', sprs.wall, 2.5);
           else if (v === 14) drawSprite(sx, sy, '', sprs.stairs_up, 2.5);
           else if (v === 15) drawSprite(sx, sy, '', sprs.floor, 2.5);
@@ -347,8 +401,13 @@ const RPG = {
       }
       for (let ch of this.chests) { if (!ch.opened && this.st === 'map' && ch.ax === this.p.areaX && ch.ay === this.p.areaY) { ctx.fillStyle = '#f90'; ctx.fillRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); ctx.strokeStyle = '#fc0'; ctx.strokeRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); } }
       
-      // ★ 主人公（勇者）のHDアニメーション描画
-      drawSprite(this.p.x * 20, this.p.y * 20 + 45, '#ff0', sprs.player, 2.5);
+      // ★ フィールドモンスターの描画（シンボルエンカウント）
+      for (let m of this.fieldMonsters) {
+         let mData = this.monsterTypes[m.type];
+         if (mData) drawSprite(m.x * 20, m.y * 20 + 43, mData.c, mData.spr, 2.5); // 少しだけ上にずらして配置
+      }
+      
+      drawSprite(this.p.x * 20, this.p.y * 20 + 43, '#ff0', sprs.player, 2.5);
       
       const s = this.calcStats(); ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 42); ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
       ctx.fillText(`Lv${this.p.lv} HP${this.p.hp}/${this.p.mhp} MP${this.p.mp}/${this.p.mmp}`, 3, 10); ctx.fillText(`ATK${s.atk} DEF${s.def} SPD${s.spd} G${this.p.gld}`, 3, 20);
@@ -364,8 +423,6 @@ const RPG = {
       ctx.fillStyle = '#f00'; ctx.fillRect(15, 38, 170, 8); ctx.fillStyle = '#0f0'; ctx.fillRect(15, 38, Math.max(0, 170 * (this.en.hp / this.en.max)), 8);
       ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText(`${this.en.hp}/${this.en.max}`, 75, 45);
       if (this.en.poisoned) { ctx.fillStyle = '#a0f'; ctx.fillText('POISON', 140, 45); }
-      
-      // ★ モンスターのHDアニメーション描画（スライムなどがプルプル動く）
       drawSprite(70, 70, this.en.c, this.en.spr, 12);
       
       if (this.battleText !== '') {
