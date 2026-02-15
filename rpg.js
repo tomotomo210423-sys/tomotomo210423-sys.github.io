@@ -1,4 +1,4 @@
-// === MICRO QUEST - ULTIMATE BUG FIX & STABLE UPDATE ===
+// === MICRO QUEST - ULTIMATE FIX & STABLE UPDATE ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
@@ -8,8 +8,10 @@ const RPG = {
   init() { this.st = 'title'; this.mIdx = 0; this.anim = 0; BGM.play('rpg_field'); },
   
   loadSave(slot) {
-    const data = localStorage.getItem(`4in1_rpg_slot${slot}`);
-    const sd = data ? JSON.parse(data) : null;
+    const data = localStorage.getItem('4in1_rpg_slot' + slot);
+    let sd = null;
+    try { if (data) sd = JSON.parse(data); } catch(e) {}
+    
     if (sd) {
       this.p = sd.p; this.dungeons = sd.dungeons; this.chests = sd.chests; this.customBosses = sd.customBosses || Array(10).fill(null);
       if(!this.p.bestiary) this.p.bestiary = []; if(!this.p.knownSpells) this.p.knownSpells = []; if(!this.p.customWep) this.p.customWep = {atk: 0, lv: 0}; if(!this.p.customArm) this.p.customArm = {def: 0, lv: 0};
@@ -23,12 +25,12 @@ const RPG = {
   saveGame() {
     let sObj = { p: this.p, dungeons: this.dungeons, chests: this.chests, customBosses: this.customBosses };
     if (this.st !== 'map' && this.p.worldX !== undefined) { sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY; if (this.st === 'dungeon') { sObj.p.areaX = this.p.worldAx; sObj.p.areaY = this.p.worldAy; } }
-    localStorage.setItem(`4in1_rpg_slot${this.saveSlot}`, JSON.stringify(sObj));
+    localStorage.setItem('4in1_rpg_slot' + this.saveSlot, JSON.stringify(sObj));
   },
 
-  // ★フリーズの原因だった「削除機能」を復活
+  // ★フリーズの真犯人！消えてしまっていた削除機能を復活
   deleteSave(slot) {
-    localStorage.removeItem(`4in1_rpg_slot${slot}`);
+    localStorage.removeItem('4in1_rpg_slot' + slot);
   },
 
   genMap() {
@@ -42,12 +44,14 @@ const RPG = {
     if (ax===1 && ay===1) { this.map[7][4] = 4; this.map[7][5] = 4; } if (ax===2 && ay===1) { this.map[5][5] = 5; } if (ax===1 && ay===0) { this.map[3][4] = 6; }
     if (ax===0 && ay===1) { this.map[8][2] = 7; } if (ax===0 && ay===0) { this.map[3][3]=8; this.map[3][2]=8; this.map[2][3]=8; this.map[2][2]=8; }
   },
+  
   genTownMap() {
     this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
     this.map[14][4]=15; this.map[14][5]=15; this.map[3][4]=16; this.map[3][5]=16; this.map[8][2]=17; this.map[8][7]=18; this.map[11][5]=19;
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.x = 4; this.p.y = 13;
   },
+  
   genDungeonMap(type) {
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) {
         if (type==='cave') this.map[r][c] = (r===0||r===14||c===0||c===9||Math.random()<0.25)?10:11;
@@ -56,21 +60,22 @@ const RPG = {
     } }
     this.map[13][5] = 14; this.p.x = 5; this.p.y = 13; this.map[Math.floor(Math.random()*8)+1][Math.floor(Math.random()*8)+1] = 20;
   },
+  
   msgBox(t, nextSt = null) { this.msg = t; this.msgNextSt = nextSt; this.st = 'msg'; playSnd('sel'); },
+  
   enterDungeon(idx, type) {
     if (this.dungeons[idx] && this.dungeons[idx].cleared) { this.msgBox("魔物は討伐済みだ。"); return; }
     this.st = 'dungeon'; this.dungeon = {idx: idx, floor: 1, maxFloor: 3, type: type};
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.worldAx = this.p.areaX; this.p.worldAy = this.p.areaY; this.worldMap = this.map.map(r => [...r]);
-    this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox(`ダンジョンに入った！\nF1`);
+    this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox("ダンジョンに入った！\nF1");
   },
+  
   exitDungeon() { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); },
   calcStats() { return { atk: this.p.atk + this.p.customWep.atk, def: this.p.def + this.p.customArm.def, spd: this.p.spd }; },
   startArenaBattle(slot) { this.isArena = true; this.battle('custom', slot); activeApp = this; },
 
   update() {
-    this.anim++; 
-    // ★アニメーション処理中は一切のキー操作を受け付けない（連打バグ対策）
-    if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
+    this.anim++; if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
     if (this.st === 'battleProcessing') return;
 
     if (keysDown.select) {
@@ -94,20 +99,21 @@ const RPG = {
           else if (this.mIdx === 3) { this.saveGame(); this.msgBox("セーブしました！"); } else if (this.mIdx === 4) { this.st = 'title'; this.mIdx = 0; }
         }
         else if (this.st === 'customMenu') {
-          if (this.mIdx === 0) { let cost = 100 + this.p.customWep.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox(`武器を強化した！`); } else playSnd('hit'); }
-          else if (this.mIdx === 1) { let cost = 100 + this.p.customArm.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox(`防具を強化した！`); } else playSnd('hit'); }
+          if (this.mIdx === 0) { let cost = 100 + this.p.customWep.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox("武器を強化した！"); } else playSnd('hit'); }
+          else if (this.mIdx === 1) { let cost = 100 + this.p.customArm.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox("防具を強化した！"); } else playSnd('hit'); }
           else if (this.mIdx === 2) { activeApp = Arena; Arena.init(); playSnd('sel'); } 
           else if (this.mIdx === 3) { this.st = 'townMap'; this.mIdx = 0; }
         }
       }
       if (keysDown.b) {
         if (this.st === 'saveSelect' && this.mIdx < 3) { 
-          // ★空データのパースエラー対策
-          const data = localStorage.getItem(`4in1_rpg_slot${this.mIdx+1}`);
-          if (data) { this.deleteSave(this.mIdx+1); playSnd('hit'); } 
+          // ★安全にデータ削除
+          if (localStorage.getItem('4in1_rpg_slot' + (this.mIdx+1))) { 
+            this.deleteSave(this.mIdx+1); playSnd('hit'); 
+          } 
         }
-        if (this.st==='equipMenu' || this.st==='spellMenu' || this.st==='bestiary') { this.st = 'menu'; this.mIdx = 0; }
-        if (this.st === 'customMenu') { this.st = 'townMap'; this.mIdx = 0; }
+        else if (this.st==='equipMenu' || this.st==='spellMenu' || this.st==='bestiary') { this.st = 'menu'; this.mIdx = 0; }
+        else if (this.st === 'customMenu') { this.st = 'townMap'; this.mIdx = 0; }
       } return;
     }
 
@@ -129,7 +135,7 @@ const RPG = {
           const adj = [ this.map[this.p.y][this.p.x], this.p.y>0?this.map[this.p.y-1][this.p.x]:0, this.p.y<14?this.map[this.p.y+1][this.p.x]:0, this.p.x>0?this.map[this.p.y][this.p.x-1]:0, this.p.x<9?this.map[this.p.y][this.p.x+1]:0 ];
           if (adj.includes(16)) { this.msgBox(this.p.story===0?"王様「東の洞窟へ行け！」":this.p.story===1?"王様「北の塔へ向かえ！」":this.p.story===2?"王様「北西の魔王城へ！」":"王様「世界に平和が！」"); }
           else if (adj.includes(17)) { if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りない。"); }
-          else if (adj.includes(18)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox(`50Gで魔法を習得した！`); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
+          else if (adj.includes(18)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox("50Gで魔法を習得した！"); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
           else if (adj.includes(19)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
         }
       }
@@ -256,7 +262,8 @@ const RPG = {
       } else {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('セーブデータ', 50, 30);
         for (let i = 0; i < 3; i++) {
-          const data = localStorage.getItem(`4in1_rpg_slot${i + 1}`); const sd = data ? JSON.parse(data) : null; const sel = this.mIdx === i;
+          const data = localStorage.getItem('4in1_rpg_slot' + (i+1)); let sd = null; try { if (data) sd = JSON.parse(data); } catch(e) {}
+          const sel = this.mIdx === i;
           ctx.fillStyle = sel ? 'rgba(0,255,0,0.2)' : 'rgba(100,100,100,0.2)'; ctx.fillRect(15, 50 + i * 65, 170, 55); ctx.strokeStyle = sel ? '#0f0' : '#666'; ctx.strokeRect(15, 50 + i * 65, 170, 55);
           ctx.fillStyle = sel ? '#0f0' : '#aaa'; ctx.font = 'bold 12px monospace'; ctx.fillText(`スロット ${i + 1}`, 25, 70 + i * 65);
           if (sd) { ctx.fillStyle = sel ? '#fff' : '#888'; ctx.font = '9px monospace'; const dP = sd.p || sd; ctx.fillText(`Lv${dP.lv} HP${dP.hp}/${dP.mhp} G:${dP.gld}`, 25, 85 + i * 65); } else { ctx.fillStyle = sel ? '#fff' : '#666'; ctx.font = '9px monospace'; ctx.fillText('データなし', 25, 85 + i * 65); }
@@ -275,7 +282,7 @@ const RPG = {
         for (let i = 0; i < mItems.length; i++) { ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((this.mIdx === i ? '> ' : '  ') + mItems[i], 30, 105 + i * 25); }
       } else if (this.st === 'bestiary') {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('モンスター図鑑', 45, 70);
-        if (this.p.bestiary.length === 0) { ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('まだ情報がない', 50, 110); } 
+        if (!this.p.bestiary || this.p.bestiary.length === 0) { ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('まだ情報がない', 50, 110); } 
         else {
           let st = Math.max(0, this.mIdx - 2); let en = Math.min(this.p.bestiary.length, st + 5); let y = 95;
           for (let i = st; i < en; i++) {
@@ -290,7 +297,7 @@ const RPG = {
         ctx.fillText(`武器: C-WEP Lv.${this.p.customWep.lv}`, 25, 165); ctx.fillText(`防具: C-ARM Lv.${this.p.customArm.lv}`, 25, 185);
       } else if (this.st === 'spellMenu') {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('習得魔法', 65, 70); ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-        if (this.p.knownSpells.length === 0) ctx.fillText('魔法を習得していない', 30, 110); else { let y = 95; for (let idx of this.p.knownSpells) { const sp = this.spells[idx]; ctx.fillStyle = sp.type==='heal'?'#0f0':sp.type==='poison'?'#a0f':'#fff'; ctx.fillText(`${sp.name} (MP${sp.mp})`, 30, y); ctx.fillStyle='#aaa'; ctx.font = '8px monospace'; ctx.fillText(sp.desc, 35, y + 12); ctx.font = '10px monospace'; y += 25; } }
+        if (!this.p.knownSpells || this.p.knownSpells.length === 0) ctx.fillText('魔法を習得していない', 30, 110); else { let y = 95; for (let idx of this.p.knownSpells) { const sp = this.spells[idx]; ctx.fillStyle = sp.type==='heal'?'#0f0':sp.type==='poison'?'#a0f':'#fff'; ctx.fillText(`${sp.name} (MP${sp.mp})`, 30, y); ctx.fillStyle='#aaa'; ctx.font = '8px monospace'; ctx.fillText(sp.desc, 35, y + 12); ctx.font = '10px monospace'; y += 25; } }
       } else if (this.st === 'customMenu') {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('町外れの工房', 55, 70); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`所持金: ${this.p.gld}G`, 120, 70);
         const wC = 100 + this.p.customWep.lv * 50; const aC = 100 + this.p.customArm.lv * 50;
