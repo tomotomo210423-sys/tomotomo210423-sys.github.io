@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>4in1 RETRO SYSTEM - ULTIMATE</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; user-select: none; overflow: hidden; }
+#boot { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; font-family: 'Courier New', monospace; transition: opacity 0.5s; }
+#boot.hidden { opacity: 0; pointer-events: none; }
+.boot-text { font-size: 14px; margin: 5px 0; }
+.boot-bar { width: 300px; height: 20px; border: 2px solid #0f0; margin-top: 20px; }
+.boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
+#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 0; transition: opacity 0.5s; }
+#gameboy.ready { opacity: 1; }
+#screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); }
+canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); }
+#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); }
+#dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; }
+.d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.1s; }
+.d-btn:active { background: #111; transform: translateY(2px); }
+#btn-up { top: 0; left: 40px; width: 40px; height: 40px; border-radius: 5px 5px 0 0; }
+#btn-down { bottom: 0; left: 40px; width: 40px; height: 40px; border-radius: 0 0 5px 5px; }
+#btn-left { top: 40px; left: 0; width: 40px; height: 40px; border-radius: 5px 0 0 5px; }
+#btn-right { top: 40px; right: 0; width: 40px; height: 40px; border-radius: 0 5px 5px 0; }
+.d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; position: absolute; }
+#action-buttons { position: absolute; right: 20px; top: 50px; width: 140px; height: 100px; transform: rotate(-15deg); }
+.a-btn { position: absolute; width: 55px; height: 55px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 20px; text-align: center; line-height: 55px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.1s; }
+.a-btn:active { background: #800; transform: translateY(2px); box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 1px 1px 2px rgba(0,0,0,0.4); }
+#btn-b { left: 0; bottom: 0; } 
+#btn-a { right: 0; top: 0; }
+.btn-label { position: absolute; font-size: 14px; color: #555; font-weight: bold; }
+#label-b { left: 20px; bottom: -25px; } 
+#label-a { right: 20px; top: -25px; }
+#sys-buttons { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; }
+.s-btn-wrap { text-align: center; }
+.s-btn { width: 50px; height: 15px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
+.s-btn:active { background: #333; }
+.s-label { font-size: 10px; color: #555; font-weight: bold; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div id="boot">
+  <div class="boot-text">4in1 RETRO SYSTEM</div>
+  <div class="boot-text">Version 2.0 ULTIMATE</div>
+  <div class="boot-text" style="margin-top: 20px;">Initializing...</div>
+  <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
+  <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading system...</div>
+</div>
+<div id="gameboy">
+  <div id="screen-container">
+    <canvas id="gameCanvas" width="200" height="300"></canvas>
+  </div>
+  <div id="controls">
+    <div id="dpad">
+      <div class="d-center"></div>
+      <div class="d-btn" id="btn-up"></div>
+      <div class="d-btn" id="btn-down"></div>
+      <div class="d-btn" id="btn-left"></div>
+      <div class="d-btn" id="btn-right"></div>
+    </div>
+    
+    <div id="action-buttons">
+      <div class="a-btn" id="btn-b">B</div>
+      <div class="btn-label" id="label-b">B</div>
+      <div class="a-btn" id="btn-a">A</div>
+      <div class="btn-label" id="label-a">A</div>
+    </div>
+    <div id="sys-buttons">
+      <div class="s-btn-wrap"><div class="s-btn" id="btn-select"></div><div class="s-label">SELECT</div></div>
+    </div>
+  </div>
+</div>
+<script>
+// === BOOT SEQUENCE ===
+let bootProgress = 0;
+const bootInterval = setInterval(() => {
+  bootProgress += Math.random() * 15;
+  if (bootProgress > 100) bootProgress = 100;
+  document.getElementById('bootProgress').style.width = bootProgress + '%';
+
+  const status = bootProgress < 30 ? 'Loading BIOS...' :
+                 bootProgress < 60 ? 'Checking ROM...' :
+                 bootProgress < 90 ? 'Initializing audio...' : 'Ready!';
+  document.getElementById('bootStatus').textContent = status;
+
+  if (bootProgress >= 100) {
+    clearInterval(bootInterval);
+    setTimeout(() => {
+      document.getElementById('boot').classList.add('hidden');
+      document.getElementById('gameboy').classList.add('ready');
+    }, 500);
+  }
+}, 100);
+
+// === CORE SYSTEM ===
+const ctx = document.getElementById('gameCanvas').getContext('2d');
+const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
+const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
+let prevKeys = {...keys};
+let activeApp = null;
+
+// === AUDIO SYSTEM ===
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+let bgmOsc = null, bgmGain = null, bgmInterval = null;
+const BGM = {
+  stop() {
+    if (bgmOsc) { bgmOsc.stop(); bgmOsc = null; }
+    if (bgmGain) bgmGain = null;
+    if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; }
+  },
+  play(type) {
+    this.stop();
+    if (!audioCtx) return;
+    bgmGain = audioCtx.createGain();
+    bgmGain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+    bgmGain.connect(audioCtx.destination);
+    
+    const melodies = {
+      menu: [262,294,330,349,392,349,330,294],
+      tetri: [523,587,659,698,784,698,659,587],
+      action: [392,440,494,523,494,440,392,349],
+      rpg: [330,349,392,440,392,349,330,294]
+    };
+    
+    const melody = melodies[type] || melodies.menu;
+    const waveTypes = {menu:'square', tetri:'sine', action:'triangle', rpg:'sawtooth'};
+    const intervals = {menu:300, tetri:200, action:250, rpg:350};
+    
+    let i = 0;
+    bgmInterval = setInterval(() => {
+      if (bgmOsc) bgmOsc.stop();
+      bgmOsc = audioCtx.createOscillator();
+      bgmOsc.type = waveTypes[type] || 'square';
+      bgmOsc.frequency.value = melody[i % melody.length];
+      bgmOsc.connect(bgmGain);
+      bgmOsc.start();
+      i++;
+    }, intervals[type] || 300);
+  }
+};
+
+function playSnd(t) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gn = audioCtx.createGain();
+  osc.connect(gn);
+  gn.connect(audioCtx.destination);
+  const n = audioCtx.currentTime;
+  
+  if (t === 'sel') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, n);
+    gn.gain.setValueAtTime(0.1, n);
+    gn.gain.linearRampToValueAtTime(0, n + 0.05);
+    osc.start(n);
+    osc.stop(n + 0.05);
+  } else if (t === 'jmp') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(300, n);
+    osc.frequency.exponentialRampToValueAtTime(600, n + 0.1);
+    gn.gain.setValueAtTime(0.05, n);
+    gn.gain.linearRampToValueAtTime(0, n + 0.1);
+    osc.start(n);
+    osc.stop(n + 0.1);
+  } else if (t === 'hit') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, n);
+    osc.frequency.exponentialRampToValueAtTime(20, n + 0.15);
+    gn.gain.setValueAtTime(0.1, n);
+    gn.gain.linearRampToValueAtTime(0, n + 0.15);
+    osc.start(n);
+    osc.stop(n + 0.15);
+  } else if (t === 'combo') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, n);
+    osc.frequency.setValueAtTime(880, n + 0.05);
+    gn.gain.setValueAtTime(0.15, n);
+    gn.gain.linearRampToValueAtTime(0, n + 0.15);
+    osc.start(n);
+    osc.stop(n + 0.15);
+  }
+}
+
+// === SAVE SYSTEM ===
+const SaveSys = {
+  data: JSON.parse(localStorage.getItem('4in1_ultimate')) || {
+    playerName: 'PLAYER',
+    scores: {n:0, h:0},
+    actStage: 1,
+    actLives: 3,
+    rpg: null,
+    rankings: {n:[], h:[]},
+    bgTheme: 0
+  },
+  save() {
+    localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
+  },
+  addScore(mode, score) {
+    const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h;
+    rank.push({name: this.data.playerName, score: score, date: Date.now()});
+    rank.sort((a,b) => b.score - a.score);
+    if (rank.length > 10) rank.splice(10);
+    this.save();
+  }
+};
+
+// === BACKGROUND THEMES ===
+const bgThemes = [
+  {
+    name: 'MATRIX',
+    draw: (ctx) => {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 200, 300);
+      ctx.fillStyle = '#0f0';
+      ctx.font = '10px monospace';
+      for (let i = 0; i < 20; i++) {
+        const x = (i * 10) + (Date.now() / 50) % 10;
+        const y = (Date.now() / 20 + i * 15) % 300;
+        ctx.fillText(String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96)), x, y);
+      }
+    }
+  },
+  {
+    name: 'STARS',
+    draw: (ctx) => {
+      ctx.fillStyle = '#000822';
+      ctx.fillRect(0, 0, 200, 300);
+      ctx.fillStyle = '#fff';
+      for (let i = 0; i < 50; i++) {
+        const x = (i * 37) % 200;
+        const y = (i * 67 + Date.now() / 10) % 300;
+        const s = 1 + (i % 3);
+        ctx.fillRect(x, y, s, s);
+      }
+    }
+  },
+  {
+    name: 'WAVE',
+    draw: (ctx) => {
+      ctx.fillStyle = '#001';
+      ctx.fillRect(0, 0, 200, 300);
+      for (let y = 0; y < 300; y += 10) {
+        const hue = (y + Date.now() / 20) % 360;
+        ctx.fillStyle = `hsl(${hue}, 70%, 30%)`;
+        ctx.fillRect(0, y, 200, 10);
+      }
+    }
+  }
+];
+
+// === PARTICLE SYSTEM ===
+const particles = [];
+function addParticle(x, y, color, type = 'star') {
+  const count = type === 'explosion' ? 8 : type === 'line' ? 20 : 5;
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x,
+      y: y,
+      vx: (Math.random() - 0.5) * 4,
+      vy: (Math.random() - 0.5) * 4 - 1,
+      life: 30,
+      color: color,
+      size: type === 'explosion' ? 2 : 1
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.2;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / 30;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+    ctx.globalAlpha = 1;
+  });
+}
+
+// === SCREEN SHAKE ===
+let shakeTimer = 0;
+function screenShake(intensity = 2) {
+  shakeTimer = intensity;
+}
+
+function applyShake() {
+  if (shakeTimer > 0) {
+    const ox = (Math.random() - 0.5) * shakeTimer * 2;
+    const oy = (Math.random() - 0.5) * shakeTimer * 2;
+    ctx.save();
+    ctx.translate(ox, oy);
+    shakeTimer--;
+  }
+}
+
+function resetShake() {
+  if (shakeTimer >= 0) ctx.restore();
+}
+
+// === SPRITE SYSTEM ===
+const drawSprite = (x, y, color, str, size = 2.5) => {
+  ctx.fillStyle = color;
+  const len = Math.sqrt(str.length);
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === '1') {
+      ctx.fillRect(x + (i % len) * size, y + Math.floor(i / len) * size, size, size);
+    }
+  }
+};
+
+const sprs = {
+  hero: "0011110001111100111111101111111011011011110011110111110001111100",
+  slime: "0000000000111100011111100111111001111110001111000011110000111100",
+  boss: "1111111110011001110111111001100110011001100110011111111110000001",
+  skull: "0111111011000011110001111100011111000110110001100111111001111110",
+  player: "0011110001111100011111000111110001111100011111000111110000111100",
+  heroNew: "0111111011111111111111111101101111111111011111100111111001111110",
+  enemyNew: "1111111110111101101001011010010111011101111111111111111110111101",
+  spike: "0010010001101100111111100111111001101100010010000100010000000000",
+  mage: "0011110001111100111111100111111000111100011111100111111001111110",
+  dragon: "1111111111111111111111111111111111011011110110111101101111111111",
+  star: "0001000000111000011111001111111001111100001110000001000000000000"
+};
+
+// === MENU SYSTEM ===
+const Menu = {
+  cur: 0,
+  apps: ['操作説明', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'ローカルランキング', '設定'],
+  selectHoldTimer: 0,
+
+  init() {
+    this.cur = 0;
+    this.selectHoldTimer = 0;
+    BGM.play('menu');
+  },
+
+  update() {
+    if (keys.select) {
+      this.selectHoldTimer++;
+      if (this.selectHoldTimer === 30) {
+        SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length;
+        SaveSys.save();
+        playSnd('combo');
+      }
+    } else {
+      this.selectHoldTimer = 0;
+    }
+
+    if (keysDown.down) {
+      this.cur = (this.cur + 1) % 7;
+      playSnd('sel');
+    }
+    if (keysDown.up) {
+      this.cur = (this.cur + 6) % 7;
+      playSnd('sel');
+    }
+
+    if (keysDown.a) {
+      playSnd('jmp');
+      const apps = [Manual, Tetri, Action, RPG, Online, Ranking, Settings];
+      activeApp = apps[this.cur];
+      activeApp.init();
+    }
+  },
+
+  draw() {
+    bgThemes[SaveSys.data.bgTheme].draw(ctx);
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#0f0';
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText('4in1 RETRO', 55, 30);
+    ctx.shadowBlur = 0;
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '9px monospace';
+    ctx.fillText('ULTIMATE v2.0', 55, 45);
+    
+    for (let i = 0; i < 7; i++) {
+      ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa';
+      ctx.font = '11px monospace';
+      ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 75 + i * 28);
+    }
+
+    ctx.fillStyle = '#888';
+    ctx.font = '9px monospace';
+    ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280);
+
+    ctx.fillStyle = '#666';
+    ctx.font = '8px monospace';
+    ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
+
+    if (this.selectHoldTimer > 0) {
+      const progress = Math.min(30, this.selectHoldTimer);
+      ctx.fillStyle = 'rgba(0,255,0,0.3)';
+      ctx.fillRect(10, 265, (180 * progress / 30), 5);
+      ctx.strokeStyle = '#0f0';
+      ctx.strokeRect(10, 265, 180, 5);
+    }
+  }
+};
+
+// === MANUAL (操作説明) ===
+const Manual = {
+  init() {},
+  update() {
+    if (keysDown.select || keysDown.b) {
+      activeApp = Menu;
+      Menu.init();
+    }
+  },
+  draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 200, 300);
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('【操作説明】', 50, 25);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px monospace';
+    const text = [
+      '',
+      '十字キー: 移動/選択',
+      'Aボタン: 決定/攻撃',
+      'Bボタン: キャンセル/加速',
+      'SELECT: メニューへ戻る',
+      '',
+      'キーボード操作:',
+      '矢印キー: 移動',
+      'Z/Space: Aボタン',
+      'X: Bボタン',
+      'Shift: SELECT',
+      '',
+      'SELECT長押し:',
+      '→ 背景テーマ変更',
+      '',
+      'データは自動保存されます'
+    ];
+    
+    text.forEach((l, i) => ctx.fillText(l, 15, 45 + i * 16));
+
+    ctx.fillStyle = '#666';
+    ctx.font = '9px monospace';
+    ctx.fillText('B または SELECT で戻る', 40, 285);
+  }
+};
+
+// === RANKING ===
+const Ranking = {
+  mode: 'normal',
+  input: false,
+  name: '',
+  cursor: 0,
+  menuCursor: 0,
+  chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
+
+  init() {
+    if (!this.input) this.mode = 'normal';
+    this.cursor = 0;
+    this.menuCursor = 0;
+  },
+
+  update() {
+    if (!this.input && (keysDown.select || keysDown.b)) {
+      activeApp = Menu;
+      Menu.init();
+      return;
+    }
+
+    if (this.input && keysDown.select) {
+      this.input = false;
+      this.name = '';
+      activeApp = Menu;
+      Menu.init();
+      return;
+    }
+
+    if (!this.input) {
+      if (keysDown.left || keysDown.right) {
+        this.mode = this.mode === 'normal' ? 'hard' : 'normal';
+        playSnd('sel');
+      }
+      if (keysDown.a) {
+        this.input = true;
+        this.name = SaveSys.data.playerName;
+        this.cursor = 0;
+        this.menuCursor = 0;
+        playSnd('jmp');
+      }
+    } else {
+      const chars = this.chars;
+      
+      if (this.menuCursor === 0) {
+        if (keysDown.right) {
+          this.cursor = (this.cursor + 1) % chars.length;
+          playSnd('sel');
+        }
+        if (keysDown.left) {
+          this.cursor = (this.cursor + chars.length - 1) % chars.length;
+          playSnd('sel');
+        }
+        if (keysDown.down) {
+          let newCursor = this.cursor + 10;
+          if (newCursor >= chars.length) {
+            this.menuCursor = 1;
+          } else {
+            this.cursor = newCursor;
+          }
+          playSnd('sel');
+        }
+        if (keysDown.up) {
+          let newCursor = this.cursor - 10;
+          if (newCursor >= 0) {
+            this.cursor = newCursor;
+            playSnd('sel');
+          }
+        }
+        if (keysDown.a) {
+          if (this.name.length < 10) {
+            this.name += chars[this.cursor];
+            playSnd('jmp');
+          } else {
+            playSnd('hit');
+          }
+        }
+        if (keysDown.b) {
+          if (this.name.length > 0) {
+            this.name = this.name.slice(0, -1);
+            playSnd('hit');
+          }
+        }
+      } else if (this.menuCursor === 1) {
+        if (keysDown.up) {
+          this.menuCursor = 0;
+          playSnd('sel');
+        }
+        if (keysDown.down) {
+          this.menuCursor = 2;
+          playSnd('sel');
+        }
+        if (keysDown.a) {
+          if (this.name.length > 0) {
+            this.name = this.name.slice(0, -1);
+            playSnd('hit');
+          }
+        }
+      } else if (this.menuCursor === 2) {
+        if (keysDown.up) {
+          this.menuCursor = 1;
+          playSnd('sel');
+        }
+        if (keysDown.a && this.name.length > 0) {
+          SaveSys.data.playerName = this.name;
+          SaveSys.save();
+          this.input = false;
+          playSnd('combo');
+          activeApp = Menu;
+          Menu.init();
+        }
+      }
+    }
+  },
+
+  draw() {
+    ctx.fillStyle = '#001';
+    ctx.fillRect(0, 0, 200, 300);
+    
+    if (!this.input) {
+      ctx.fillStyle = '#0ff';
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText('LOCAL RANKING', 50, 20);
+      
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px monospace';
+      ctx.fillText((this.mode === 'normal' ? '[NORMAL]' : '<NORMAL>'), 30, 40);
+      ctx.fillText((this.mode === 'hard' ? '[HARD]' : '<HARD>'), 120, 40);
+      
+      const rank = this.mode === 'normal' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h;
+      
+      ctx.fillStyle = '#ff0';
+      ctx.font = '9px monospace';
+      ctx.fillText('RANK NAME       SCORE', 15, 58);
+      
+      for (let i = 0; i < 10; i++) {
+        const entry = rank[i];
+        ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa';
+        ctx.font = '9px monospace';
+        
+        if (entry) {
+          const name = entry.name.padEnd(10, ' ');
+          const score = String(entry.score).padStart(6, ' ');
+          ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ${name} ${score}`, 15, 76 + i * 18);
+        } else {
+          ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ----------  ----`, 15, 76 + i * 18);
+        }
+      }
+      
+      ctx.fillStyle = '#0f0';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('プレイヤー名: ' + SaveSys.data.playerName, 15, 270);
+      
+      ctx.fillStyle = '#888';
+      ctx.font = '9px monospace';
+      ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
+    } else {
+      ctx.fillStyle = '#0f0';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('名前入力', 65, 25);
+      
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 16px monospace';
+      const displayName = this.name + '_';
+      ctx.fillText(displayName, 100 - displayName.length * 4.5, 50);
+      
+      const chars = this.chars;
+      ctx.fillStyle = '#fff';
+      ctx.font = '11px monospace';
+      const gridW = 10;
+      
+      for (let i = 0; i < chars.length; i++) {
+        const row = Math.floor(i / gridW);
+        const col = i % gridW;
+        const x = 15 + col * 17;
+        const y = 90 + row * 18;
+        
+        if (i === this.cursor && this.menuCursor === 0) {
+          ctx.fillStyle = '#000';
+          ctx.fillRect(x - 2, y - 13, 14, 15);
+          ctx.fillStyle = '#0f0';
+        } else {
+          ctx.fillStyle = '#aaa';
+        }
+        ctx.fillText(chars[i], x, y);
+      }
+      
+      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800';
+      ctx.fillRect(25, 175, 70, 22);
+      
+      ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(25, 175, 70, 22);
+      
+      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('DELETE', 30, 191);
+      
+      const okEnabled = this.name.length > 0;
+      ctx.fillStyle = this.menuCursor === 2 ? (okEnabled ? '#0f0' : '#444') : (okEnabled ? '#080' : '#222');
+      ctx.fillRect(105, 175, 70, 22);
+      
+      ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666';
+      ctx.strokeRect(105, 175, 70, 22);
+      ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEnabled ? '#ccc' : '#666');
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('OK', 130, 191);
+      
+      ctx.fillStyle = '#666';
+      ctx.font = '8px monospace';
+      ctx.fillText('↑↓←→:選択 A:追加 B:削除', 25, 215);
+    }
+  }
+};
+
+// === SETTINGS ===
+const Settings = {
+  menuCursor: 0,
+
+  init() {
+    this.menuCursor = 0;
+  },
+
+  update() {
+    if (keysDown.select || keysDown.b) {
+      activeApp = Menu;
+      Menu.init();
+      return;
+    }
+
+    if (keysDown.up) {
+      this.menuCursor = 0;
+      playSnd('sel');
+    }
+    if (keysDown.down) {
+      this.menuCursor = 1;
+      playSnd('sel');
+    }
+
+    if (keysDown.a) {
+      if (this.menuCursor === 0) {
+        activeApp = Ranking;
+        activeApp.input = true;
+        activeApp.name = SaveSys.data.playerName;
+        activeApp.cursor = 0;
+        activeApp.menuCursor = 0;
+        activeApp.init();
+      } else if (this.menuCursor === 1) {
+        SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length;
+        SaveSys.save();
+        playSnd('combo');
+      }
+    }
+  },
+
+  draw() {
+    ctx.fillStyle = '#001';
+    ctx.fillRect(0, 0, 200, 300);
+
+    ctx.fillStyle = '#0f0';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('【設定】', 70, 30);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px monospace';
+    ctx.fillText((this.menuCursor === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80);
+    ctx.fillText((this.menuCursor === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
+
+    ctx.fillStyle = '#888';
+    ctx.font = '10px monospace';
+    ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95);
+    ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125);
+
+    ctx.fillStyle = '#666';
+    ctx.font = '9px monospace';
+    ctx.fillText('SELECT: 戻る', 60, 280);
+  }
+};
+
+// === INPUT SYSTEM ===
+const setBtn = (id, k) => {
+  const e = document.getElementById(id);
+  if (!e) return;
+  const p = (ev) => {
+    ev.preventDefault();
+    keys[k] = true;
+    initAudio();
+  };
+  const r = (ev) => {
+    ev.preventDefault();
+    keys[k] = false;
+  };
+  e.addEventListener('touchstart', p, {passive: false});
+  e.addEventListener('touchend', r, {passive: false});
+  e.addEventListener('mousedown', p);
+  e.addEventListener('mouseup', r);
+  e.addEventListener('mouseleave', r);
+};
+
+['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select'].forEach((id, i) => {
+  setBtn(id, ['up', 'down', 'left', 'right', 'a', 'b', 'select'][i]);
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); }
+  if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); }
+  if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
+  if (e.key === 'z' || e.key === ' ') { keys.a = true; initAudio(); }
+  if (e.key === 'x') { keys.b = true; initAudio(); }
+  if (e.key === 'Shift') { keys.select = true; initAudio(); }
+});
+
+window.addEventListener('keyup', e => {
+  if (e.key === 'ArrowUp') keys.up = false;
+  if (e.key === 'ArrowDown') keys.down = false;
+  if (e.key === 'ArrowLeft') keys.left = false;
+  if (e.key === 'ArrowRight') keys.right = false;
+  if (e.key === 'z' || e.key === ' ') keys.a = false;
+  if (e.key === 'x') keys.b = false;
+  if (e.key === 'Shift') keys.select = false;
+});
+</script>
+
+<script src="games.js"></script>
+
+<script>
+// === MAIN LOOP ===
+activeApp = Menu;
+activeApp.init();
+
+function loop() {
+  for (let k in keys) {
+    keysDown[k] = keys[k] && !prevKeys[k];
+    prevKeys[k] = keys[k];
+  }
+  activeApp.update();
+  activeApp.draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
