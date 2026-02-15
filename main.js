@@ -1,4 +1,4 @@
-// === CORE SYSTEM - ROUTE A: NEW SPRITES & CLEAN MAP ===
+// === CORE SYSTEM - ROUTE A: 16x16 HD & CLEAN GRAPHICS ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
@@ -62,45 +62,40 @@ const PALETTE = { '2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#0
 const drawSprite = (x, y, color, strData, size = 2.5) => {
   if (!strData) return;
   const str = Array.isArray(strData) ? strData[Math.floor(Date.now() / 300) % strData.length] : strData;
-  const len = Math.sqrt(str.length);
-  const dotSize = (8 / len) * size;
+  const len = Math.sqrt(str.length); const dotSize = (8 / len) * size;
   for (let i = 0; i < str.length; i++) {
-    const char = str[i];
-    if (char === '0') continue;
+    const char = str[i]; if (char === '0') continue;
     ctx.fillStyle = (char === '1') ? color : (PALETTE[char] || color);
     ctx.fillRect(x + (i % len) * dotSize, y + Math.floor(i / len) * dotSize, dotSize, dotSize);
   }
 };
 
 const sprs = {
-  player: [
-    "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
-    "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"
-  ],
-  heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
-  slime: [
-    "000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000",
-    "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"
-  ],
+  // ★ RPGキャラクター＆モンスター
+  player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
+  slime: ["000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
   boss: "000033333333000000031111111130000031131111311300003138311383130000311311113113000031111331111300000311111111300000003333333300000033a111111a330003aa31111113aa3003a3311111133a3003303111111303300000311331130000000031133113000000003330033300000000000000000000",
   skull: "0000033333300000000032222223000000032222222230000003233223323000000323322332300000032223322230000000322222230000000003233230000000000322223000000000003333000000000033a22a33000000032a2222a230000003222332223000000033300333000000003230032300000000333003330000",
   mage: "0000003333000000000003111130000000003111111300000003111111113000003133333333130000000344443000000000343443430000000034444443000000000311113080000000311111138000000311111111390000031311113139000003331111333900000003333330090000000330033009000000033003300000",
   dragon: "0000000003333000000000003111130000000000313113000000000031111130000000031113330000033331111300000031111111130000031111111111300031131111111113003113111111111300033031111111300000000311331130000000031133113000000003330033300000000000000000000000000000000000",
-  enemyNew: "000000000000000000330000000033000313000000003130311300033000311331130031130031133113031111303113031331133113313000311111111113000003113113113000000031311313000000000311113000000000003333000000000000000000000000000000000000000000000000000000",
-  bat: "000000000000000003000000000000303d300000000003d33dd3003333003dd33dd333dddd333dd303ddd3dddd3ddd30003dddddddddd3000003ddd33ddd30000003dd3223dd300000003d3223d30000000003dddd30000000000033330000000000000000000000000000000000000000",
+  // ★ バット（コウモリ）を本物らしく修正
+  enemyNew: "000000000000000000000000000000000003300000033000003dd300003dd30003dddd3003dddd303dddddd33dddddd33dddddddddddddd303d33dddddd33d30003003d55d300300000003dddd3000000000003223000000000000033000000000000000000000000000000000000000",
   
-  // テトリベーダー用 新スキン
-  fighter: "00000003300000000000003bb3000000000003bbbb300000000003b22b30000000003bbbbbb3000000003bbbbbb300000003b3bbbb3b3000003bb3bbbb3bb30003bbb3bbbb3bbb303bbbb3bbbb3bbbb333333333333333330003bb3333bb30000003f53003f530000003f53003f5300000000000000000000000000000000000",
-  banana: "000000333000000000000388830000000000388888300000000038888883000000038888888300000003888888830000003888888830000000388888830000000038888883000000000388883000000000038888300000000000388300000000000033300000000000000000000000000000000000000000000000000000",
-  peperoncino: "0000000000000000000033333333000000332222222233000322288888822230322888858888822332888588886888233288888e88888823328688888858882332288888888882230322288888822230003322222222330000003333333300000000000000000000000000000000000000000000000000000000000000000000",
-  cannon: "000000000000000000000003300000000000003aa30000000000003aa30000000000003aa3000000000003aaaa300000000003aaaa30000000003a3aa3a3000000003a3aa3a300000003aaaaaaaa3000003888888888830003888888888888303888888888888883333333333333333300000000000000000000000000000000",
-
-  // マップ用スプライト（見やすさ改善）
-  grass: [
-    "6666666666666666666f6666666666666666666666666666666666666f6666666666666666666666666666f66666666666666666666666666666666666666666",
-    "66666666666666666666f6666666666666666666666666666666666666f66666666666666666666666666666f666666666666666666666666666666666666666"
-  ],
-  tree: "00f600000f666000f6666f0066f666f00f66600000e0000000e0000000e00000", mount: "000a000000aaa0000aaaaa00aaa3aaa0aaaaa3aa2aa333a22223333222223333", water: ["777777777b77b777777777777b77b77777777777777777777b77b77777777777", "77777777777777777b77b777777777777b77b77777777777777777777b77b777"], town: "00f000000fff00000f2f00000020000000200000002000000e2e0000eeeeee00", cave: "000000000aaaa000a3333a00a3333a00a3333a00a3333a00a3333a00aaaaaaaa", tower: "0022000002aa20002aaaa2002aaaa2002a22a2002aaaa2002aaaa2002a22a200", ruins: "0a000a000aa0aa00aaaaaa00aa33aa00aa33aa00aaaaaa000aa0aa000a000a00", demon: "0033000003553000355553003533530035555300355553003533530035555300", floor: "999999999e9e9e9e99999999e9e9e9e9999999999e9e9e9e99999999e9e9e9e9", wall: "aaaaaaaa22222222aaaaaaaa22222222aaaaaaaa22222222aaaaaaaa22222222", stairs_up: "00000000000000000000000066666666a6666666aa666666aaa66666aaaa6666", stairs_dn: "000000000000000000000000333333333333333a333333aa3333aaa333aaaa33", sign: "00000000e99999e09222229092222290e99999e0009000000090000000900000", spike: "00000000000000000000000110000000000000011000000000000011110000000000001111000000000001111110000000001111111100000001111111111000000111111111111000111111111111110011101111110111011110111111011111111011111101111011100111100111000110001100011000000000000000000", star: "0001000000111000011111001111111001111100001110000001000000000000"
+  // ★ RPGマップ用（見やすく調整）
+  grass: "000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  tree: "0000000333300000000003666630000000003666666300000003666666663000003666666666630000366666666663000036666666666300000366666666300000003666666300000000036666300000000000399300000000000039930000000000003993000000000000033000000000000000000000",
+  mount: "0000000000000000000000000000000000000003300000000000003aa3000000000003aaaa30000000003aaaaaa3000000003aaa3aaa30000003aa3333aa30000003a399993a300000393999999393000039999999999300039999999999993003999999999999303333333333333333",
+  water: ["0000000000000000000000000000000000002220000000000000000000000000000000000000000000000000000000000000000000000000000000000000222000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000002220000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000022200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"],
+  town: "00000000000000000000003300000000000003ff3000000000003ffff30000000003ffffff300000003ffffffff3000003ffffffffff3000033333333333300000003223000000000003223000000000003223000000000003223000000000003333000000000000000000000000000000000000",
+  cave: "000000000000000000003333330000000003aaaaaa300000003aaaaaaaa3000003aaaaaaaaaa300003aaaaaaaaaa300003aaa3333aaa300003aa333333aa300003aa333333aa300003aa333333aa300003aa333333aa300003aa333333aa300003aa333333aa300003333333333330000000000000000",
+  
+  // ★ テトリベーダー用新スキン
+  fighter: "000000033000000000000032230000000000032bb23000000000032bb23000000003332bb23330000032222bb2222300032bb22bb22bb23032bbbb2bb2bbbb233333333bb33333330000032222300000000032b22b230000000033333333000000000055550000000000000550000000000000000000000",
+  banana: "00000000000003300000000000003883000000000003888300000000003888300000000003888300000000038883000000000388830000000038883000000003888300000000388830000000038883000000000388830000000000388830000000000038830000000000000330000000000000000000",
+  peperoncino: "000000000000000000000000000000000000000000000000000000033300000000000338883300000000388858883000000386888868830000388888688588300388588888888888332222222222222233222222222222223033222222222233000033333333333000000000000000000000000000000000",
+  cannon: "0000000000000000000000033000000000000003300000000000000330000000000000033000000000000033330000000000036666300000000036666663000000036666666630000003666666663000003aaaaaaaaaa300003a3a3a3a3a3300003aaaaaaaaaa3000003333333333300000000000000000",
+  
+  star: "0001000000111000011111001111111001111100001110000001000000000000"
 };
 
 const Menu = {
@@ -113,7 +108,8 @@ const Menu = {
     if (keysDown.a) { playSnd('jmp'); const appObjs = [Guide, Tetri, Action, RPG, Online, Ranking, Settings]; activeApp = appObjs[this.cur]; activeApp.init(); }
   },
   draw() {
-    bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('4in1 RETRO', 55, 30); ctx.shadowBlur = 0;
+    bgThemes[SaveSys.data.bgTheme].draw(ctx);
+    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('4in1 RETRO', 55, 30); ctx.shadowBlur = 0;
     ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v5.0', 60, 45);
     for (let i = 0; i < 7; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 75 + i * 28); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
@@ -121,6 +117,7 @@ const Menu = {
   }
 };
 
+// Ranking & Settings remain identical
 const Ranking = {
   mode: 'normal', input: false, name: '', cursor: 0, menuCursor: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
   init() { if (!this.input) this.mode = 'normal'; this.cursor = 0; this.menuCursor = 0; },
@@ -132,13 +129,19 @@ const Ranking = {
       if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.cursor = 0; this.menuCursor = 0; playSnd('jmp'); }
     } else {
       if (this.menuCursor === 0) {
-        if (keysDown.right) { this.cursor = (this.cursor + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.cursor = (this.cursor + this.chars.length - 1) % this.chars.length; playSnd('sel'); }
-        if (keysDown.down) { let nC = this.cursor + 10; if (nC >= this.chars.length) this.menuCursor = 1; else this.cursor = nC; playSnd('sel'); } if (keysDown.up) { let nC = this.cursor - 10; if (nC >= 0) { this.cursor = nC; playSnd('sel'); } }
-        if (keysDown.a) { if (this.name.length < 10) { this.name += this.chars[this.cursor]; playSnd('jmp'); } else playSnd('hit'); } if (keysDown.b) { if (this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } }
+        if (keysDown.right) { this.cursor = (this.cursor + 1) % this.chars.length; playSnd('sel'); }
+        if (keysDown.left) { this.cursor = (this.cursor + this.chars.length - 1) % this.chars.length; playSnd('sel'); }
+        if (keysDown.down) { let nC = this.cursor + 10; if (nC >= this.chars.length) this.menuCursor = 1; else this.cursor = nC; playSnd('sel'); }
+        if (keysDown.up) { let nC = this.cursor - 10; if (nC >= 0) { this.cursor = nC; playSnd('sel'); } }
+        if (keysDown.a) { if (this.name.length < 10) { this.name += this.chars[this.cursor]; playSnd('jmp'); } else playSnd('hit'); }
+        if (keysDown.b) { if (this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } }
       } else if (this.menuCursor === 1) {
-        if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); } if (keysDown.down) { this.menuCursor = 2; playSnd('sel'); } if (keysDown.a) { if (this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } }
+        if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); }
+        if (keysDown.down) { this.menuCursor = 2; playSnd('sel'); }
+        if (keysDown.a) { if (this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } }
       } else if (this.menuCursor === 2) {
-        if (keysDown.up) { this.menuCursor = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); activeApp = Menu; Menu.init(); }
+        if (keysDown.up) { this.menuCursor = 1; playSnd('sel'); }
+        if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); activeApp = Menu; Menu.init(); }
       }
     }
   },
@@ -147,14 +150,26 @@ const Ranking = {
     if (!this.input) {
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
       ctx.fillText((this.mode === 'normal' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'hard' ? '[HARD]' : '<HARD>'), 120, 40);
-      const rank = this.mode === 'normal' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
-      for (let i = 0; i < 10; i++) { ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa'; if (rank[i]) { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ${rank[i].name.padEnd(10, ' ')} ${String(rank[i].score).padStart(6, ' ')}`, 15, 76 + i * 18); } else { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ----------  ----`, 15, 76 + i * 18); } }
+      const rank = this.mode === 'normal' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h;
+      ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa';
+        if (rank[i]) { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ${rank[i].name.padEnd(10, ' ')} ${String(rank[i].score).padStart(6, ' ')}`, 15, 76 + i * 18); } 
+        else { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ----------  ----`, 15, 76 + i * 18); }
+      }
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('プレイヤー名: ' + SaveSys.data.playerName, 15, 270); ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
     } else {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
-      for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.cursor && this.menuCursor === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
-      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 30, 191);
-      const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50);
+      ctx.font = '11px monospace';
+      for (let i = 0; i < this.chars.length; i++) {
+        const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18;
+        if (i === this.cursor && this.menuCursor === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; }
+        ctx.fillText(this.chars[i], x, y);
+      }
+      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 175, 70, 22);
+      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 30, 191);
+      const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22);
+      ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
       ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText('↑↓←→:選択 A:追加 B:削除', 25, 215);
     }
   }
@@ -164,8 +179,12 @@ const Settings = {
   menuCursor: 0, init() { this.menuCursor = 0; },
   update() {
     if (keysDown.select || keysDown.b) { activeApp = Menu; Menu.init(); return; }
-    if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); } if (keysDown.down) { this.menuCursor = 1; playSnd('sel'); }
-    if (keysDown.a) { if (this.menuCursor === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } else if (this.menuCursor === 1) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } }
+    if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); }
+    if (keysDown.down) { this.menuCursor = 1; playSnd('sel'); }
+    if (keysDown.a) {
+      if (this.menuCursor === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } 
+      else if (this.menuCursor === 1) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
+    }
   },
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
