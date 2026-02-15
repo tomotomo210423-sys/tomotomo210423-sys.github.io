@@ -1,4 +1,7 @@
-// === MICRO QUEST - FULL GRAPHICS OVERHAUL ===
+// === MICRO QUEST - SPRITE SHEET & CASTLE UPDATE ===
+const imgHero = new Image();
+imgHero.src = 'hero.png'; // ★ 勇者のスプライトシート画像を読み込み
+
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
@@ -41,8 +44,20 @@ const RPG = {
   genTownMap() {
     this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
-    this.map[14][4]=15; this.map[14][5]=15; this.map[3][4]=16; this.map[3][5]=16; this.map[8][2]=17; this.map[8][7]=18; this.map[11][5]=19;
+    this.map[14][4]=15; this.map[14][5]=15;
+    this.map[1][4]=21; this.map[1][5]=21; // ★ 王様の城の入り口を追加（21番タイル）
+    this.map[8][2]=17; this.map[8][7]=18; this.map[11][5]=19;
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.x = 4; this.p.y = 13;
+  },
+
+  // ★ 新機能：王様の城マップ生成
+  genCastleMap() {
+    this.map = Array(15).fill().map(() => Array(10).fill(10)); // 壁
+    for (let r = 1; r < 14; r++) { for (let c = 2; c < 8; c++) { this.map[r][c] = 15; } } // 床
+    for (let r = 2; r < 14; r++) { this.map[r][4] = 22; this.map[r][5] = 22; } // 赤い絨毯（22番タイル）
+    this.map[14][4]=15; this.map[14][5]=15; // 出口
+    this.map[2][4]=16; this.map[2][5]=16; // 王様
+    this.p.x = 4; this.p.y = 13;
   },
   
   genDungeonMap(type) {
@@ -60,7 +75,7 @@ const RPG = {
     if (this.dungeons[idx] && this.dungeons[idx].cleared) { this.msgBox("魔物は討伐済みだ。"); return; }
     this.st = 'dungeon'; this.dungeon = {idx: idx, floor: 1, maxFloor: 3, type: type};
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.worldAx = this.p.areaX; this.p.worldAy = this.p.areaY; this.worldMap = this.map.map(r => [...r]);
-    this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox("ダンジョンに入った！\nF1");
+    this.genDungeonMap(type); BGM.play('rpg_dungeon'); this.msgBox(`ダンジョンに入った！\nF1`);
   },
   
   exitDungeon() { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); },
@@ -68,22 +83,18 @@ const RPG = {
   startArenaBattle(slot) { this.isArena = true; this.battle('custom', slot); activeApp = this; },
 
   update() {
-    this.anim++; 
-    if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
+    this.anim++; if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
     if (this.st === 'battleProcessing') return;
 
     if (keysDown.select) {
       if (this.st === 'title' || this.st === 'saveSelect') { activeApp = Menu; Menu.init(); return; }
-      if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') { this.st = 'menu'; this.mIdx = 0; playSnd('sel'); return; }
-      if (this.st === 'menu') { this.st = this.dungeon ? 'dungeon' : this.map[0][0]===1? 'townMap' : 'map'; return; }
+      if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap' || this.st === 'castle') { this.st = 'menu'; this.mIdx = 0; playSnd('sel'); return; }
+      if (this.st === 'menu') { this.st = this.dungeon ? 'dungeon' : (this.map[0][0]===1 || this.map[0][0]===10) ? 'townMap' : 'map'; return; }
     }
     
     if (this.st==='title'||this.st==='saveSelect'||this.st==='menu'||this.st==='equipMenu'||this.st==='spellMenu'||this.st==='customMenu'||this.st==='bestiary') {
       if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); }
-      if (keysDown.down) { 
-        let max = this.st==='menu'?4 : this.st==='bestiary'?Math.max(0,this.p.bestiary.length-1) : 3;
-        this.mIdx = Math.min(max, this.mIdx + 1); playSnd('sel'); 
-      }
+      if (keysDown.down) { let max = this.st==='menu'?4 : this.st==='bestiary'?Math.max(0,this.p.bestiary.length-1) : 3; this.mIdx = Math.min(max, this.mIdx + 1); playSnd('sel'); }
       if (keysDown.a) {
         if (this.st === 'title') { if (this.mIdx === 0) { this.st = 'saveSelect'; this.mIdx = 0; } else { activeApp = Menu; Menu.init(); } playSnd('jmp'); }
         else if (this.st === 'saveSelect') { if (this.mIdx < 3) { this.loadSave(this.mIdx + 1); playSnd('jmp'); } else { this.st = 'title'; this.mIdx = 0; } }
@@ -93,24 +104,22 @@ const RPG = {
           else if (this.mIdx === 3) { this.saveGame(); this.msgBox("セーブしました！"); } else if (this.mIdx === 4) { this.st = 'title'; this.mIdx = 0; }
         }
         else if (this.st === 'customMenu') {
-          if (this.mIdx === 0) { let cost = 100 + this.p.customWep.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox("武器を強化した！"); } else playSnd('hit'); }
-          else if (this.mIdx === 1) { let cost = 100 + this.p.customArm.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox("防具を強化した！"); } else playSnd('hit'); }
+          if (this.mIdx === 0) { let cost = 100 + this.p.customWep.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customWep.atk += 5; this.p.customWep.lv++; playSnd('combo'); this.msgBox(`武器を強化した！`); } else playSnd('hit'); }
+          else if (this.mIdx === 1) { let cost = 100 + this.p.customArm.lv * 50; if (this.p.gld >= cost) { this.p.gld -= cost; this.p.customArm.def += 3; this.p.customArm.lv++; playSnd('combo'); this.msgBox(`防具を強化した！`); } else playSnd('hit'); }
           else if (this.mIdx === 2) { activeApp = Arena; Arena.init(); playSnd('sel'); } 
           else if (this.mIdx === 3) { this.st = 'townMap'; this.mIdx = 0; }
         }
       }
       if (keysDown.b) {
-        if (this.st === 'saveSelect' && this.mIdx < 3) { 
-          if (localStorage.getItem('4in1_rpg_slot' + (this.mIdx+1))) { this.deleteSave(this.mIdx+1); playSnd('hit'); } 
-        }
-        else if (this.st==='equipMenu' || this.st==='spellMenu' || this.st==='bestiary') { this.st = 'menu'; this.mIdx = 0; }
-        else if (this.st === 'customMenu') { this.st = 'townMap'; this.mIdx = 0; }
+        if (this.st === 'saveSelect' && this.mIdx < 3) { if (localStorage.getItem('4in1_rpg_slot' + (this.mIdx+1))) { this.deleteSave(this.mIdx+1); playSnd('hit'); } }
+        if (this.st==='equipMenu' || this.st==='spellMenu' || this.st==='bestiary') { this.st = 'menu'; this.mIdx = 0; }
+        if (this.st === 'customMenu') { this.st = 'townMap'; this.mIdx = 0; }
       } return;
     }
 
-    if (this.st === 'msg') { if (keysDown.a) { if (this.msgNextSt) { this.st = this.msgNextSt; this.msgNextSt = null; } else { this.st = this.dungeon ? 'dungeon' : this.map[0][0]===1 ? 'townMap' : 'map'; } } return; }
+    if (this.st === 'msg') { if (keysDown.a) { if (this.msgNextSt) { this.st = this.msgNextSt; this.msgNextSt = null; } else { this.st = this.dungeon ? 'dungeon' : (this.map[0][0]===1 || this.map[0][0]===10) ? 'townMap' : 'map'; } } return; }
 
-    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') {
+    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap' || this.st === 'castle') {
       if (keysDown.a) {
         let t = this.map[this.p.y][this.p.x];
         if (this.st === 'map') {
@@ -122,25 +131,40 @@ const RPG = {
         } else if (this.st === 'dungeon') {
           if (t===14) { if (this.dungeon.floor===1) this.exitDungeon(); else { this.dungeon.floor--; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); } }
           else if (t===20) { if (this.dungeon.floor===this.dungeon.maxFloor) this.battle('miniboss', this.dungeons[this.dungeon.idx].boss); else { this.dungeon.floor++; this.genDungeonMap(this.dungeon.type); playSnd('jmp'); } }
-        } else if (this.st === 'townMap') {
+        } else if (this.st === 'townMap' || this.st === 'castle') {
           const adj = [ this.map[this.p.y][this.p.x], this.p.y>0?this.map[this.p.y-1][this.p.x]:0, this.p.y<14?this.map[this.p.y+1][this.p.x]:0, this.p.x>0?this.map[this.p.y][this.p.x-1]:0, this.p.x<9?this.map[this.p.y][this.p.x+1]:0 ];
           if (adj.includes(16)) { this.msgBox(this.p.story===0?"王様「東の洞窟へ行け！」":this.p.story===1?"王様「北の塔へ向かえ！」":this.p.story===2?"王様「北西の魔王城へ！」":"王様「世界に平和が！」"); }
           else if (adj.includes(17)) { if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りない。"); }
-          else if (adj.includes(18)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox("50Gで魔法を習得した！"); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
+          else if (adj.includes(18)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox(`50Gで魔法を習得した！`); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
           else if (adj.includes(19)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
         }
       }
+      
       let nx = this.p.x, ny = this.p.y;
       if (keysDown.up) ny--; if (keysDown.down) ny++; if (keysDown.left) nx--; if (keysDown.right) nx++;
       if (nx !== this.p.x || ny !== this.p.y) {
         if (this.st === 'map') {
-          if (nx < 0) { if (this.p.areaX > 0) { this.p.areaX--; this.p.x = 9; this.genMap(); playSnd('jmp'); } } else if (nx > 9) { if (this.p.areaX < 2) { this.p.areaX++; this.p.x = 0; this.genMap(); playSnd('jmp'); } }
-          else if (ny < 0) { if (this.p.areaY > 0) { this.p.areaY--; this.p.y = 14; this.genMap(); playSnd('jmp'); } } else if (ny > 14) { if (this.p.areaY < 2) { this.p.areaY++; this.p.y = 0; this.genMap(); playSnd('jmp'); } }
-          else { let t = this.map[ny][nx]; if (t!==1 && t!==2 && t!==3) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if ((t===0 || t===9) && Math.random() < 0.12) { const enc = this.encounterTable[`${this.p.areaX},${this.p.areaY}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } } }
-        } else if (this.st === 'dungeon' || this.st === 'townMap') {
+          // ★ エリア移動バグの完全修正：移動後の足元を必ず平地(0)にすることでスタックを防止！
+          if (nx < 0) { if (this.p.areaX > 0) { this.p.areaX--; this.p.x = 9; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } } 
+          else if (nx > 9) { if (this.p.areaX < 2) { this.p.areaX++; this.p.x = 0; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } }
+          else if (ny < 0) { if (this.p.areaY > 0) { this.p.areaY--; this.p.y = 14; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } } 
+          else if (ny > 14) { if (this.p.areaY < 2) { this.p.areaY++; this.p.y = 0; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } }
+          else { 
+            let t = this.map[ny][nx]; 
+            if (t!==1 && t!==2 && t!==3) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if ((t===0 || t===9) && Math.random() < 0.12) { const enc = this.encounterTable[`${this.p.areaX},${this.p.areaY}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } } 
+          }
+        } else if (this.st === 'dungeon' || this.st === 'townMap' || this.st === 'castle') {
+          // ★ 城への出入り処理
           if (this.st === 'townMap' && ny > 14) { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); }
+          else if (this.st === 'castle' && ny > 14) { this.st = 'townMap'; this.genTownMap(); this.p.x = 4; this.p.y = 2; playSnd('jmp'); }
           else if (ny >= 0 && ny < 15 && nx >= 0 && nx < 10) {
-            let t = this.map[ny][nx]; if (t!==1 && t!==10 && t!==12 && t!==13 && t!==16 && t!==17 && t!==18 && t!==19) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if (this.st === 'dungeon' && Math.random() < 0.15) { const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } }
+            let t = this.map[ny][nx]; 
+            if (this.st === 'townMap' && t === 21) { this.st = 'castle'; this.genCastleMap(); playSnd('jmp'); } // お城に入る
+            else if (this.st === 'castle') { if (t===15 || t===22) { this.p.x = nx; this.p.y = ny; playSnd('sel'); } }
+            else if (t!==1 && t!==10 && t!==12 && t!==13 && t!==16 && t!==17 && t!==18 && t!==19 && t!==21) { 
+              this.p.x = nx; this.p.y = ny; playSnd('sel'); 
+              if (this.st === 'dungeon' && Math.random() < 0.15) { const enc = this.encounterTable[`${this.p.worldAx},${this.p.worldAy}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } 
+            }
           }
         }
       }
@@ -241,7 +265,6 @@ const RPG = {
   },
   levelUp() { this.p.lv++; this.p.mhp += 15; this.p.mmp += 8; this.p.atk += 3; this.p.def += 2; this.p.spd += 2; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; this.p.exp = 0; playSnd('combo'); },
   
-  // ★ マップを美しいドット絵（スプライト）に置き換えるグラフィック処理
   draw() {
     applyShake(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
     if (this.st === 'title' || this.st === 'saveSelect') {
@@ -299,7 +322,7 @@ const RPG = {
       ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText(this.st==='menu'?'A:決定 SELECT:戻る':'B:戻る', 50, 245); resetShake(); return;
     }
 
-    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') {
+    if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap' || this.st === 'castle') {
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 10; c++) {
           let v = this.map[r][c]; let sx = c * 20, sy = r * 20 + 45;
@@ -312,14 +335,15 @@ const RPG = {
           else if (v === 6) drawSprite(sx, sy, '', sprs.tower, 2.5);
           else if (v === 7) drawSprite(sx, sy, '', sprs.ruins, 2.5);
           else if (v === 8) drawSprite(sx, sy, '', sprs.demon, 2.5);
-          else if (v === 9) { drawSprite(sx, sy, '', sprs.grass, 2.5); ctx.fillStyle = '#a80'; ctx.fillRect(sx+5, sy+5, 10, 10); } // 橋
+          else if (v === 9) { drawSprite(sx, sy, '', sprs.grass, 2.5); ctx.fillStyle = '#a80'; ctx.fillRect(sx+5, sy+5, 10, 10); } 
           else if (v === 10 || v === 11 || v === 12 || v === 13) drawSprite(sx, sy, '', sprs.wall, 2.5);
           else if (v === 14) drawSprite(sx, sy, '', sprs.stairs_up, 2.5);
           else if (v === 15) drawSprite(sx, sy, '', sprs.floor, 2.5);
           else if (v >= 16 && v <= 19) drawSprite(sx, sy, '', sprs.sign, 2.5);
           else if (v === 20) drawSprite(sx, sy, '', sprs.stairs_dn, 2.5);
+          else if (v === 21) { drawSprite(sx, sy, '', sprs.wall, 2.5); ctx.fillStyle = '#000'; ctx.fillRect(sx+4, sy+8, 12, 12); } // 城門
+          else if (v === 22) { drawSprite(sx, sy, '', sprs.floor, 2.5); ctx.fillStyle = 'rgba(200,0,0,0.5)'; ctx.fillRect(sx, sy, 20, 20); } // 絨毯
           
-          // アイコン系の文字重ね（町の施設など）
           if (v === 16) { ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('王', sx + 3, sy + 15); }
           else if (v === 17) { ctx.fillStyle = '#f00'; ctx.font = 'bold 12px monospace'; ctx.fillText('宿', sx + 3, sy + 15); }
           else if (v === 18) { ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace'; ctx.fillText('魔', sx + 3, sy + 15); }
@@ -327,13 +351,43 @@ const RPG = {
         }
       }
       for (let ch of this.chests) { if (!ch.opened && this.st === 'map' && ch.ax === this.p.areaX && ch.ay === this.p.areaY) { ctx.fillStyle = '#f90'; ctx.fillRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); ctx.strokeStyle = '#fc0'; ctx.strokeRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); } }
-      drawSprite(this.p.x * 20, this.p.y * 20 + 45, '#ff0', sprs.player);
+      
+      // ★ 勇者の画像（スプライトシート）を使った描画エンジン
+      let sx = this.p.x * 20, sy = this.p.y * 20 + 45;
+      let heroDrawSuccess = false;
+      if (imgHero.complete && imgHero.width > 0) {
+        try {
+          let fw = imgHero.width / 3; let fh = imgHero.height / 3;
+          let frame = 1; // 停止時
+          if (keys.up || keys.down || keys.left || keys.right) {
+            frame = Math.floor(Date.now() / 150) % 4;
+            if (frame === 3) frame = 1; // 0->1->2->1 のループ
+          }
+          let dirRow = 1; // 下向き（2段目）
+          if (keys.up) dirRow = 0; // 上向き（1段目）
+          else if (keys.left || keys.right) dirRow = 2; // 横向き（3段目）
+          
+          ctx.save();
+          if (keys.left) {
+             ctx.translate(sx + 20, sy); ctx.scale(-1, 1);
+             ctx.drawImage(imgHero, frame * fw, dirRow * fh, fw, fh, 0, 0, 20, 20);
+          } else {
+             ctx.drawImage(imgHero, frame * fw, dirRow * fh, fw, fh, sx, sy, 20, 20);
+          }
+          ctx.restore();
+          heroDrawSuccess = true;
+        } catch(e) {}
+      }
+      if (!heroDrawSuccess) {
+         drawSprite(sx, sy, '#ff0', sprs.player);
+      }
       
       const s = this.calcStats(); ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 42); ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
       ctx.fillText(`Lv${this.p.lv} HP${this.p.hp}/${this.p.mhp} MP${this.p.mp}/${this.p.mmp}`, 3, 10); ctx.fillText(`ATK${s.atk} DEF${s.def} SPD${s.spd} G${this.p.gld}`, 3, 20);
       ctx.fillText(`武:C-WEP Lv${this.p.customWep.lv}`, 3, 30); ctx.fillText(`防:C-ARM Lv${this.p.customArm.lv}`, 3, 40);
       if (this.st === 'dungeon') { ctx.fillStyle = '#0ff'; ctx.fillText(`[${this.dungeon.type.toUpperCase()}] F${this.dungeon.floor}/${this.dungeon.maxFloor}`, 110, 30); } 
       else if (this.st === 'townMap') { ctx.fillStyle = '#0ff'; ctx.fillText(`[TOWN]`, 160, 30); }
+      else if (this.st === 'castle') { ctx.fillStyle = '#ff0'; ctx.fillText(`[CASTLE]`, 150, 30); }
       else { ctx.fillStyle = '#ff0'; ctx.fillText(`[AREA ${this.p.areaX}-${this.p.areaY}]`, 140, 30); }
     }
 
