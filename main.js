@@ -1,4 +1,4 @@
-// === CORE SYSTEM ===
+// === CORE SYSTEM - 16x16 HD UPDATE ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
@@ -22,28 +22,17 @@ const BGM = {
   play(type) {
     this.stop(); if (!audioCtx) return;
     bgmGain = audioCtx.createGain(); bgmGain.gain.setValueAtTime(0.03, audioCtx.currentTime); bgmGain.connect(audioCtx.destination);
-    
-    // BGMのバリエーションを大幅追加
     const melodies = { 
-      menu: [262,330,392,523], 
-      tetri: [330,392,349,330,294,330,349,392], 
-      action: [392,440,494,523,494,440,392,349], 
-      rpg_field: [262,294,330,349,392,440,494,523],
-      rpg_town: [330,392,330,262,294,349,294,196],
-      rpg_dungeon: [146,164,146,130,146,164,196,164],
-      rpg_battle: [440,494,523,587,659,587,523,494],
-      rpg_boss: [329,311,329,246,293,261,220,0]
+      menu: [262,330,392,523], tetri: [330,392,349,330,294,330,349,392], action: [392,440,494,523,494,440,392,349], 
+      rpg_field: [262,294,330,349,392,440,494,523], rpg_town: [330,392,330,262,294,349,294,196], rpg_dungeon: [146,164,146,130,146,164,196,164], rpg_battle: [440,494,523,587,659,587,523,494], rpg_boss: [329,311,329,246,293,261,220,0]
     };
     const waveTypes = {menu:'square', tetri:'sine', action:'triangle', rpg_field:'square', rpg_town:'sine', rpg_dungeon:'triangle', rpg_battle:'sawtooth', rpg_boss:'sawtooth'}; 
     const intervals = {menu:400, tetri:200, action:250, rpg_field:350, rpg_town:450, rpg_dungeon:400, rpg_battle:150, rpg_boss:200};
     
-    const melody = melodies[type] || melodies.menu;
-    let i = 0;
+    const melody = melodies[type] || melodies.menu; let i = 0;
     bgmInterval = setInterval(() => {
       if (bgmOsc) bgmOsc.stop();
-      if (melody[i % melody.length] > 0) {
-        bgmOsc = audioCtx.createOscillator(); bgmOsc.type = waveTypes[type] || 'square'; bgmOsc.frequency.value = melody[i % melody.length]; bgmOsc.connect(bgmGain); bgmOsc.start();
-      }
+      if (melody[i % melody.length] > 0) { bgmOsc = audioCtx.createOscillator(); bgmOsc.type = waveTypes[type] || 'square'; bgmOsc.frequency.value = melody[i % melody.length]; bgmOsc.connect(bgmGain); bgmOsc.start(); }
       i++;
     }, intervals[type] || 300);
   }
@@ -61,10 +50,7 @@ function playSnd(t) {
 const SaveSys = {
   data: JSON.parse(localStorage.getItem('4in1_ultimate')) || { playerName: 'PLAYER', scores: {n:0, h:0}, actStage: 1, actLives: 3, rpg: null, rankings: {n:[], h:[]}, bgTheme: 0 },
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
-  addScore(mode, score) {
-    const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h;
-    rank.push({name: this.data.playerName, score: score, date: Date.now()}); rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save();
-  }
+  addScore(mode, score) { const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; rank.push({name: this.data.playerName, score: score, date: Date.now()}); rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); }
 };
 
 const bgThemes = [
@@ -74,10 +60,7 @@ const bgThemes = [
 ];
 
 const particles = [];
-function addParticle(x, y, color, type = 'star') {
-  const count = type === 'explosion' ? 8 : type === 'line' ? 20 : 5;
-  for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4 - 1, life: 30, color: color, size: type === 'explosion' ? 2 : 1 }); }
-}
+function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 8 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4 - 1, life: 30, color: color, size: type === 'explosion' ? 2 : 1 }); } }
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 30; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
@@ -86,17 +69,31 @@ function screenShake(intensity = 2) { shakeTimer = intensity; }
 function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2); shakeTimer--; } }
 function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
+// ★ 超強化：16x16対応スケーリング機能付き描画関数
 const drawSprite = (x, y, color, str, size = 2.5) => {
-  ctx.fillStyle = color; const len = Math.sqrt(str.length);
-  for (let i = 0; i < str.length; i++) { if (str[i] === '1') { ctx.fillRect(x + (i % len) * size, y + Math.floor(i / len) * size, size, size); } }
+  ctx.fillStyle = color;
+  const len = Math.sqrt(str.length); // 64文字なら8、256文字なら16と自動判別
+  const dotSize = (8 / len) * size;  // 16x16の場合はドットサイズを半分にして枠に収める
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === '1') {
+      ctx.fillRect(x + (i % len) * dotSize, y + Math.floor(i / len) * dotSize, dotSize, dotSize);
+    }
+  }
 };
+
+// ★ 超強化：16x16 HD スプライトデータ（256文字）
 const sprs = {
-  hero: "0011110001111100111111101111111011011011110011110111110001111100", slime: "0000000000111100011111100111111001111110001111000011110000111100",
-  boss: "1111111110011001110111111001100110011001100110011111111110000001", skull: "0111111011000011110001111100011111000110110001100111111001111110",
-  player: "0011110001111100011111000111110001111100011111000111110000111100", heroNew: "0111111011111111111111111101101111111111011111100111111001111110",
-  enemyNew: "1111111110111101101001011010010111011101111111111111111110111101", spike: "0010010001101100111111100111111001101100010010000100010000000000",
-  mage: "0011110001111100111111100111111000111100011111100111111001111110", dragon: "1111111111111111111111111111111111011011110110111101101111111111",
-  star: "0001000000111000011111001111111001111100001110000001000000000000"
+  hero: "0000011111100000000011111111000000011000000110000001011001101000000100000000100000010111111010000000111111110000000001111110000000111111111111000110011111100110011001111110011000000111111000000000011001100000000011100111000000001110011100000001111001111000",
+  slime: "0000000000000000000000011000000000000011110000000000011111100000000011111111000000011111111110000011111111111100011101111011111001110111101111100111111111111110011111111111111011111111111111111111111111111111111111111111111101111111111111100011111111111100",
+  boss: "0001111111111000001111111111110001110011110011100110000110000110011111111111111000111100001111000001111111111000001111111111110001111111111111101110111111110111110011111111001111001111111100111111111111111111000011111111000000011110011110000011110000111100",
+  skull: "0000111111110000000111111111100000111111111111000011001111001100001000011000010000110011110011000011111111111100000111111111100000001110011100000000101001010000000011111111000000011111111110000011011111101100001101111110110000110111111011000000011111100000",
+  player: "0000011111100000000011111111000000011000000110000001011001101000000100000000100000010111111010000000111111110000000001111110000000111111111111000110011111100110011001111110011000000111111000000000011001100000000011100111000000001110011100000001111001111000",
+  heroNew: "0000011111100000000011111111000000011000000110000001011001101000000100000000100000010111111010000000111111110000000001111110000000111111111111000110011111100110011001111110011000000111111000000000011001100000000011100111000000001110011100000001111001111000",
+  enemyNew: "0000000000000000110000000000001111100001100001110111001111001110001111111111110000011101101110000001111111111000001111111111110001111111111111101110011111100111110000111100001110000001100000010000000110000000000000111100000000000010010000000000000000000000",
+  spike: "0000000000000000000000011000000000000001100000000000001111000000000000111100000000000111111000000000111111110000000111111111100000111111111111000111111111111110011101111110111011110111111011111111011111101111011100111100111000110001100011000000000000000000",
+  mage: "000000111100000000000111111000000000111111110000000111111111100000111001100111000011101111011100001111111111110000001111111100000001111111111000001111111111111100001101111110110001110111111011100110011111100110000001111110000000000111111000000000011111100000",
+  dragon: "0000000011111100000000111111111000000111111001110000111111111111001111111111111101111110011100001111111111110000111111111110000001111111111110000011111111111110000111101111111000011110011111000001111000111100001111000011110000111100001111000111110000111110",
+  star: "0001000000111000011111001111111001111100001110000001000000000000" // エフェクト類は8x8のままで自動対応
 };
 
 const Menu = {
