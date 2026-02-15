@@ -1,4 +1,4 @@
-// === CUSTOM ARENA SYSTEM - ROUTE A: 16x16 HD FULL COLOR EDITOR ===
+// === CUSTOM ARENA SYSTEM - CLEAR ERASER UPDATE ===
 const Arena = {
   st: 'arenaMenu', mIdx: 0, selectedSlot: 0, editBoss: null, nameStr: '', nameCursor: 0, menuCursor: 0,
   numTarget: '', numStr: '', numCursor: 0, numKeys: ['1','2','3','4','5','6','7','8','9','DEL','0','OK'],
@@ -67,7 +67,6 @@ const Arena = {
          else if (this.mIdx === 6) { this.st = 'spellEdit'; this.spellCursor = 0; playSnd('jmp'); }
          else if (this.mIdx === 7) { 
            this.st = 'dotEdit'; this.dotCursor = {x:0, y:0}; this.penColorIdx = 1;
-           // ★ 古い8x8(64文字)のデータを16x16(256文字)に自動拡大変換
            if (this.editBoss.sprData.length === 64) {
                let newData = '';
                for (let r=0; r<8; r++) {
@@ -76,9 +75,7 @@ const Arena = {
                    newData += row + row;
                }
                this.dotData = newData.split('');
-           } else {
-               this.dotData = this.editBoss.sprData.split(''); 
-           }
+           } else { this.dotData = this.editBoss.sprData.split(''); }
            playSnd('jmp'); 
          }
          else if (this.mIdx === 9) { RPG.customBosses[this.selectedSlot] = JSON.parse(JSON.stringify(this.editBoss)); RPG.saveGame(); this.st = 'arenaSubMenu'; this.mIdx = 0; playSnd('combo'); }
@@ -113,15 +110,13 @@ const Arena = {
       if (keysDown.left) { this.dotCursor.x = (this.dotCursor.x + 15) % 16; playSnd('sel'); }
       if (keysDown.right) { this.dotCursor.x = (this.dotCursor.x + 1) % 16; playSnd('sel'); }
       
-      // ★ SELECTボタンで色切り替え
       if (keysDown.select) { this.penColorIdx = (this.penColorIdx + 1) % 16; playSnd('sel'); }
       
-      // ★ Aボタン押しっぱなしでお絵かき可能（スマホの操作性向上）
       if (keys.a) { 
          let i = this.dotCursor.y * 16 + this.dotCursor.x; 
          if(this.dotData[i] !== this.penChars[this.penColorIdx]) {
              this.dotData[i] = this.penChars[this.penColorIdx];
-             if(keysDown.a) playSnd('jmp'); // 押した瞬間だけ音を鳴らす
+             if(keysDown.a) playSnd('jmp');
          }
       }
       if (keysDown.b) { this.editBoss.sprData = this.dotData.join(''); this.st = 'bossEdit'; playSnd('combo'); }
@@ -147,11 +142,9 @@ const Arena = {
   
   draw() {
     applyShake();
-    
     if (this.st === 'bossNameEdit') {
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
       ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('名前: ' + this.nameStr + '_', 10, 25);
-      
       const chars = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789!?ー';
       ctx.font = '10px monospace';
       for (let i=0; i<chars.length; i++) {
@@ -159,17 +152,12 @@ const Arena = {
         if (i === this.nameCursor && this.menuCursor === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x-2, y-10, 14, 14); ctx.fillStyle = '#fff'; } else { ctx.fillStyle = '#aaa'; }
         ctx.fillText(chars[i], x, y);
       }
-      
       ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 255, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 255, 70, 22);
       ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 40, 271);
-      
-      const okEn = this.nameStr.length > 0;
-      ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 255, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 255, 70, 22);
+      const okEn = this.nameStr.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 255, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 255, 70, 22);
       ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('決定(OK)', 115, 271);
-      
       ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('十字:選択 A:入力/決定 B:戻る', 15, 290);
-      resetShake();
-      return;
+      resetShake(); return;
     }
 
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
@@ -204,7 +192,6 @@ const Arena = {
       const b = this.editBoss;
       const items = [ `名前: ${b.name}`, `ＨＰ: ${b.hp}`, `ＭＰ: ${b.mp}`, `攻撃: ${b.atk}`, `防御: ${b.def}`, `速度: ${b.spd}`, `技　: 設定する`, `姿　: (Aで作成)`, `色　: < ${this.colorNames[b.colorId]} >`, `[保存して戻る]` ];
       for (let i = 0; i < items.length; i++) { ctx.fillStyle = this.mIdx === i ? '#0f0' : '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mIdx === i ? '> ' : '  ') + items[i], 15, 85 + i * 16); }
-      
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(135, 120, 45, 45); ctx.strokeStyle = '#0f0'; ctx.strokeRect(135, 120, 45, 45);
       drawSprite(138, 123, this.colors[b.colorId], b.sprData, 5);
       ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText('A:変更/入力  B:戻る', 50, 265);
@@ -231,22 +218,23 @@ const Arena = {
     }
     else if (this.st === 'dotEdit') {
       ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('16x16 HDエディタ', 45, 65);
-      
       let ox = 50, oy = 80, sz = 6;
       for (let i = 0; i < 256; i++) {
-        let cx = i % 16, cy = Math.floor(i / 16);
-        let char = this.dotData[i];
+        let cx = i % 16, cy = Math.floor(i / 16); let char = this.dotData[i];
         ctx.fillStyle = char === '0' ? '#333' : (char === '1' ? this.colors[this.editBoss.colorId] : PALETTE[char]);
         ctx.fillRect(ox + cx * sz, oy + cy * sz, sz - 1, sz - 1);
       }
-      // カーソル
       ctx.strokeStyle = '#f00'; ctx.lineWidth = 1; ctx.strokeRect(ox + this.dotCursor.x * sz, oy + this.dotCursor.y * sz, sz, sz);
       
-      // ペンの色表示
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('PEN:', 60, 195);
+      // ★ 消しゴム（透明色）が選ばれているかどうかのUIを明確にしました
       let pChar = this.penChars[this.penColorIdx];
-      ctx.fillStyle = pChar === '0' ? '#111' : (pChar === '1' ? this.colors[this.editBoss.colorId] : PALETTE[pChar]);
-      ctx.fillRect(90, 185, 15, 15); ctx.strokeStyle = '#fff'; ctx.strokeRect(90, 185, 15, 15);
+      let isEraser = (pChar === '0');
+      ctx.fillStyle = isEraser ? '#f00' : '#fff'; ctx.font = 'bold 10px monospace'; 
+      ctx.fillText(isEraser ? '▶ 消しゴム (ERASER)' : `▶ カラー ${this.penColorIdx}`, 40, 195);
+      
+      ctx.fillStyle = isEraser ? '#111' : (pChar === '1' ? this.colors[this.editBoss.colorId] : PALETTE[pChar]);
+      ctx.fillRect(90, 205, 15, 15); ctx.strokeStyle = '#fff'; ctx.strokeRect(90, 205, 15, 15);
+      if (isEraser) { ctx.fillStyle = '#666'; ctx.font = '10px monospace'; ctx.fillText('×', 94, 216); }
       
       ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('SELECT:色 A:塗る B:完了', 25, 265);
     }
