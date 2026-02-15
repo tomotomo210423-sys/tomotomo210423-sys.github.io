@@ -1,4 +1,4 @@
-// === TETRIVADER ===
+// === TETRIVADER - NEW SKINS & BALANCED DANMAKU ===
 const Tetri = {
   mode: 'normal', difficultySelect: false, brd: [], blts: [], m: null, px: 4.5, cool: 0, sc: 0, st: 'play', dropCounter: 0, combo: 0,
   starFall: false, starY: 0, starX: 5, danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0, playerSkin: 0,
@@ -30,7 +30,8 @@ const Tetri = {
   update() {
     if (keysDown.select) { if (this.difficultySelect) { this.difficultySelect = false; activeApp = Menu; Menu.init(); } else { this.st = 'over'; this.difficultySelect = false; activeApp = Menu; Menu.init(); } return; }
     if (this.difficultySelect) {
-      if (keysDown.left || keysDown.right) { this.playerSkin = (this.playerSkin + 1) % 3; playSnd('sel'); }
+      if (keysDown.left) { this.playerSkin = (this.playerSkin + 3) % 4; playSnd('sel'); }
+      if (keysDown.right) { this.playerSkin = (this.playerSkin + 1) % 4; playSnd('sel'); }
       if (keysDown.up || keysDown.down) { this.mode = this.mode === 'normal' ? 'hard' : 'normal'; playSnd('sel'); }
       if (keysDown.a) { playSnd('jmp'); this.init(true); } return;
     }
@@ -39,7 +40,17 @@ const Tetri = {
     if (this.danmakuMode) {
       this.danmakuTimer--;
       if (keys.left) this.px = Math.max(0, this.px - 0.2); if (keys.right) this.px = Math.min(9, this.px + 0.2);
-      if (Math.random() < 0.15) { const pt = [{x: Math.random() * 10, y: 0, vx: 0, vy: 0.15, type: 'normal'}, {x: Math.random() * 10, y: 0, vx: (Math.random() - 0.5) * 0.3, vy: 0.15, type: 'curve'}, {x: Math.random() * 10, y: 0, vx: 0, vy: 0.1, type: 'accel'}]; this.danmakuBullets.push(pt[Math.floor(Math.random() * pt.length)]); }
+      
+      // ★ 弾幕の発生率を 0.15 から 0.06 に下げて避けやすくしました
+      if (Math.random() < 0.06) { 
+        const pt = [
+          {x: Math.random() * 10, y: 0, vx: 0, vy: 0.15, type: 'normal'}, 
+          {x: Math.random() * 10, y: 0, vx: (Math.random() - 0.5) * 0.3, vy: 0.15, type: 'curve'}, 
+          {x: Math.random() * 10, y: 0, vx: 0, vy: 0.1, type: 'accel'}
+        ]; 
+        this.danmakuBullets.push(pt[Math.floor(Math.random() * pt.length)]); 
+      }
+      
       for (let i = this.danmakuBullets.length - 1; i >= 0; i--) {
         let b = this.danmakuBullets[i]; if (b.type === 'accel') b.vy += 0.005; b.x += b.vx; b.y += b.vy;
         if (Math.abs(b.x - this.px - 0.5) < 0.4 && Math.abs(b.y - 14) < 0.4) {
@@ -109,14 +120,19 @@ const Tetri = {
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('TETRIVADER', 50, 50); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('難易度を選択', 60, 80);
       const modes = [{name: 'NORMAL', desc: '標準的な難易度'}, {name: 'HARD', desc: '高速＋弾幕モード'}];
       for (let i = 0; i < 2; i++) { const sel = (i === 0 && this.mode === 'normal') || (i === 1 && this.mode === 'hard'); ctx.fillStyle = sel ? '#0f0' : '#666'; ctx.fillRect(30, 110 + i * 60, 140, 45); ctx.fillStyle = sel ? '#000' : '#aaa'; ctx.font = 'bold 14px monospace'; ctx.fillText(modes[i].name, 60, 135 + i * 60); ctx.font = '9px monospace'; ctx.fillText(modes[i].desc, 40, 148 + i * 60); }
-      ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('自機スキン:', 60, 240); ctx.fillText(`< ${['標準', '三角', '丸'][this.playerSkin]} >`, 55, 255);
+      
+      // ★ スキン名を4種類に変更
+      const skinNames = ['カッコイイ戦闘機', 'バナナ', 'ペペロンチーノ', '大砲'];
+      ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('自機スキン:', 60, 240); 
+      ctx.fillText(`< ${skinNames[this.playerSkin]} >`, 100 - (skinNames[this.playerSkin].length * 5), 255);
+      
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('↑↓: 難易度  ←→: スキン', 35, 275); ctx.fillText('A: 決定  SELECT: 戻る', 40, 288);
       resetShake(); return;
     }
     if (this.danmakuMode) {
       ctx.fillStyle = '#200'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText('DANMAKU MODE!', 40, 30); ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace'; ctx.fillText('SUCCESS = x2 SCORE!', 30, 50); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`TIME: ${Math.ceil(this.danmakuTimer / 60)}`, 70, 65);
       this.danmakuBullets.forEach(b => { ctx.shadowBlur = 15; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(b.x * 20 + 10, b.y * 20 + 10, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 10; ctx.shadowColor = '#ff0'; ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(b.x * 20 + 10, b.y * 20 + 10, 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x * 20 + 10, b.y * 20 + 10, 1, 0, Math.PI * 2); ctx.fill(); });
-      ctx.shadowBlur = 0; this.drawPlayer(this.px * 20, 14 * 20 + 5); ctx.fillStyle = '#fff'; ctx.fillRect(this.px * 20 + 8, 14 * 20 + 13, 4, 4);
+      ctx.shadowBlur = 0; this.drawPlayer(this.px * 20, 14 * 20 + 5);
       drawParticles(); if (this.playerHit) { ctx.fillStyle = 'rgba(255,0,0,0.5)'; ctx.fillRect(0, 0, 200, 300); }
       resetShake(); return;
     }
@@ -134,9 +150,9 @@ const Tetri = {
     resetShake();
   },
   
+  // ★ 新しいスキンを呼び出して描画する関数
   drawPlayer(x, y) {
-    if (this.playerSkin === 0) { drawSprite(x, y, '#fff', sprs.player, 2.5); }
-    else if (this.playerSkin === 1) { ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(x + 10, y); ctx.lineTo(x, y + 20); ctx.lineTo(x + 20, y + 20); ctx.closePath(); ctx.fill(); }
-    else { ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.arc(x + 10, y + 10, 10, 0, Math.PI * 2); ctx.fill(); }
+    const skinList = [sprs.fighter, sprs.banana, sprs.peperoncino, sprs.cannon];
+    drawSprite(x - 5, y - 5, '#fff', skinList[this.playerSkin], 2.0);
   }
 };
