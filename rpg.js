@@ -1,7 +1,4 @@
-// === MICRO QUEST - SPRITE SHEET & CASTLE UPDATE ===
-const imgHero = new Image();
-imgHero.src = 'hero.png'; // ★ 勇者のスプライトシート画像を読み込み
-
+// === MICRO QUEST - ROUTE A: 16x16 HD FULL COLOR UPDATE ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
@@ -45,18 +42,17 @@ const RPG = {
     this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
     this.map[14][4]=15; this.map[14][5]=15;
-    this.map[1][4]=21; this.map[1][5]=21; // ★ 王様の城の入り口を追加（21番タイル）
+    this.map[1][4]=21; this.map[1][5]=21;
     this.map[8][2]=17; this.map[8][7]=18; this.map[11][5]=19;
     this.p.worldX = this.p.x; this.p.worldY = this.p.y; this.p.x = 4; this.p.y = 13;
   },
 
-  // ★ 新機能：王様の城マップ生成
   genCastleMap() {
-    this.map = Array(15).fill().map(() => Array(10).fill(10)); // 壁
-    for (let r = 1; r < 14; r++) { for (let c = 2; c < 8; c++) { this.map[r][c] = 15; } } // 床
-    for (let r = 2; r < 14; r++) { this.map[r][4] = 22; this.map[r][5] = 22; } // 赤い絨毯（22番タイル）
-    this.map[14][4]=15; this.map[14][5]=15; // 出口
-    this.map[2][4]=16; this.map[2][5]=16; // 王様
+    this.map = Array(15).fill().map(() => Array(10).fill(10));
+    for (let r = 1; r < 14; r++) { for (let c = 2; c < 8; c++) { this.map[r][c] = 15; } }
+    for (let r = 2; r < 14; r++) { this.map[r][4] = 22; this.map[r][5] = 22; }
+    this.map[14][4]=15; this.map[14][5]=15;
+    this.map[2][4]=16; this.map[2][5]=16;
     this.p.x = 4; this.p.y = 13;
   },
   
@@ -144,7 +140,6 @@ const RPG = {
       if (keysDown.up) ny--; if (keysDown.down) ny++; if (keysDown.left) nx--; if (keysDown.right) nx++;
       if (nx !== this.p.x || ny !== this.p.y) {
         if (this.st === 'map') {
-          // ★ エリア移動バグの完全修正：移動後の足元を必ず平地(0)にすることでスタックを防止！
           if (nx < 0) { if (this.p.areaX > 0) { this.p.areaX--; this.p.x = 9; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } } 
           else if (nx > 9) { if (this.p.areaX < 2) { this.p.areaX++; this.p.x = 0; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } }
           else if (ny < 0) { if (this.p.areaY > 0) { this.p.areaY--; this.p.y = 14; this.genMap(); this.map[this.p.y][this.p.x] = 0; playSnd('jmp'); } } 
@@ -154,12 +149,11 @@ const RPG = {
             if (t!==1 && t!==2 && t!==3) { this.p.x = nx; this.p.y = ny; playSnd('sel'); if ((t===0 || t===9) && Math.random() < 0.12) { const enc = this.encounterTable[`${this.p.areaX},${this.p.areaY}`] || ['slime']; this.battle(false, enc[Math.floor(Math.random() * enc.length)]); } } 
           }
         } else if (this.st === 'dungeon' || this.st === 'townMap' || this.st === 'castle') {
-          // ★ 城への出入り処理
           if (this.st === 'townMap' && ny > 14) { this.map = this.worldMap; this.p.x = this.p.worldX; this.p.y = this.p.worldY; this.st = 'map'; BGM.play('rpg_field'); }
           else if (this.st === 'castle' && ny > 14) { this.st = 'townMap'; this.genTownMap(); this.p.x = 4; this.p.y = 2; playSnd('jmp'); }
           else if (ny >= 0 && ny < 15 && nx >= 0 && nx < 10) {
             let t = this.map[ny][nx]; 
-            if (this.st === 'townMap' && t === 21) { this.st = 'castle'; this.genCastleMap(); playSnd('jmp'); } // お城に入る
+            if (this.st === 'townMap' && t === 21) { this.st = 'castle'; this.genCastleMap(); playSnd('jmp'); } 
             else if (this.st === 'castle') { if (t===15 || t===22) { this.p.x = nx; this.p.y = ny; playSnd('sel'); } }
             else if (t!==1 && t!==10 && t!==12 && t!==13 && t!==16 && t!==17 && t!==18 && t!==19 && t!==21) { 
               this.p.x = nx; this.p.y = ny; playSnd('sel'); 
@@ -326,6 +320,7 @@ const RPG = {
       for (let r = 0; r < 15; r++) {
         for (let c = 0; c < 10; c++) {
           let v = this.map[r][c]; let sx = c * 20, sy = r * 20 + 45;
+          // ★ 16x16 HD スプライトエンジンでマップを描画！
           if (v === 0) drawSprite(sx, sy, '', sprs.grass, 2.5);
           else if (v === 1) drawSprite(sx, sy, '', sprs.tree, 2.5);
           else if (v === 2) drawSprite(sx, sy, '', sprs.mount, 2.5);
@@ -341,8 +336,8 @@ const RPG = {
           else if (v === 15) drawSprite(sx, sy, '', sprs.floor, 2.5);
           else if (v >= 16 && v <= 19) drawSprite(sx, sy, '', sprs.sign, 2.5);
           else if (v === 20) drawSprite(sx, sy, '', sprs.stairs_dn, 2.5);
-          else if (v === 21) { drawSprite(sx, sy, '', sprs.wall, 2.5); ctx.fillStyle = '#000'; ctx.fillRect(sx+4, sy+8, 12, 12); } // 城門
-          else if (v === 22) { drawSprite(sx, sy, '', sprs.floor, 2.5); ctx.fillStyle = 'rgba(200,0,0,0.5)'; ctx.fillRect(sx, sy, 20, 20); } // 絨毯
+          else if (v === 21) { drawSprite(sx, sy, '', sprs.wall, 2.5); ctx.fillStyle = '#000'; ctx.fillRect(sx+4, sy+8, 12, 12); }
+          else if (v === 22) { drawSprite(sx, sy, '', sprs.floor, 2.5); ctx.fillStyle = 'rgba(200,0,0,0.5)'; ctx.fillRect(sx, sy, 20, 20); }
           
           if (v === 16) { ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('王', sx + 3, sy + 15); }
           else if (v === 17) { ctx.fillStyle = '#f00'; ctx.font = 'bold 12px monospace'; ctx.fillText('宿', sx + 3, sy + 15); }
@@ -352,35 +347,8 @@ const RPG = {
       }
       for (let ch of this.chests) { if (!ch.opened && this.st === 'map' && ch.ax === this.p.areaX && ch.ay === this.p.areaY) { ctx.fillStyle = '#f90'; ctx.fillRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); ctx.strokeStyle = '#fc0'; ctx.strokeRect(ch.x * 20 + 5, ch.y * 20 + 50, 10, 10); } }
       
-      // ★ 勇者の画像（スプライトシート）を使った描画エンジン
-      let sx = this.p.x * 20, sy = this.p.y * 20 + 45;
-      let heroDrawSuccess = false;
-      if (imgHero.complete && imgHero.width > 0) {
-        try {
-          let fw = imgHero.width / 3; let fh = imgHero.height / 3;
-          let frame = 1; // 停止時
-          if (keys.up || keys.down || keys.left || keys.right) {
-            frame = Math.floor(Date.now() / 150) % 4;
-            if (frame === 3) frame = 1; // 0->1->2->1 のループ
-          }
-          let dirRow = 1; // 下向き（2段目）
-          if (keys.up) dirRow = 0; // 上向き（1段目）
-          else if (keys.left || keys.right) dirRow = 2; // 横向き（3段目）
-          
-          ctx.save();
-          if (keys.left) {
-             ctx.translate(sx + 20, sy); ctx.scale(-1, 1);
-             ctx.drawImage(imgHero, frame * fw, dirRow * fh, fw, fh, 0, 0, 20, 20);
-          } else {
-             ctx.drawImage(imgHero, frame * fw, dirRow * fh, fw, fh, sx, sy, 20, 20);
-          }
-          ctx.restore();
-          heroDrawSuccess = true;
-        } catch(e) {}
-      }
-      if (!heroDrawSuccess) {
-         drawSprite(sx, sy, '#ff0', sprs.player);
-      }
+      // ★ 主人公（勇者）のHDアニメーション描画
+      drawSprite(this.p.x * 20, this.p.y * 20 + 45, '#ff0', sprs.player, 2.5);
       
       const s = this.calcStats(); ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 42); ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
       ctx.fillText(`Lv${this.p.lv} HP${this.p.hp}/${this.p.mhp} MP${this.p.mp}/${this.p.mmp}`, 3, 10); ctx.fillText(`ATK${s.atk} DEF${s.def} SPD${s.spd} G${this.p.gld}`, 3, 20);
@@ -396,6 +364,8 @@ const RPG = {
       ctx.fillStyle = '#f00'; ctx.fillRect(15, 38, 170, 8); ctx.fillStyle = '#0f0'; ctx.fillRect(15, 38, Math.max(0, 170 * (this.en.hp / this.en.max)), 8);
       ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText(`${this.en.hp}/${this.en.max}`, 75, 45);
       if (this.en.poisoned) { ctx.fillStyle = '#a0f'; ctx.fillText('POISON', 140, 45); }
+      
+      // ★ モンスターのHDアニメーション描画（スライムなどがプルプル動く）
       drawSprite(70, 70, this.en.c, this.en.spr, 12);
       
       if (this.battleText !== '') {
