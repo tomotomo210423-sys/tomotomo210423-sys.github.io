@@ -13,7 +13,6 @@ const Arena = {
         origBattle.call(this, bossType, monsterType);
         if (bossType === 'custom') {
           const b = RPG.customBosses[monsterType];
-          // 古いボスのデータでもエラーが起きないようにフォールバック（初期値）を設定
           this.en.spr = b.sprData || sprs.boss;
           this.en.c = Arena.colors[b.colorId || 7] || '#0ff';
           this.en.spells = b.spells || [];
@@ -40,7 +39,6 @@ const Arena = {
           if (this.mIdx === 0) { RPG.startArenaBattle(this.selectedSlot); } 
           else if (this.mIdx === 1) { 
             this.editBoss = JSON.parse(JSON.stringify(RPG.customBosses[this.selectedSlot])); 
-            // ★バグ修正：古いカスタムボスだった場合は、ここで新しいデータを追加してあげる
             if (!this.editBoss.sprData) this.editBoss.sprData = sprs.boss;
             if (this.editBoss.colorId === undefined) this.editBoss.colorId = 7;
             if (!this.editBoss.spells) this.editBoss.spells = [];
@@ -121,12 +119,40 @@ const Arena = {
   },
   
   draw() {
-    applyShake(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
+    applyShake();
+    
+    // ★バグ修正: 名前入力画面だけは枠を取り払って全画面を広く使う
+    if (this.st === 'bossNameEdit') {
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
+      ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('名前: ' + this.nameStr + '_', 10, 25);
+      
+      const chars = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789!?ー';
+      ctx.font = '10px monospace';
+      for (let i=0; i<chars.length; i++) {
+        let x = 12 + (i%10)*18; let y = 55 + Math.floor(i/10)*18;
+        if (i === this.nameCursor && this.menuCursor === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x-2, y-10, 14, 14); ctx.fillStyle = '#fff'; } else { ctx.fillStyle = '#aaa'; }
+        ctx.fillText(chars[i], x, y);
+      }
+      
+      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 255, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 255, 70, 22);
+      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 40, 271);
+      
+      const okEn = this.nameStr.length > 0;
+      ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 255, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 255, 70, 22);
+      ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('決定(OK)', 115, 271);
+      
+      ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('十字:選択 A:入力/決定 B:戻る', 15, 290);
+      resetShake();
+      return;
+    }
+
+    // 他の画面用の背景と枠
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { ctx.fillStyle = '#222'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); } }
     ctx.fillStyle = 'rgba(0,0,0,0.95)'; ctx.fillRect(10, 45, 180, 230); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 45, 180, 230);
 
     if (this.st === 'arenaMenu') {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('闘技場', 70, 65);
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('カスタム闘技場', 45, 65);
       for (let i = 0; i < 10; i++) {
         const b = RPG.customBosses[i]; ctx.fillStyle = this.mIdx === i ? '#0f0' : '#aaa'; ctx.font = '9px monospace';
         let txt = b ? `${b.name} (HP${b.hp}/ATK${b.atk})` : `--- 空き ---`;
@@ -187,23 +213,6 @@ const Arena = {
       }
       ctx.strokeStyle = '#f00'; ctx.lineWidth = 2; ctx.strokeRect(ox + this.dotCursor.x * sz, oy + this.dotCursor.y * sz, sz - 1, sz - 1); ctx.lineWidth = 1;
       ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('A:塗る/消す B:完了', 45, 265);
-    }
-    else if (this.st === 'bossNameEdit') {
-      ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('名前: ' + this.nameStr + '_', 15, 65);
-      const chars = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789!?ー';
-      ctx.font = '10px monospace';
-      for (let i=0; i<chars.length; i++) {
-        let x = 15 + (i%10)*17; let y = 90 + Math.floor(i/10)*18;
-        if (i === this.nameCursor && this.menuCursor === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x-2, y-10, 14, 14); ctx.fillStyle = '#fff'; } else { ctx.fillStyle = '#aaa'; }
-        ctx.fillText(chars[i], x, y);
-      }
-      
-      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 240, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 240, 70, 22);
-      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 40, 256);
-      
-      const okEn = this.nameStr.length > 0;
-      ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 240, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 240, 70, 22);
-      ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('決定', 125, 256);
     }
     resetShake();
   }
