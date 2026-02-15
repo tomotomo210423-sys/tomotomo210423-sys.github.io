@@ -1,4 +1,4 @@
-// === MICRO QUEST - BUG FIX & STABLE UPDATE ===
+// === MICRO QUEST - ULTIMATE BUG FIX & STABLE UPDATE ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
@@ -6,8 +6,10 @@ const RPG = {
   encounterTable: { '1,1': ['slime'], '2,1': ['slime', 'bat'], '1,0': ['bat', 'skeleton', 'mage'], '0,1': ['skeleton', 'mage', 'golem'], '0,0': ['mage', 'golem', 'dragon'], '2,2': ['skeleton', 'dragon'] },
 
   init() { this.st = 'title'; this.mIdx = 0; this.anim = 0; BGM.play('rpg_field'); },
+  
   loadSave(slot) {
-    const sd = JSON.parse(localStorage.getItem(`4in1_rpg_slot${slot}`));
+    const data = localStorage.getItem(`4in1_rpg_slot${slot}`);
+    const sd = data ? JSON.parse(data) : null;
     if (sd) {
       this.p = sd.p; this.dungeons = sd.dungeons; this.chests = sd.chests; this.customBosses = sd.customBosses || Array(10).fill(null);
       if(!this.p.bestiary) this.p.bestiary = []; if(!this.p.knownSpells) this.p.knownSpells = []; if(!this.p.customWep) this.p.customWep = {atk: 0, lv: 0}; if(!this.p.customArm) this.p.customArm = {def: 0, lv: 0};
@@ -17,11 +19,18 @@ const RPG = {
     }
     this.saveSlot = slot; this.st = 'map'; this.genMap(); BGM.play('rpg_field');
   },
+  
   saveGame() {
     let sObj = { p: this.p, dungeons: this.dungeons, chests: this.chests, customBosses: this.customBosses };
     if (this.st !== 'map' && this.p.worldX !== undefined) { sObj.p.x = this.p.worldX; sObj.p.y = this.p.worldY; if (this.st === 'dungeon') { sObj.p.areaX = this.p.worldAx; sObj.p.areaY = this.p.worldAy; } }
     localStorage.setItem(`4in1_rpg_slot${this.saveSlot}`, JSON.stringify(sObj));
   },
+
+  // ★フリーズの原因だった「削除機能」を復活
+  deleteSave(slot) {
+    localStorage.removeItem(`4in1_rpg_slot${slot}`);
+  },
+
   genMap() {
     this.map = Array(15).fill().map(() => Array(10).fill(0));
     let ax = this.p.areaX, ay = this.p.areaY, seed = ax * 10 + ay + 100; let rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
@@ -59,7 +68,11 @@ const RPG = {
   startArenaBattle(slot) { this.isArena = true; this.battle('custom', slot); activeApp = this; },
 
   update() {
-    this.anim++; if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
+    this.anim++; 
+    // ★アニメーション処理中は一切のキー操作を受け付けない（連打バグ対策）
+    if (this.battleWaitTimer > 0) { this.battleWaitTimer--; return; }
+    if (this.st === 'battleProcessing') return;
+
     if (keysDown.select) {
       if (this.st === 'title' || this.st === 'saveSelect') { activeApp = Menu; Menu.init(); return; }
       if (this.st === 'map' || this.st === 'dungeon' || this.st === 'townMap') { this.st = 'menu'; this.mIdx = 0; playSnd('sel'); return; }
@@ -88,7 +101,11 @@ const RPG = {
         }
       }
       if (keysDown.b) {
-        if (this.st === 'saveSelect' && this.mIdx < 3) { if (localStorage.getItem(`4in1_rpg_slot${this.mIdx+1}`)) { this.deleteSave(this.mIdx+1); playSnd('hit'); } }
+        if (this.st === 'saveSelect' && this.mIdx < 3) { 
+          // ★空データのパースエラー対策
+          const data = localStorage.getItem(`4in1_rpg_slot${this.mIdx+1}`);
+          if (data) { this.deleteSave(this.mIdx+1); playSnd('hit'); } 
+        }
         if (this.st==='equipMenu' || this.st==='spellMenu' || this.st==='bestiary') { this.st = 'menu'; this.mIdx = 0; }
         if (this.st === 'customMenu') { this.st = 'townMap'; this.mIdx = 0; }
       } return;
@@ -131,9 +148,6 @@ const RPG = {
         }
       }
     }
-
-    // ★バグ修正: battleProcessing中（演出中）はすべてのキー操作を完全にブロックする
-    if (this.st === 'battleProcessing') return; 
 
     if (this.st === 'battle' || this.st === 'magic') {
       if (this.st === 'magic') {
@@ -224,7 +238,6 @@ const RPG = {
       if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`魔物を退治した！\nLvUP! ${this.en.gld}G獲得`); } else this.msgBox(`魔物を退治した！\n${this.en.gld}G獲得`);
     } else {
       this.p.exp += this.en.exp; this.p.gld += this.en.gld;
-      // ★バグ修正: レベルアップしなくても必ずメッセージを挟むように変更
       if (this.p.exp >= this.p.lv * 25) { this.levelUp(); this.msgBox(`勝利！ LvUP！\n${this.en.gld}G獲得`); } 
       else { BGM.play(this.dungeon ? 'rpg_dungeon' : 'rpg_field'); this.msgBox(`勝利！\n${this.en.gld}G獲得`); }
     }
@@ -243,7 +256,7 @@ const RPG = {
       } else {
         ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('セーブデータ', 50, 30);
         for (let i = 0; i < 3; i++) {
-          const sd = JSON.parse(localStorage.getItem(`4in1_rpg_slot${i + 1}`)); const sel = this.mIdx === i;
+          const data = localStorage.getItem(`4in1_rpg_slot${i + 1}`); const sd = data ? JSON.parse(data) : null; const sel = this.mIdx === i;
           ctx.fillStyle = sel ? 'rgba(0,255,0,0.2)' : 'rgba(100,100,100,0.2)'; ctx.fillRect(15, 50 + i * 65, 170, 55); ctx.strokeStyle = sel ? '#0f0' : '#666'; ctx.strokeRect(15, 50 + i * 65, 170, 55);
           ctx.fillStyle = sel ? '#0f0' : '#aaa'; ctx.font = 'bold 12px monospace'; ctx.fillText(`スロット ${i + 1}`, 25, 70 + i * 65);
           if (sd) { ctx.fillStyle = sel ? '#fff' : '#888'; ctx.font = '9px monospace'; const dP = sd.p || sd; ctx.fillText(`Lv${dP.lv} HP${dP.hp}/${dP.mhp} G:${dP.gld}`, 25, 85 + i * 65); } else { ctx.fillStyle = sel ? '#fff' : '#666'; ctx.font = '9px monospace'; ctx.fillText('データなし', 25, 85 + i * 65); }
