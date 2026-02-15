@@ -1,9 +1,10 @@
-// === CUSTOM ARENA SYSTEM (FULL FEATURES UPDATE & BUG FIX) ===
+// === CUSTOM ARENA SYSTEM - ROUTE A: 16x16 HD FULL COLOR EDITOR ===
 const Arena = {
   st: 'arenaMenu', mIdx: 0, selectedSlot: 0, editBoss: null, nameStr: '', nameCursor: 0, menuCursor: 0,
   numTarget: '', numStr: '', numCursor: 0, numKeys: ['1','2','3','4','5','6','7','8','9','DEL','0','OK'],
   spellCursor: 0, dotCursor: {x:0, y:0}, dotData: [], hooked: false,
   colors: ['#0a0', '#aaa', '#60c', '#884', '#f00', '#08f', '#f80', '#0ff', '#f0f'], colorNames: ['緑', '灰/白', '紫', '茶/黄', '赤', '青', 'オレンジ', 'シアン', 'マゼンタ'],
+  penChars: ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'], penColorIdx: 1,
   
   init() {
     this.st = 'arenaMenu'; this.mIdx = 0;
@@ -64,7 +65,22 @@ const Arena = {
          if (this.mIdx === 0) { this.st = 'bossNameEdit'; this.nameCursor = 0; this.menuCursor = 0; this.nameStr = this.editBoss.name; playSnd('jmp'); }
          else if (this.mIdx >= 1 && this.mIdx <= 5) { this.st = 'numInput'; this.numTarget = ['hp','mp','atk','def','spd'][this.mIdx-1]; this.numStr = String(this.editBoss[this.numTarget]); this.numCursor = 0; playSnd('jmp'); }
          else if (this.mIdx === 6) { this.st = 'spellEdit'; this.spellCursor = 0; playSnd('jmp'); }
-         else if (this.mIdx === 7) { this.st = 'dotEdit'; this.dotCursor = {x:0, y:0}; this.dotData = this.editBoss.sprData.split(''); playSnd('jmp'); }
+         else if (this.mIdx === 7) { 
+           this.st = 'dotEdit'; this.dotCursor = {x:0, y:0}; this.penColorIdx = 1;
+           // ★ 古い8x8(64文字)のデータを16x16(256文字)に自動拡大変換
+           if (this.editBoss.sprData.length === 64) {
+               let newData = '';
+               for (let r=0; r<8; r++) {
+                   let row = '';
+                   for (let c=0; c<8; c++) row += this.editBoss.sprData[r*8+c].repeat(2);
+                   newData += row + row;
+               }
+               this.dotData = newData.split('');
+           } else {
+               this.dotData = this.editBoss.sprData.split(''); 
+           }
+           playSnd('jmp'); 
+         }
          else if (this.mIdx === 9) { RPG.customBosses[this.selectedSlot] = JSON.parse(JSON.stringify(this.editBoss)); RPG.saveGame(); this.st = 'arenaSubMenu'; this.mIdx = 0; playSnd('combo'); }
       }
       if (keysDown.b) { this.st = 'arenaSubMenu'; this.mIdx = 0; }
@@ -92,12 +108,23 @@ const Arena = {
       if (keysDown.b) { this.st = 'bossEdit'; }
     }
     else if (this.st === 'dotEdit') {
-      if (keysDown.up) { this.dotCursor.y = (this.dotCursor.y + 7) % 8; playSnd('sel'); }
-      if (keysDown.down) { this.dotCursor.y = (this.dotCursor.y + 1) % 8; playSnd('sel'); }
-      if (keysDown.left) { this.dotCursor.x = (this.dotCursor.x + 7) % 8; playSnd('sel'); }
-      if (keysDown.right) { this.dotCursor.x = (this.dotCursor.x + 1) % 8; playSnd('sel'); }
-      if (keysDown.a) { let i = this.dotCursor.y * 8 + this.dotCursor.x; this.dotData[i] = this.dotData[i] === '1' ? '0' : '1'; playSnd('jmp'); }
-      if (keysDown.b || keysDown.select) { this.editBoss.sprData = this.dotData.join(''); this.st = 'bossEdit'; playSnd('combo'); }
+      if (keysDown.up) { this.dotCursor.y = (this.dotCursor.y + 15) % 16; playSnd('sel'); }
+      if (keysDown.down) { this.dotCursor.y = (this.dotCursor.y + 1) % 16; playSnd('sel'); }
+      if (keysDown.left) { this.dotCursor.x = (this.dotCursor.x + 15) % 16; playSnd('sel'); }
+      if (keysDown.right) { this.dotCursor.x = (this.dotCursor.x + 1) % 16; playSnd('sel'); }
+      
+      // ★ SELECTボタンで色切り替え
+      if (keysDown.select) { this.penColorIdx = (this.penColorIdx + 1) % 16; playSnd('sel'); }
+      
+      // ★ Aボタン押しっぱなしでお絵かき可能（スマホの操作性向上）
+      if (keys.a) { 
+         let i = this.dotCursor.y * 16 + this.dotCursor.x; 
+         if(this.dotData[i] !== this.penChars[this.penColorIdx]) {
+             this.dotData[i] = this.penChars[this.penColorIdx];
+             if(keysDown.a) playSnd('jmp'); // 押した瞬間だけ音を鳴らす
+         }
+      }
+      if (keysDown.b) { this.editBoss.sprData = this.dotData.join(''); this.st = 'bossEdit'; playSnd('combo'); }
     }
     else if (this.st === 'bossNameEdit') {
       const chars = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789!?ー';
@@ -121,7 +148,6 @@ const Arena = {
   draw() {
     applyShake();
     
-    // ★バグ修正: 名前入力画面だけは枠を取り払って全画面を広く使う
     if (this.st === 'bossNameEdit') {
       ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
       ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('名前: ' + this.nameStr + '_', 10, 25);
@@ -146,9 +172,8 @@ const Arena = {
       return;
     }
 
-    // 他の画面用の背景と枠
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
-    for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { ctx.fillStyle = '#222'; ctx.fillRect(c * 20, r * 20 + 45, 20, 20); } }
+    for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { drawSprite(c * 20, r * 20 + 45, '', sprs.wall, 2.5); } }
     ctx.fillStyle = 'rgba(0,0,0,0.95)'; ctx.fillRect(10, 45, 180, 230); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 45, 180, 230);
 
     if (this.st === 'arenaMenu') {
@@ -205,14 +230,25 @@ const Arena = {
       ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('B:戻る', 80, 265);
     }
     else if (this.st === 'dotEdit') {
-      ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('ドット絵エディタ', 50, 70);
-      let ox = 50, oy = 90, sz = 12;
-      for (let i = 0; i < 64; i++) {
-        let cx = i % 8, cy = Math.floor(i / 8);
-        ctx.fillStyle = this.dotData[i] === '1' ? this.colors[this.editBoss.colorId] : '#333'; ctx.fillRect(ox + cx * sz, oy + cy * sz, sz - 1, sz - 1);
+      ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('16x16 HDエディタ', 45, 65);
+      
+      let ox = 50, oy = 80, sz = 6;
+      for (let i = 0; i < 256; i++) {
+        let cx = i % 16, cy = Math.floor(i / 16);
+        let char = this.dotData[i];
+        ctx.fillStyle = char === '0' ? '#333' : (char === '1' ? this.colors[this.editBoss.colorId] : PALETTE[char]);
+        ctx.fillRect(ox + cx * sz, oy + cy * sz, sz - 1, sz - 1);
       }
-      ctx.strokeStyle = '#f00'; ctx.lineWidth = 2; ctx.strokeRect(ox + this.dotCursor.x * sz, oy + this.dotCursor.y * sz, sz - 1, sz - 1); ctx.lineWidth = 1;
-      ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('A:塗る/消す B:完了', 45, 265);
+      // カーソル
+      ctx.strokeStyle = '#f00'; ctx.lineWidth = 1; ctx.strokeRect(ox + this.dotCursor.x * sz, oy + this.dotCursor.y * sz, sz, sz);
+      
+      // ペンの色表示
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('PEN:', 60, 195);
+      let pChar = this.penChars[this.penColorIdx];
+      ctx.fillStyle = pChar === '0' ? '#111' : (pChar === '1' ? this.colors[this.editBoss.colorId] : PALETTE[pChar]);
+      ctx.fillRect(90, 185, 15, 15); ctx.strokeStyle = '#fff'; ctx.strokeRect(90, 185, 15, 15);
+      
+      ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('SELECT:色 A:塗る B:完了', 25, 265);
     }
     resetShake();
   }
