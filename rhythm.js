@@ -1,50 +1,70 @@
-// === BEAT BROS - AUTO GENERATE RHYTHM GAME (FILE DIALOG FIX) ===
+// === BEAT BROS - AUTO GENERATE RHYTHM GAME (NATIVE UI FIX & SAVE) ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
-  score: 0, combo: 0, maxCombo: 0, judgements: [], fileInputBound: false,
+  score: 0, combo: 0, maxCombo: 0, judgements: [],
   
   init() {
     this.st = 'menu'; this.mode = 'normal';
     this.audioBuffer = null; if (this.source) { this.source.stop(); this.source.disconnect(); this.source = null; }
     BGM.play('menu');
-    
-    // ★ ブラウザのセキュリティを突破するハック処理
-    if (!this.fileInputBound) {
-      this.fileInputBound = true;
-      const fileTrigger = (e) => {
-        if (activeApp === this && this.st === 'menu') {
-          // Zキー、スペースキー、または画面のAボタンを直接押した瞬間に発火させる
-          if ((e.type === 'keydown' && (e.key === 'z' || e.key === ' ')) || 
-              ((e.type === 'mousedown' || e.type === 'touchstart') && (e.target.id === 'btn-a' || e.target.id === 'label-a'))) {
-            this.openFileDialog();
-          }
-        }
-      };
-      window.addEventListener('keydown', fileTrigger);
-      window.addEventListener('mousedown', fileTrigger);
-      window.addEventListener('touchstart', fileTrigger, {passive: false});
-    }
+    this.showFileUI(); // ★ 100%確実に開くHTMLボタンを画面上に召喚
   },
   
-  openFileDialog() {
-    initAudio(); 
-    let input = document.getElementById('hidden-music-input');
-    if (!input) {
-      // 画面の裏側に透明なファイル入力フォームを作る
-      input = document.createElement('input');
-      input.id = 'hidden-music-input';
-      input.type = 'file'; 
+  // ★ ゲーム画面の上に「曲を選ぶ」ボタン（HTML）を直接重ねて表示する処理
+  showFileUI() {
+    let ui = document.getElementById('rhythm-file-ui');
+    if (!ui) {
+      ui = document.createElement('div');
+      ui.id = 'rhythm-file-ui';
+      ui.style.position = 'absolute';
+      ui.style.bottom = '40px'; // 画面の下の方に配置
+      ui.style.left = '50%';
+      ui.style.transform = 'translateX(-50%)';
+      ui.style.zIndex = '100';
+      ui.style.textAlign = 'center';
+      ui.style.width = '100%';
+      
+      let label = document.createElement('label');
+      label.style.display = 'inline-block';
+      label.style.background = '#ff0';
+      label.style.color = '#000';
+      label.style.padding = '10px 15px';
+      label.style.fontFamily = 'monospace';
+      label.style.fontWeight = 'bold';
+      label.style.fontSize = '12px';
+      label.style.borderRadius = '5px';
+      label.style.cursor = 'pointer';
+      label.style.border = '2px solid #fff';
+      label.style.boxShadow = '0 0 15px #ff0';
+      label.innerHTML = '📁 曲ファイルを選ぶ'; // ボタンのテキスト
+      
+      let input = document.createElement('input');
+      input.type = 'file';
       input.accept = 'audio/*';
-      input.style.display = 'none';
-      document.body.appendChild(input);
+      input.style.display = 'none'; // input自体は隠して、labelをボタンにする
+      input.onchange = (e) => {
+        if (e.target.files[0]) {
+          initAudio();
+          this.hideFileUI();
+          this.loadFile(e.target.files[0]);
+          e.target.value = ''; // 連続選択できるようにリセット
+        }
+      };
+      
+      label.appendChild(input);
+      ui.appendChild(label);
+      
+      // ゲームのスクリーン枠の中に追加する
+      const container = document.getElementById('screen-container');
+      if (container) container.appendChild(ui);
+      else document.body.appendChild(ui); // 見つからなければ画面全体に
     }
-    input.onchange = e => { 
-      if (e.target.files[0]) {
-        this.loadFile(e.target.files[0]); 
-        input.value = ''; // 連続で同じファイルを選べるようにリセット
-      } 
-    };
-    input.click(); // ここでファイル画面が開く！
+    ui.style.display = 'block';
+  },
+  
+  hideFileUI() {
+    let ui = document.getElementById('rhythm-file-ui');
+    if (ui) ui.style.display = 'none';
   },
   
   loadFile(file) {
@@ -54,7 +74,7 @@ const Rhythm = {
       audioCtx.decodeAudioData(e.target.result, buffer => {
         this.audioBuffer = buffer;
         this.generateNotes(buffer);
-      }, err => { alert("このファイルは解析できませんでした。"); this.init(); });
+      }, err => { alert("このファイルは解析できませんでした。別の曲を試してください。"); this.init(); });
     };
     reader.readAsArrayBuffer(file);
   },
@@ -92,21 +112,34 @@ const Rhythm = {
     this.source = audioCtx.createBufferSource();
     this.source.buffer = this.audioBuffer;
     this.source.connect(audioCtx.destination);
-    this.source.onended = () => { this.st = 'result'; }; 
+    
+    // 曲が終わった時にハイスコアならセーブ
+    this.source.onended = () => { 
+      this.st = 'result'; 
+      let finalScore = Math.floor(this.score);
+      if (finalScore > SaveSys.data.rhythm[this.mode]) {
+         SaveSys.data.rhythm[this.mode] = finalScore;
+         SaveSys.save();
+      }
+    }; 
     
     this.startTime = audioCtx.currentTime + 2; 
     this.source.start(this.startTime);
   },
   
   update() {
-    if (keysDown.select) { if (this.source) { this.source.stop(); this.source = null; } switchApp(Menu); return; }
+    if (keysDown.select) { 
+       this.hideFileUI(); // 戻る時はボタンを隠す
+       if (this.source) { this.source.stop(); this.source = null; } 
+       switchApp(Menu); 
+       return; 
+    }
     
     if (this.st === 'menu') {
       if (keysDown.up || keysDown.down) { 
         if (this.mode === 'easy') this.mode = 'normal'; else if (this.mode === 'normal') this.mode = 'hard'; else this.mode = 'easy';
         playSnd('sel'); 
       }
-      if (keysDown.a) { playSnd('jmp'); } // ★ 音を鳴らすだけに変更（開く処理は上のイベントリスナーが担当）
     }
     else if (this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
@@ -147,7 +180,7 @@ const Rhythm = {
       }
       for (let i = this.judgements.length - 1; i >= 0; i--) { this.judgements[i].life--; if (this.judgements[i].life <= 0) this.judgements.splice(i, 1); }
     }
-    else if (this.st === 'result') { if (keysDown.a || keysDown.b) { this.init(); } }
+    else if (this.st === 'result') { if (keysDown.a || keysDown.b) { this.init(); } } // もう一度遊ぶ時に再びボタンを表示
   },
   
   draw() {
@@ -160,9 +193,14 @@ const Rhythm = {
       const modes = ['easy', 'normal', 'hard'];
       for (let i = 0; i < 3; i++) {
         ctx.fillStyle = this.mode === modes[i] ? '#0f0' : '#666';
-        ctx.fillText((this.mode === modes[i] ? '> ' : '  ') + modes[i].toUpperCase(), 75, 130 + i * 30);
+        ctx.fillText((this.mode === modes[i] ? '> ' : '  ') + modes[i].toUpperCase(), 65, 125 + i * 35);
+        ctx.fillStyle = this.mode === modes[i] ? '#ff0' : '#888'; ctx.font = '8px monospace';
+        ctx.fillText(`HI-SCORE: ${SaveSys.data.rhythm[modes[i]]}`, 65, 137 + i * 35);
+        ctx.font = '10px monospace'; 
       }
-      ctx.fillStyle = '#ff0'; ctx.fillText('A: ファイルを選択', 50, 230);
+      
+      // ★ 案内の文字を変更
+      ctx.fillStyle = '#0ff'; ctx.fillText('▼ 画面のボタンをタップ ▼', 25, 230);
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if (this.st === 'loading') {
