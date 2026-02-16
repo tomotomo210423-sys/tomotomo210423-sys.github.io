@@ -1,4 +1,4 @@
-// === CORE SYSTEM - FULL RESTORE & ULTIMATE EVOLUTION ===
+　// === CORE SYSTEM - ULTIMATE SAFE & REFINED VERSION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
@@ -19,10 +19,10 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// 4トラック本格レトロBGMエンジン
-let bgmOsc = [], bgmGain = [], bgmInterval = null;
+// ★ 危険箇所②修正: BGMエンジンのメモリリーク対策（自動停止スケジュール）
+let bgmOsc = [], bgmInterval = null;
 const BGM = {
-  stop() { bgmOsc.forEach(o => o.stop()); bgmOsc = []; if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
+  stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
   play(type) {
     this.stop(); if (!audioCtx) return;
     const mels = {
@@ -36,13 +36,16 @@ const BGM = {
     const track = mels[type] || mels.menu; let i = 0;
     
     bgmInterval = setInterval(() => {
-      bgmOsc.forEach(o => o.stop()); bgmOsc = [];
+      const now = audioCtx.currentTime;
+      const duration = track.spd / 1000;
+      
       const playNote = (freq, wave, vol) => {
         if (!freq) return;
         const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
         o.type = wave; o.frequency.value = freq;
-        g.gain.setValueAtTime(vol, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (track.spd/1000));
-        o.connect(g); g.connect(audioCtx.destination); o.start(); bgmOsc.push(o);
+        g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        o.connect(g); g.connect(audioCtx.destination); 
+        o.start(now); o.stop(now + duration + 0.1); // 未来の停止を絶対予約（メモリリーク防止）
       };
       playNote(track.t1[i % track.t1.length], 'square', 0.05);
       playNote(track.t2[i % track.t2.length], 'square', 0.03);
@@ -50,8 +53,9 @@ const BGM = {
       
       if (track.n[i % track.n.length] > 0 && noiseBuffer) {
         const src = audioCtx.createBufferSource(); const g = audioCtx.createGain();
-        src.buffer = noiseBuffer; g.gain.setValueAtTime(0.05, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-        src.connect(g); g.connect(audioCtx.destination); src.start(); bgmOsc.push(src);
+        src.buffer = noiseBuffer; g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        src.connect(g); g.connect(audioCtx.destination); 
+        src.start(now); src.stop(now + 0.2); // ノイズも停止予約
       }
       i++;
     }, track.spd);
@@ -75,10 +79,33 @@ function playSnd(t) {
   }
 }
 
+// 自己修復機能付きのセーブシステム
 const SaveSys = {
-  data: JSON.parse(localStorage.getItem('4in1_ultimate')) || { playerName: 'PLAYER', scores: {n:0, h:0}, actStage: 1, actLives: 5, actSeed: Math.floor(Math.random()*1000), rpg: null, rankings: {n:[], h:[]}, bgTheme: 0 },
+  data: (function() {
+    let d = {};
+    try { 
+      let parsed = JSON.parse(localStorage.getItem('4in1_ultimate')); 
+      if (parsed && typeof parsed === 'object') d = parsed;
+    } catch(e) {}
+    return {
+      playerName: d.playerName || 'PLAYER',
+      scores: d.scores || {n:0, h:0},
+      actStage: d.actStage !== undefined ? d.actStage : 1,
+      actLives: d.actLives !== undefined ? d.actLives : 5,
+      actSeed: d.actSeed !== undefined ? d.actSeed : Math.floor(Math.random()*1000),
+      rpg: d.rpg || null,
+      rankings: d.rankings || {n:[], h:[]},
+      bgTheme: d.bgTheme || 0
+    };
+  })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
-  addScore(mode, score) { const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; rank.push({name: this.data.playerName, score: score, date: Date.now()}); rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); }
+  addScore(mode, score) { 
+    if (!this.data.rankings) this.data.rankings = {n:[], h:[]};
+    const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
+    rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
+    rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); 
+    this.save(); 
+  }
 };
 
 const bgThemes = [
@@ -110,18 +137,10 @@ const drawSprite = (x, y, color, strData, size = 2.5) => {
   }
 };
 
-// ★ 完全復元したスプライト大辞典（ここで削ったのがすべてのエラーの原因でした）
 const sprs = {
-  // === 16x16 HD ===
-  player: [
-    "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
-    "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"
-  ],
+  player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
   heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
-  slime: [
-    "000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000",
-    "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"
-  ],
+  slime: ["000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
   boss: "000033333333000000031111111130000031131111311300003138311383130000311311113113000031111331111300000311111111300000003333333300000033a111111a330003aa31111113aa3003a3311111133a3003303111111303300000311331130000000031133113000000003330033300000000000000000000",
   skull: "0000033333300000000032222223000000032222222230000003233223323000000323322332300000032223322230000000322222230000000003233230000000000322223000000000003333000000000033a22a33000000032a2222a230000003222332223000000033300333000000003230032300000000333003330000",
   mage: "0000003333000000000003111130000000003111111300000003111111113000003133333333130000000344443000000000343443430000000034444443000000000311113080000000311111138000000311111111390000031311113139000003331111333900000003333330090000000330033009000000033003300000",
@@ -173,7 +192,7 @@ function drawTransition() {
   }
 }
 
-// ★ 完全復元: 美しい配置と文字サイズのメニュー画面
+// メニュー
 const Menu = {
   cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'ローカルランキング', '設定', 'データ引継ぎ'], selectHoldTimer: 0,
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
@@ -181,27 +200,19 @@ const Menu = {
     if (keys.select) { this.selectHoldTimer++; if (this.selectHoldTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.selectHoldTimer = 0; }
     if (keysDown.down) { this.cur = (this.cur + 1) % 8; playSnd('sel'); }
     if (keysDown.up) { this.cur = (this.cur + 7) % 8; playSnd('sel'); }
-    if (keysDown.a) { 
-      const appObjs = [Guide, Tetri, Action, RPG, Online, Ranking, Settings, DataBackup]; 
-      switchApp(appObjs[this.cur]); 
-    }
+    if (keysDown.a) { const appObjs = [Guide, Tetri, Action, RPG, Online, Ranking, Settings, DataBackup]; switchApp(appObjs[this.cur]); }
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx);
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('4in1 RETRO', 55, 30); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v6.0', 60, 45);
-    for (let i = 0; i < 8; i++) { 
-      ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; 
-      ctx.font = '11px monospace'; 
-      ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 68 + i * 24); 
-    }
-    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280); 
-    ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v6.2', 60, 45);
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 68 + i * 24); }
+    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
     if (this.selectHoldTimer > 0) { const p = Math.min(30, this.selectHoldTimer); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(10, 265, (180 * p / 30), 5); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 265, 180, 5); }
   }
 };
 
-// ★ 完全復元: データ引き継ぎ管理室
+// ★ 危険箇所①修正: データ復元後の安全確保（自動リロード）
 const DataBackup = {
   st: 'map', px: 4.5, py: 6, anim: 0, msg: '', backupStr: '',
   init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('menu'); },
@@ -219,7 +230,17 @@ const DataBackup = {
        if (Math.abs(this.px - 2) < 1.5 && Math.abs(this.py - 2) < 1.5) {
            try { 
              this.backupStr = btoa(unescape(encodeURIComponent(JSON.stringify(SaveSys.data))));
-             navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); }).catch(e=> { this.msg = 'コピー失敗...'; this.st = 'msg'; });
+             if (navigator.clipboard && window.isSecureContext) {
+                 navigator.clipboard.writeText(this.backupStr).then(()=> { 
+                   this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); 
+                 }).catch(e=> { 
+                   prompt("自動コピーがブロックされました。\n以下の呪文を手動でコピーしてください:", this.backupStr);
+                   this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); 
+                 });
+             } else {
+                 prompt("以下の呪文を手動でコピーしてください:", this.backupStr);
+                 this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); 
+             }
            } catch(e) { this.msg = 'データ変換エラー'; this.st = 'msg'; playSnd('hit'); }
        } 
        else if (Math.abs(this.px - 7) < 1.5 && Math.abs(this.py - 2) < 1.5) {
@@ -227,7 +248,12 @@ const DataBackup = {
            if (input) {
              try {
                const parsed = JSON.parse(decodeURIComponent(escape(atob(input))));
-               if (parsed && parsed.playerName) { SaveSys.data = parsed; SaveSys.save(); this.msg = 'データの復元に成功した！'; this.st = 'msg'; playSnd('combo'); } 
+               if (parsed && parsed.playerName) { 
+                 SaveSys.data = parsed; SaveSys.save(); 
+                 // ★ データが不完全でもバグらないように、読み込み直後に強制的に画面をリロード（再起動）する
+                 alert("データの復元に成功しました！\nゲームを再起動します。");
+                 location.reload(); 
+               } 
                else throw new Error('Invalid');
              } catch(e) { this.msg = '呪文が違います！'; this.st = 'msg'; playSnd('hit'); }
            }
@@ -247,7 +273,6 @@ const DataBackup = {
   }
 };
 
-// ★ 完全復元: ランキング画面（文字入力含む）
 const Ranking = {
   mode: 'normal', input: false, name: '', cursor: 0, menuCursor: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
   init() { if (!this.input) this.mode = 'normal'; this.cursor = 0; this.menuCursor = 0; },
@@ -305,7 +330,6 @@ const Ranking = {
   }
 };
 
-// ★ 完全復元: 設定画面
 const Settings = {
   menuCursor: 0, init() { this.menuCursor = 0; },
   update() {
@@ -327,7 +351,10 @@ const Settings = {
 
 function loop() {
   try {
-    for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; }
+    // ★ 危険箇所③修正: ヒットストップ中の入力消失（無反応バグ）を防止
+    if (hitStopTimer <= 0) {
+      for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; }
+    }
     
     if (transTimer > 0) {
       transTimer--;
