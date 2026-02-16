@@ -76,7 +76,7 @@ function playSnd(t) {
   }
 }
 
-// ★ セーブシステムを5in1仕様にアップデート
+// ★ セーブシステム 5in1仕様 (rhythmデータを追加)
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -92,7 +92,7 @@ const SaveSys = {
     if (!d.rankings.n) d.rankings.n = [];
     if (!d.rankings.h) d.rankings.h = [];
     
-    // ★ 新規追加：リズムゲームのハイスコア枠
+    // ★ リズムゲームのハイスコア枠
     if (!d.rhythm || typeof d.rhythm !== 'object') d.rhythm = {easy: 0, normal: 0, hard: 0};
 
     return {
@@ -104,7 +104,7 @@ const SaveSys = {
       rpg: d.rpg || null,
       rankings: d.rankings,
       bgTheme: d.bgTheme || 0,
-      rhythm: d.rhythm // ★ 追加
+      rhythm: d.rhythm
     };
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
@@ -191,6 +191,7 @@ function drawTransition() {
   if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x+y) < (20 - transTimer)) ctx.fillRect(x*20, y*20, 20, 20); } } }
 }
 
+// ★ 9項目のメニュー構成
 const Menu = {
   cur: 0, 
   apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
@@ -357,7 +358,13 @@ const setBtn = (id, k) => {
   const p = (ev) => { ev.preventDefault(); keys[k] = true; initAudio(); }; const r = (ev) => { ev.preventDefault(); keys[k] = false; };
   e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
 };
-['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select'].forEach((id, i) => { setBtn(id, ['up', 'down', 'left', 'right', 'a', 'b', 'select'][i]); });
+
+// ★ リズムゲーム専用の大型鍵盤もタッチ操作にバインド
+['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select', 'btn-rhythm-a', 'btn-rhythm-b'].forEach((id, i) => { 
+  const keysArr = ['up', 'down', 'left', 'right', 'a', 'b', 'select', 'a', 'b'];
+  setBtn(id, keysArr[i]); 
+});
+
 window.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
   if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
