@@ -1,4 +1,4 @@
-　// === CORE SYSTEM - ULTIMATE SAFE & REFINED VERSION ===
+// === CORE SYSTEM - ULTIMATE SAFE & REFINED VERSION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
@@ -19,7 +19,7 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// ★ 危険箇所②修正: BGMエンジンのメモリリーク対策（自動停止スケジュール）
+// 4トラック本格レトロBGMエンジン
 let bgmOsc = [], bgmInterval = null;
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
@@ -45,7 +45,7 @@ const BGM = {
         o.type = wave; o.frequency.value = freq;
         g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + duration);
         o.connect(g); g.connect(audioCtx.destination); 
-        o.start(now); o.stop(now + duration + 0.1); // 未来の停止を絶対予約（メモリリーク防止）
+        o.start(now); o.stop(now + duration + 0.1);
       };
       playNote(track.t1[i % track.t1.length], 'square', 0.05);
       playNote(track.t2[i % track.t2.length], 'square', 0.03);
@@ -55,7 +55,7 @@ const BGM = {
         const src = audioCtx.createBufferSource(); const g = audioCtx.createGain();
         src.buffer = noiseBuffer; g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         src.connect(g); g.connect(audioCtx.destination); 
-        src.start(now); src.stop(now + 0.2); // ノイズも停止予約
+        src.start(now); src.stop(now + 0.2);
       }
       i++;
     }, track.spd);
@@ -79,7 +79,7 @@ function playSnd(t) {
   }
 }
 
-// 自己修復機能付きのセーブシステム
+// ★ 自己修復機能付きのセーブシステム（この部分が古いデータのクラッシュを完全に防ぎます！）
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -87,20 +87,32 @@ const SaveSys = {
       let parsed = JSON.parse(localStorage.getItem('4in1_ultimate')); 
       if (parsed && typeof parsed === 'object') d = parsed;
     } catch(e) {}
-    return {
+    
+    // データが壊れていても絶対にエラーにならないように初期値をマージする
+    let out = {
       playerName: d.playerName || 'PLAYER',
-      scores: d.scores || {n:0, h:0},
+      scores: { n: 0, h: 0 },
       actStage: d.actStage !== undefined ? d.actStage : 1,
       actLives: d.actLives !== undefined ? d.actLives : 5,
       actSeed: d.actSeed !== undefined ? d.actSeed : Math.floor(Math.random()*1000),
       rpg: d.rpg || null,
-      rankings: d.rankings || {n:[], h:[]},
+      rankings: { n: [], h: [] },
       bgTheme: d.bgTheme || 0
     };
+    
+    if (d.scores && typeof d.scores === 'object') {
+        out.scores.n = d.scores.n || 0;
+        out.scores.h = d.scores.h || 0;
+    }
+    if (d.rankings && typeof d.rankings === 'object') {
+        out.rankings.n = d.rankings.n || [];
+        out.rankings.h = d.rankings.h || [];
+    }
+    return out;
   })(),
+  
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
   addScore(mode, score) { 
-    if (!this.data.rankings) this.data.rankings = {n:[], h:[]};
     const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
     rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
     rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); 
@@ -138,6 +150,7 @@ const drawSprite = (x, y, color, strData, size = 2.5) => {
 };
 
 const sprs = {
+  // === 16x16 HD ===
   player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
   heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
   slime: ["000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
@@ -205,14 +218,14 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx);
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('4in1 RETRO', 55, 30); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v6.2', 60, 45);
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v6.3', 60, 45);
     for (let i = 0; i < 8; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 68 + i * 24); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
     if (this.selectHoldTimer > 0) { const p = Math.min(30, this.selectHoldTimer); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(10, 265, (180 * p / 30), 5); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 265, 180, 5); }
   }
 };
 
-// ★ 危険箇所①修正: データ復元後の安全確保（自動リロード）
+// データ引き継ぎ部屋
 const DataBackup = {
   st: 'map', px: 4.5, py: 6, anim: 0, msg: '', backupStr: '',
   init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('menu'); },
@@ -250,7 +263,6 @@ const DataBackup = {
                const parsed = JSON.parse(decodeURIComponent(escape(atob(input))));
                if (parsed && parsed.playerName) { 
                  SaveSys.data = parsed; SaveSys.save(); 
-                 // ★ データが不完全でもバグらないように、読み込み直後に強制的に画面をリロード（再起動）する
                  alert("データの復元に成功しました！\nゲームを再起動します。");
                  location.reload(); 
                } 
@@ -351,7 +363,7 @@ const Settings = {
 
 function loop() {
   try {
-    // ★ 危険箇所③修正: ヒットストップ中の入力消失（無反応バグ）を防止
+    // ヒットストップ中の入力消失を防止（汁気による操作抜けの解決）
     if (hitStopTimer <= 0) {
       for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; }
     }
