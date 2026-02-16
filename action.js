@@ -1,4 +1,4 @@
-// === UNREASONABLE BROS - HYBRID HD UPDATE ===
+// === UNREASONABLE BROS - SYNCED HIGH DENSITY VERSION ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1}, score: 0, camX: 0, coyoteTime: 0, stageTheme: 'grass',
@@ -9,7 +9,9 @@ const Action = {
     this.st = 'play'; this.p = {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1};
     this.map = []; this.platforms = []; this.coins = []; this.spikes = []; this.enemies = []; this.invisibleBlocks = []; this.fakeCoins = [];
     this.score = 0; this.camX = 0; this.coyoteTime = 0;
-    const stage = SaveSys.data.actStage; this.stageTheme = stage === 1 ? 'grass' : stage === 2 ? 'desert' : 'lava';
+    
+    // ★ 修正点: SaveSys.act を参照してエラーを防止
+    const stage = SaveSys.act.stage; this.stageTheme = stage === 1 ? 'grass' : stage === 2 ? 'desert' : 'lava';
     for (let i = 0; i < 50; i++) this.map.push({x: i * 20, y: 270, w: 20, h: 30, type: 'ground'});
     if (stage === 1) {
       this.platforms.push({x: 150, y: 230, w: 40, h: 10}); this.platforms.push({x: 250, y: 200, w: 40, h: 10}); this.platforms.push({x: 350, y: 170, w: 60, h: 10});
@@ -34,8 +36,9 @@ const Action = {
   },
   
   die() {
-    SaveSys.data.actLives--; SaveSys.save(); playSnd('hit'); screenShake(8); addParticle(this.p.x, this.p.y, '#00f', 'explosion');
-    if (SaveSys.data.actLives < 0) { SaveSys.data.actStage = 1; SaveSys.data.actLives = 3; SaveSys.save(); this.st = 'gameover'; } else this.st = 'dead';
+    // ★ 修正点: SaveSys.act を参照してエラーを防止
+    SaveSys.act.lives--; SaveSys.saveAct(); playSnd('hit'); screenShake(8); addParticle(this.p.x, this.p.y, '#00f', 'explosion');
+    if (SaveSys.act.lives < 0) { SaveSys.act.stage = 1; SaveSys.act.lives = 3; SaveSys.saveAct(); this.st = 'gameover'; } else this.st = 'dead';
   },
   
   update() {
@@ -50,8 +53,9 @@ const Action = {
     for (let m of this.map) {
       if (m.type === 'ground' && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) { if (this.p.vy > 0) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; } }
       if (m.type === 'goal' && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) {
-        SaveSys.data.actStage++; SaveSys.save(); playSnd('combo');
-        if (SaveSys.data.actStage > 3) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
+        // ★ 修正点: SaveSys.act を参照してエラーを防止
+        SaveSys.act.stage++; SaveSys.saveAct(); playSnd('combo');
+        if (SaveSys.act.stage > 3) { this.st = 'clear'; SaveSys.act.stage = 1; SaveSys.saveAct(); } else this.load(); return;
       }
     }
     for (let plat of this.platforms) {
@@ -104,7 +108,6 @@ const Action = {
       resetShake(); return;
     }
     
-    // 背景の描画（元の美しいグラデーションとギミックを維持）
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
     if (this.stageTheme === 'grass') { gradient.addColorStop(0, '#4af'); gradient.addColorStop(1, '#8cf'); } 
     else if (this.stageTheme === 'desert') { gradient.addColorStop(0, '#fc8'); gradient.addColorStop(1, '#fa4'); } 
@@ -117,7 +120,6 @@ const Action = {
     for (let m of this.map) {
       if (m.x - this.camX > -50 && m.x - this.camX < 250) {
         if (m.type === 'ground') {
-          // 元の描画の上に、薄くHDの草模様（スプライト）を重ねるハイブリッド仕様
           ctx.fillStyle = this.stageTheme === 'grass' ? '#8b4513' : this.stageTheme === 'desert' ? '#d2b48c' : '#444'; ctx.fillRect(m.x - this.camX, m.y, m.w, m.h);
           ctx.fillStyle = this.stageTheme === 'grass' ? '#6b3513' : this.stageTheme === 'desert' ? '#c19a6b' : '#222'; ctx.fillRect(m.x - this.camX, m.y, m.w, 5);
         } else if (m.type === 'goal') { 
@@ -140,7 +142,6 @@ const Action = {
       }
     }
     
-    // ★ コインをHDスプライトで描画（なければ丸い図形）
     for (let coin of this.coins) {
       if (!coin.collected && coin.x - this.camX > -50 && coin.x - this.camX < 250) {
         const offset = Math.sin(Date.now() / 100) * 3; 
@@ -148,7 +149,6 @@ const Action = {
         else { ctx.fillStyle = '#ffd700'; ctx.beginPath(); ctx.arc(coin.x - this.camX, coin.y + offset, 6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; }
       }
     }
-    // ★ 偽コインをHDスプライトで赤く描画
     for (let fc of this.fakeCoins) {
       if (!fc.touched && fc.x - this.camX > -50 && fc.x - this.camX < 250) {
         const offset = Math.sin(Date.now() / 100) * 3; 
@@ -159,7 +159,6 @@ const Action = {
     
     for (let spike of this.spikes) { if (spike.x - this.camX > -50 && spike.x - this.camX < 250) drawSprite(spike.x - this.camX, spike.y, '#888', sprs.spike, 2.5); }
     
-    // ★ 敵をHDスプライトで描画
     for (let e of this.enemies) {
       if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
         const offsetY = e.enemyType === 'flying' ? Math.sin((e.anim || 0) * Math.PI / 180) * 4 : Math.sin((e.anim || 0) * Math.PI / 180) * 2;
@@ -169,7 +168,6 @@ const Action = {
       }
     }
     
-    // ★ プレイヤーをアニメーション付きのHDスプライトで描画
     if (this.st !== 'dead' && this.st !== 'gameover') {
       ctx.save(); if (this.p.dir < 0) { ctx.scale(-1, 1); ctx.translate(-((this.p.x - this.camX) * 2 + 20), 0); } 
       drawSprite(this.p.x - this.camX, this.p.y, '#00f', sprs.player || sprs.heroNew, 2.5); 
@@ -178,7 +176,8 @@ const Action = {
     
     drawParticles();
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, 200, 32); ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-    ctx.fillText(`ST:${SaveSys.data.actStage} ♥:${SaveSys.data.actLives}`, 5, 12); ctx.fillText(`SC:${this.score}`, 5, 25);
+    // ★ 修正点: SaveSys.act を参照してエラーを防止
+    ctx.fillText(`ST:${SaveSys.act.stage} ♥:${SaveSys.act.lives}`, 5, 12); ctx.fillText(`SC:${this.score}`, 5, 25);
     if (this.st === 'dead' || this.st === 'gameover') { ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 100, 200, 60); ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText(this.st === 'gameover' ? 'GAMEOVER' : 'OOPS!', 60, 125); ctx.font = '10px monospace'; ctx.fillText('(A) ' + (this.st === 'gameover' ? 'Menu' : 'Retry'), 55, 145); }
     if (this.st === 'clear') { ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 100, 200, 60); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('CLEAR!', 65, 125); ctx.font = '10px monospace'; ctx.fillText('(A) Menu', 60, 145); }
     resetShake();
