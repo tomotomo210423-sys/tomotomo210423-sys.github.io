@@ -1,20 +1,50 @@
-// === BEAT BROS - AUTO GENERATE RHYTHM GAME ===
+// === BEAT BROS - AUTO GENERATE RHYTHM GAME (FILE DIALOG FIX) ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
-  score: 0, combo: 0, maxCombo: 0, judgements: [],
+  score: 0, combo: 0, maxCombo: 0, judgements: [], fileInputBound: false,
   
   init() {
     this.st = 'menu'; this.mode = 'normal';
     this.audioBuffer = null; if (this.source) { this.source.stop(); this.source.disconnect(); this.source = null; }
     BGM.play('menu');
+    
+    // ★ ブラウザのセキュリティを突破するハック処理
+    if (!this.fileInputBound) {
+      this.fileInputBound = true;
+      const fileTrigger = (e) => {
+        if (activeApp === this && this.st === 'menu') {
+          // Zキー、スペースキー、または画面のAボタンを直接押した瞬間に発火させる
+          if ((e.type === 'keydown' && (e.key === 'z' || e.key === ' ')) || 
+              ((e.type === 'mousedown' || e.type === 'touchstart') && (e.target.id === 'btn-a' || e.target.id === 'label-a'))) {
+            this.openFileDialog();
+          }
+        }
+      };
+      window.addEventListener('keydown', fileTrigger);
+      window.addEventListener('mousedown', fileTrigger);
+      window.addEventListener('touchstart', fileTrigger, {passive: false});
+    }
   },
   
   openFileDialog() {
     initAudio(); 
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'audio/*';
-    input.onchange = e => { if (e.target.files[0]) this.loadFile(e.target.files[0]); };
-    input.click();
+    let input = document.getElementById('hidden-music-input');
+    if (!input) {
+      // 画面の裏側に透明なファイル入力フォームを作る
+      input = document.createElement('input');
+      input.id = 'hidden-music-input';
+      input.type = 'file'; 
+      input.accept = 'audio/*';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+    }
+    input.onchange = e => { 
+      if (e.target.files[0]) {
+        this.loadFile(e.target.files[0]); 
+        input.value = ''; // 連続で同じファイルを選べるようにリセット
+      } 
+    };
+    input.click(); // ここでファイル画面が開く！
   },
   
   loadFile(file) {
@@ -76,7 +106,7 @@ const Rhythm = {
         if (this.mode === 'easy') this.mode = 'normal'; else if (this.mode === 'normal') this.mode = 'hard'; else this.mode = 'easy';
         playSnd('sel'); 
       }
-      if (keysDown.a) { playSnd('jmp'); this.openFileDialog(); }
+      if (keysDown.a) { playSnd('jmp'); } // ★ 音を鳴らすだけに変更（開く処理は上のイベントリスナーが担当）
     }
     else if (this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
