@@ -1,4 +1,4 @@
-// === CORE SYSTEM - ULTIMATE SAFE & REFINED VERSION ===
+// === CORE SYSTEM - FATAL BUG FIX & ULTIMATE UNIFICATION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
@@ -19,7 +19,6 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// 4トラック本格レトロBGMエンジン
 let bgmOsc = [], bgmInterval = null;
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
@@ -36,16 +35,14 @@ const BGM = {
     const track = mels[type] || mels.menu; let i = 0;
     
     bgmInterval = setInterval(() => {
-      const now = audioCtx.currentTime;
-      const duration = track.spd / 1000;
-      
+      const now = audioCtx.currentTime; const duration = track.spd / 1000;
       const playNote = (freq, wave, vol) => {
         if (!freq) return;
         const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
         o.type = wave; o.frequency.value = freq;
         g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + duration);
         o.connect(g); g.connect(audioCtx.destination); 
-        o.start(now); o.stop(now + duration + 0.1);
+        o.start(now); o.stop(now + duration + 0.1); 
       };
       playNote(track.t1[i % track.t1.length], 'square', 0.05);
       playNote(track.t2[i % track.t2.length], 'square', 0.03);
@@ -55,7 +52,7 @@ const BGM = {
         const src = audioCtx.createBufferSource(); const g = audioCtx.createGain();
         src.buffer = noiseBuffer; g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         src.connect(g); g.connect(audioCtx.destination); 
-        src.start(now); src.stop(now + 0.2);
+        src.start(now); src.stop(now + 0.2); 
       }
       i++;
     }, track.spd);
@@ -79,7 +76,7 @@ function playSnd(t) {
   }
 }
 
-// ★ 自己修復機能付きのセーブシステム（この部分が古いデータのクラッシュを完全に防ぎます！）
+// ★ 鉄壁の自己修復機能付きセーブシステム（エラーの根源を排除）
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -88,29 +85,25 @@ const SaveSys = {
       if (parsed && typeof parsed === 'object') d = parsed;
     } catch(e) {}
     
-    // データが壊れていても絶対にエラーにならないように初期値をマージする
-    let out = {
+    // 欠損データを検知して必ず補完する（エラー発生率0%へ）
+    if (!d.scores || typeof d.scores !== 'object') d.scores = {n:0, h:0};
+    if (typeof d.scores.n !== 'number') d.scores.n = 0;
+    if (typeof d.scores.h !== 'number') d.scores.h = 0;
+    if (!d.rankings || typeof d.rankings !== 'object') d.rankings = {n:[], h:[]};
+    if (!d.rankings.n) d.rankings.n = [];
+    if (!d.rankings.h) d.rankings.h = [];
+
+    return {
       playerName: d.playerName || 'PLAYER',
-      scores: { n: 0, h: 0 },
+      scores: d.scores,
       actStage: d.actStage !== undefined ? d.actStage : 1,
       actLives: d.actLives !== undefined ? d.actLives : 5,
       actSeed: d.actSeed !== undefined ? d.actSeed : Math.floor(Math.random()*1000),
       rpg: d.rpg || null,
-      rankings: { n: [], h: [] },
+      rankings: d.rankings,
       bgTheme: d.bgTheme || 0
     };
-    
-    if (d.scores && typeof d.scores === 'object') {
-        out.scores.n = d.scores.n || 0;
-        out.scores.h = d.scores.h || 0;
-    }
-    if (d.rankings && typeof d.rankings === 'object') {
-        out.rankings.n = d.rankings.n || [];
-        out.rankings.h = d.rankings.h || [];
-    }
-    return out;
   })(),
-  
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
   addScore(mode, score) { 
     const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
@@ -150,7 +143,6 @@ const drawSprite = (x, y, color, strData, size = 2.5) => {
 };
 
 const sprs = {
-  // === 16x16 HD ===
   player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
   heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
   slime: ["000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
@@ -170,11 +162,6 @@ const sprs = {
     "000000333300000000003311113300000003113113113000003111111111130003113111111311300311311111131130031111111111113000311311113113000003300000033000000300000000300000300000000003000300000000000030000000000000000000000000000000000000000000000000",
     "000000333300000000003311113300000003113113113000003111111111130003113111111311300311311111131130031111111111113000031131111311300000330000003300000300300003003000300000000000030000000000000000000000000000000000000000000000000000000000000000"
   ],
-  beam: "000000033000000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b300000000000003b3000000000000033000000000000000000000000000000",
-  princess: "0000003333000000000003888830000000000384444830000000034344343000000003444444300000000034444300000000003cccc30000000003cccccc3000000038cccccc8300000038cccccc830000003ccccccc300000003cccccccc300000003cccccccc300000003333333333000000003cc30000000000003333000000",
-  q_block: "0000000000000000033333333333333003888888888888300388833338888830038838888388883003883888838888300388888838888830038888838888883003888838888888300388883888888830038888888888883003888838888888300388883888888830038888888888883003333333333333300000000000000000",
-
-  // === 8x8 ===
   grass: ["0000000000600666006000000000000000000000000000000000000000000000", "0000000000060066000000000000000000000000000000000000000000000000"],
   tree: "0003300000366300036666300366663003666630003663000009900000099000",
   mount: "000000000033000003aa30003aaaa3003aaa3aa33aa33aa33999999339999993",
@@ -195,17 +182,12 @@ const sprs = {
   spike: "000000000030030003aa33aa03aaaaaa0aaaaaaa3aaa3aaa3aa3aaaa3aaaaaaa"
 };
 
-// トランジション（画面遷移演出）
 let transTimer = 0; let nextApp = null;
 function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
 function drawTransition() {
-  if (transTimer > 0) {
-    ctx.fillStyle = '#000';
-    for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x+y) < (20 - transTimer)) ctx.fillRect(x*20, y*20, 20, 20); } }
-  }
+  if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x+y) < (20 - transTimer)) ctx.fillRect(x*20, y*20, 20, 20); } } }
 }
 
-// メニュー
 const Menu = {
   cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'ローカルランキング', '設定', 'データ引継ぎ'], selectHoldTimer: 0,
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
@@ -225,7 +207,6 @@ const Menu = {
   }
 };
 
-// データ引き継ぎ部屋
 const DataBackup = {
   st: 'map', px: 4.5, py: 6, anim: 0, msg: '', backupStr: '',
   init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('menu'); },
@@ -244,16 +225,9 @@ const DataBackup = {
            try { 
              this.backupStr = btoa(unescape(encodeURIComponent(JSON.stringify(SaveSys.data))));
              if (navigator.clipboard && window.isSecureContext) {
-                 navigator.clipboard.writeText(this.backupStr).then(()=> { 
-                   this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); 
-                 }).catch(e=> { 
-                   prompt("自動コピーがブロックされました。\n以下の呪文を手動でコピーしてください:", this.backupStr);
-                   this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); 
-                 });
-             } else {
-                 prompt("以下の呪文を手動でコピーしてください:", this.backupStr);
-                 this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); 
-             }
+                 navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); 
+                 }).catch(e=> { prompt("自動コピーがブロックされました。\n以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); });
+             } else { prompt("以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); }
            } catch(e) { this.msg = 'データ変換エラー'; this.st = 'msg'; playSnd('hit'); }
        } 
        else if (Math.abs(this.px - 7) < 1.5 && Math.abs(this.py - 2) < 1.5) {
@@ -263,19 +237,15 @@ const DataBackup = {
                const parsed = JSON.parse(decodeURIComponent(escape(atob(input))));
                if (parsed && parsed.playerName) { 
                  SaveSys.data = parsed; SaveSys.save(); 
-                 alert("データの復元に成功しました！\nゲームを再起動します。");
-                 location.reload(); 
-               } 
-               else throw new Error('Invalid');
+                 alert("データの復元に成功しました！\nゲームを再起動します。"); location.reload(); 
+               } else throw new Error('Invalid');
              } catch(e) { this.msg = '呪文が違います！'; this.st = 'msg'; playSnd('hit'); }
            }
        }
     }
   },
   draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
-    ctx.fillStyle = '#034'; ctx.fillRect(20, 20, 160, 140);
-    ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 160, 140); ctx.lineWidth = 1;
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#034'; ctx.fillRect(20, 20, 160, 140); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 160, 140); ctx.lineWidth = 1;
     for(let i=20; i<180; i+=20) { ctx.beginPath(); ctx.moveTo(i, 20); ctx.lineTo(i, 160); ctx.stroke(); }
     const offsetY1 = Math.sin(this.anim * 0.1) * 2; ctx.fillStyle = '#0f0'; ctx.fillRect(35, 35, 20, 20); ctx.fillStyle = '#fff'; ctx.fillRect(38, 38, 14, 14); ctx.fillStyle = '#0f0'; ctx.font = '8px monospace'; ctx.fillText('コピー', 32, 28 + offsetY1); ctx.fillText('▲', 42, 65);
     const offsetY2 = Math.cos(this.anim * 0.1) * 2; ctx.fillStyle = '#f80'; ctx.fillRect(145, 35, 20, 20); ctx.fillStyle = '#fff'; ctx.fillRect(148, 38, 14, 14); ctx.fillStyle = '#f80'; ctx.fillText('復元', 145, 28 + offsetY2); ctx.fillText('▼', 152, 65);
@@ -315,10 +285,8 @@ const Ranking = {
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
     if (!this.input) {
-      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-      ctx.fillText((this.mode === 'normal' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'hard' ? '[HARD]' : '<HARD>'), 120, 40);
-      const rank = this.mode === 'normal' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h;
-      ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
+      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mode === 'normal' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'hard' ? '[HARD]' : '<HARD>'), 120, 40);
+      const rank = this.mode === 'normal' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
       for (let i = 0; i < 10; i++) {
         ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa';
         if (rank[i]) { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ${rank[i].name.padEnd(10, ' ')} ${String(rank[i].score).padStart(6, ' ')}`, 15, 76 + i * 18); } 
@@ -326,17 +294,14 @@ const Ranking = {
       }
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('プレイヤー名: ' + SaveSys.data.playerName, 15, 270); ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
     } else {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50);
-      ctx.font = '11px monospace';
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
       for (let i = 0; i < this.chars.length; i++) {
         const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18;
         if (i === this.cursor && this.menuCursor === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; }
         ctx.fillText(this.chars[i], x, y);
       }
-      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 175, 70, 22);
-      ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 30, 191);
-      const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22);
-      ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
+      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 30, 191);
+      const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
       ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText('↑↓←→:選択 A:追加 B:削除', 25, 215);
     }
   }
@@ -356,30 +321,17 @@ const Settings = {
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
     ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.menuCursor === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.menuCursor === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
-    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125);
-    ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
+    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
   }
 };
 
 function loop() {
   try {
-    // ヒットストップ中の入力消失を防止（汁気による操作抜けの解決）
-    if (hitStopTimer <= 0) {
-      for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; }
-    }
-    
-    if (transTimer > 0) {
-      transTimer--;
-      if (transTimer === 0 && nextApp) { activeApp = nextApp; activeApp.init(); nextApp = null; }
-    } else if (hitStopTimer > 0) {
-      hitStopTimer--; 
-    } else {
-      if (activeApp && activeApp.update) activeApp.update();
-    }
-    
-    if (activeApp && activeApp.draw) activeApp.draw();
-    drawTransition();
-
+    if (hitStopTimer <= 0) { for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; } }
+    if (transTimer > 0) { transTimer--; if (transTimer === 0 && nextApp) { activeApp = nextApp; activeApp.init(); nextApp = null; } } 
+    else if (hitStopTimer > 0) { hitStopTimer--; } 
+    else { if (activeApp && activeApp.update) activeApp.update(); }
+    if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
   } catch (err) {
     console.error("Game Loop Error:", err);
     ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = "#fff"; ctx.font = "10px monospace";
