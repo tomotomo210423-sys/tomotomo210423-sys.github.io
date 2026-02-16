@@ -1,40 +1,39 @@
-// === UNREASONABLE BROS - DENSITY, BG & REASON UPDATE ===
+// === UNREASONABLE BROS - BUG FIX & SAVE UNIFICATION ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1}, score: 0, camX: 0, coyoteTime: 0, stageTheme: 'grass',
-  mIdx: 1, deathReason: '', // 死因テキスト用
+  mIdx: 1, deathReason: '',
   
-  init() { this.st = 'title'; BGM.play('action'); },
+  init() { 
+    this.st = 'title'; BGM.play('action'); 
+    if (SaveSys.data.actLives === undefined) {
+      SaveSys.data.actLives = 5; SaveSys.data.actStage = 1; SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save();
+    }
+  },
   
   load() {
     this.st = 'play'; this.p = {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1};
     this.map = []; this.platforms = []; this.coins = []; this.spikes = []; this.enemies = []; this.invisibleBlocks = []; this.fakeCoins = [];
     this.score = 0; this.camX = 0; this.coyoteTime = 0; this.deathReason = '';
     
-    const stage = SaveSys.act.stage; 
+    const stage = SaveSys.data.actStage; 
     this.stageTheme = stage % 3 === 1 ? 'grass' : stage % 3 === 2 ? 'desert' : 'lava';
-    
-    // ステージを長く設定（約2.5倍）
     for (let i = 0; i < 100; i++) this.map.push({x: i * 20, y: 270, w: 20, h: 30, type: 'ground'});
 
-    let seed = stage * 100 + SaveSys.act.randomSeed;
+    let seed = stage * 100 + SaveSys.data.actSeed;
     let rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
 
-    // 配置間隔を広げ、オブジェクトの重なりを防止
     for (let x = 100; x < 1900; x += 60 + rand() * 60) {
       let r = rand();
-      if (r < 0.45) { // 足場（消える足場を追加）
-        let py = 140 + rand() * 90;
-        let isDisappear = rand() < 0.3; // 30%の確率で消える床
+      if (r < 0.45) {
+        let py = 140 + rand() * 90; let isDisappear = rand() < 0.3;
         this.platforms.push({x: x, y: py, w: 30 + rand() * 30, h: 10, disappear: isDisappear, timer: 0});
         if (rand() < 0.5) this.coins.push({x: x + 10, y: py - 30, collected: false});
-      } else if (r < 0.75) { // 敵
+      } else if (r < 0.75) {
         this.enemies.push({x: x, y: 260, vx: 1.0 + rand(), type: 'patrol', range: 40 + rand() * 60, startX: x, enemyType: rand() > 0.5 ? 'slime' : 'flying'});
-      } else if (r < 0.9) { // トゲ
+      } else if (r < 0.9) {
         this.spikes.push({x: x, y: 260, w: 20, h: 10});
       }
-      
-      // 理不尽要素
       if (rand() < 0.3) this.fakeCoins.push({x: x + 5, y: 100 + rand() * 120, touched: false});
       if (rand() < 0.25) this.invisibleBlocks.push({x: x, y: 170 + rand() * 50, w: 30, h: 10, visible: false});
     }
@@ -43,18 +42,14 @@ const Action = {
   
   die(reason) {
     this.deathReason = reason;
-    SaveSys.act.lives--; SaveSys.saveAct(); playSnd('hit'); screenShake(8); addParticle(this.p.x, this.p.y, '#00f', 'explosion');
-    if (SaveSys.act.lives < 0) { 
-      SaveSys.act.stage = 1; SaveSys.act.lives = 5; SaveSys.act.randomSeed = Math.floor(Math.random() * 1000);
-      SaveSys.saveAct(); this.st = 'gameover'; 
-    } else {
-      this.st = 'dead';
-    }
+    SaveSys.data.actLives--; SaveSys.save(); playSnd('hit'); screenShake(8); addParticle(this.p.x, this.p.y, '#00f', 'explosion');
+    if (SaveSys.data.actLives < 0) { 
+      SaveSys.data.actStage = 1; SaveSys.data.actLives = 5; SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save(); this.st = 'gameover'; 
+    } else { this.st = 'dead'; }
   },
   
   update() {
-    if (keysDown.select) { activeApp = Menu; Menu.init(); return; }
-    
+    if (keysDown.select) { switchApp(Menu); return; }
     if (this.st === 'title') {
       if (keysDown.a) { this.load(); playSnd('jmp'); }
       if (keysDown.b) { this.st = 'confirmDelete'; this.mIdx = 1; playSnd('sel'); }
@@ -64,17 +59,15 @@ const Action = {
       if (keysDown.up || keysDown.down) { this.mIdx = this.mIdx === 0 ? 1 : 0; playSnd('sel'); }
       if (keysDown.a) {
         if (this.mIdx === 0) {
-          SaveSys.act.stage = 1; SaveSys.act.lives = 5; SaveSys.act.randomSeed = Math.floor(Math.random() * 1000); SaveSys.saveAct();
+          SaveSys.data.actStage = 1; SaveSys.data.actLives = 5; SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save();
           playSnd('hit'); this.st = 'title';
         } else { this.st = 'title'; playSnd('sel'); }
       }
-      if (keysDown.b) { this.st = 'title'; }
-      return;
+      if (keysDown.b) { this.st = 'title'; } return;
     }
 
-    if (this.st !== 'play') { if (keysDown.a) { if (this.st === 'clear') { activeApp = Menu; Menu.init(); } else this.load(); } return; }
+    if (this.st !== 'play') { if (keysDown.a) { if (this.st === 'clear') { switchApp(Menu); } else this.load(); } return; }
     
-    // ★ キャラクターの速度を遅く調整
     if (keys.left) { this.p.vx -= 0.8; this.p.dir = -1; }
     if (keys.right) { this.p.vx += 0.8; this.p.dir = 1; }
     this.p.vx = Math.max(-3.5, Math.min(3.5, this.p.vx)); this.p.vx *= 0.85; this.p.vy += 0.4; this.p.anim = (this.p.anim + Math.abs(this.p.vx)) % 360;
@@ -84,8 +77,8 @@ const Action = {
     for (let m of this.map) {
       if (m.type === 'ground' && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) { if (this.p.vy > 0) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; } }
       if (m.type === 'goal' && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) {
-        SaveSys.act.stage++; SaveSys.saveAct(); playSnd('combo');
-        if (SaveSys.act.stage > 3) { this.st = 'clear'; SaveSys.act.stage = 1; SaveSys.saveAct(); } else this.load(); return;
+        SaveSys.data.actStage++; SaveSys.save(); playSnd('combo');
+        if (SaveSys.data.actStage > 3) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
       }
     }
     
@@ -150,21 +143,18 @@ const Action = {
       resetShake(); return;
     }
     
-    // ★ 固有の背景強化
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
     if (this.stageTheme === 'grass') { gradient.addColorStop(0, '#4af'); gradient.addColorStop(1, '#8cf'); } 
     else if (this.stageTheme === 'desert') { gradient.addColorStop(0, '#fc8'); gradient.addColorStop(1, '#fa4'); } 
     else { gradient.addColorStop(0, '#f44'); gradient.addColorStop(1, '#a00'); }
     ctx.fillStyle = gradient; ctx.fillRect(0, 0, 200, 300);
     
-    // 遠景エフェクト
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     for(let i=0; i<5; i++) {
         let cx = ((Date.now() * 0.02) + i * 80) % 250 - 25;
         if(this.stageTheme !== 'lava') ctx.fillRect(cx, 30 + (i%3)*30, 40, 10);
         else { ctx.fillStyle='rgba(255,100,0,0.5)'; ctx.fillRect(cx, 200 - (i%3)*50, 5, 15); }
     }
-
     if (this.stageTheme === 'desert') { ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(30, 50, 20, 0, Math.PI * 2); ctx.fill(); } 
     else if (this.stageTheme === 'lava') { ctx.fillStyle = 'rgba(255,100,0,0.3)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(50 + i * 60, 280, 30, 0, Math.PI * 2); ctx.fill(); } }
 
@@ -176,8 +166,7 @@ const Action = {
           ctx.fillStyle = this.stageTheme === 'grass' ? '#8b4513' : this.stageTheme === 'desert' ? '#d2b48c' : '#444'; ctx.fillRect(m.x, m.y, m.w, m.h);
           ctx.fillStyle = this.stageTheme === 'grass' ? '#6b3513' : this.stageTheme === 'desert' ? '#c19a6b' : '#222'; ctx.fillRect(m.x, m.y, m.w, 5);
         } else if (m.type === 'goal') { 
-          ctx.fillStyle = '#ffd700'; ctx.fillRect(m.x, m.y, m.w, m.h); 
-          ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('★', m.x + 7, m.y + 30); 
+          ctx.fillStyle = '#ffd700'; ctx.fillRect(m.x, m.y, m.w, m.h); ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('★', m.x + 7, m.y + 30); 
         }
       }
     }
@@ -213,7 +202,6 @@ const Action = {
         drawSprite(e.x - 4, e.y + offsetY - 4, color, spr, 2.5);
       }
     }
-    
     if (this.st !== 'dead' && this.st !== 'gameover') {
       ctx.save(); if (this.p.dir < 0) { ctx.scale(-1, 1); ctx.translate(-(this.p.x * 2 + 20), 0); } 
       drawSprite(this.p.x, this.p.y, '#00f', sprs.player || sprs.heroNew, 2.5); 
@@ -223,12 +211,11 @@ const Action = {
 
     drawParticles();
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, 200, 32); ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-    ctx.fillText(`ST:${SaveSys.act.stage} ♥:${SaveSys.act.lives} SC:${this.score}`, 5, 20);
+    ctx.fillText(`ST:${SaveSys.data.actStage} ♥:${SaveSys.data.actLives} SC:${this.score}`, 5, 20);
     
     if (this.st === 'dead' || this.st === 'gameover') { 
       ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 100, 200, 80); 
       ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText(this.st === 'gameover' ? 'GAMEOVER' : 'OOPS!', 60, 125); 
-      // ★ 死因テキストの表示
       ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText(this.deathReason, 100 - (this.deathReason.length * 5), 145);
       ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('(A) ' + (this.st === 'gameover' ? 'Menu' : 'Retry'), 65, 165); 
     }
