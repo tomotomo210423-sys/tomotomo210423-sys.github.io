@@ -1,4 +1,4 @@
-// === BEAT BROS - ERROR FIX & PC KEYBOARD SUPPORT ===
+// === BEAT BROS - ULTIMATE PERFECT EDITION ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -107,8 +107,9 @@ const Rhythm = {
     let maxVol = 0;
     for (let i = 0; i < raw.length; i += 1000) if (Math.abs(raw[i]) > maxVol) maxVol = Math.abs(raw[i]);
     
-    let threshold = maxVol * (this.mode === 'hard' ? 0.35 : this.mode === 'normal' ? 0.5 : 0.85);
-    let minGap = this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.25 : 0.5;
+    // ★ 丁度いいハードモードのバランス調整（Normalより密度増＆速度UP）
+    let threshold = maxVol * (this.mode === 'hard' ? 0.45 : this.mode === 'normal' ? 0.6 : 0.85);
+    let minGap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.25 : 0.5;
     
     let lastTime = 0;
     for (let i = 0; i < raw.length; i += 256) {
@@ -135,10 +136,10 @@ const Rhythm = {
     this.source.onended = () => { 
       this.st = 'result'; 
       let finalScore = Math.floor(this.score);
-      // ★ セーブデータの安全確認
-      if (!SaveSys.data.rhythm) SaveSys.data.rhythm = {easy: 0, normal: 0, hard: 0};
-      if (finalScore > SaveSys.data.rhythm[this.mode]) {
-         SaveSys.data.rhythm[this.mode] = finalScore;
+      let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0};
+      if (finalScore > rData[this.mode]) {
+         rData[this.mode] = finalScore;
+         SaveSys.data.rhythm = rData;
          SaveSys.save();
       }
     }; 
@@ -169,7 +170,6 @@ const Rhythm = {
   },
   
   update() {
-    // ★ 念のためキーボード入力を安全に取得
     let kD = typeof keysDown !== 'undefined' ? keysDown : {};
     
     if (this.st === 'menu') {
@@ -242,7 +242,6 @@ const Rhythm = {
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('【音楽ファイル読込】', 45, 80);
       const modes = ['easy', 'normal', 'hard'];
       
-      // ★ クラッシュ対策：データが存在しない場合は仮のオブジェクトを用意する
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0};
       
       for (let i = 0; i < 3; i++) {
