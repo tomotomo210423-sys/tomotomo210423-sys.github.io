@@ -1,4 +1,4 @@
-// === BEAT BROS - ULTIMATE PERFECT EDITION ===
+　// === BEAT BROS - ULTIMATE GENERATOR FIX & PC SUPPORT ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -57,6 +57,11 @@ const Rhythm = {
       let label = document.createElement('label');
       label.style.display = 'inline-block'; label.style.background = '#ff0'; label.style.color = '#000'; label.style.padding = '10px 15px'; label.style.fontFamily = 'monospace'; label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; label.style.cursor = 'pointer'; label.style.border = '2px solid #fff'; label.style.boxShadow = '0 0 15px #ff0';
       label.innerHTML = '📁 曲ファイルを選ぶ';
+      
+      // ★ スマホ対策：ボタンに触れた瞬間にオーディオのロックを解除する
+      label.onclick = () => { initAudio(); };
+      label.ontouchstart = () => { initAudio(); };
+      
       let input = document.createElement('input');
       input.type = 'file'; input.accept = 'audio/*'; input.style.display = 'none';
       input.onchange = (e) => {
@@ -104,11 +109,15 @@ const Rhythm = {
     const raw = buffer.getChannelData(0);
     this.notes = [];
     
-    let maxVol = 0;
-    for (let i = 0; i < raw.length; i += 1000) if (Math.abs(raw[i]) > maxVol) maxVol = Math.abs(raw[i]);
+    // ★ 大進化：曲の「平均音量」をベースに解析するアルゴリズムに変更！
+    let sum = 0, count = 0;
+    for (let i = 0; i < raw.length; i += 1000) { sum += Math.abs(raw[i]); count++; }
+    let avgVol = sum / count;
     
-    // ★ 丁度いいハードモードのバランス調整（Normalより密度増＆速度UP）
-    let threshold = maxVol * (this.mode === 'hard' ? 0.45 : this.mode === 'normal' ? 0.6 : 0.85);
+    // 曲の大小に関わらず、必ず一定数のノーツが生成されるように調整
+    let threshold = avgVol * (this.mode === 'hard' ? 1.2 : this.mode === 'normal' ? 2.0 : 3.0);
+    if (threshold < 0.01) threshold = 0.01; // 無音でも無理やりノーツを置く
+    
     let minGap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.25 : 0.5;
     
     let lastTime = 0;
@@ -123,6 +132,15 @@ const Rhythm = {
         }
       }
     }
+    
+    // ★ 究極のフェイルセーフ：万が一ノーツが10個以下しか作れなかったら、強制的に等間隔で配置する！
+    if (this.notes.length < 10) {
+       this.notes = []; 
+       for (let t = 2; t < buffer.duration; t += minGap * 1.5) {
+           this.notes.push({ time: t, lane: Math.floor(Math.random() * 4), hit: false, y: -50, missed: false });
+       }
+    }
+    
     this.startPlay();
   },
   
