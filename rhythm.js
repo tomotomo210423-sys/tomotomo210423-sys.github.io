@@ -1,4 +1,4 @@
-// === BEAT BROS - PC KEYBOARD SUPPORT & VISUAL FEEDBACK ===
+　// === BEAT BROS - ERROR FIX & PC KEYBOARD SUPPORT ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -135,6 +135,8 @@ const Rhythm = {
     this.source.onended = () => { 
       this.st = 'result'; 
       let finalScore = Math.floor(this.score);
+      // ★ セーブデータの安全確認
+      if (!SaveSys.data.rhythm) SaveSys.data.rhythm = {easy: 0, normal: 0, hard: 0};
       if (finalScore > SaveSys.data.rhythm[this.mode]) {
          SaveSys.data.rhythm[this.mode] = finalScore;
          SaveSys.save();
@@ -167,9 +169,12 @@ const Rhythm = {
   },
   
   update() {
+    // ★ 念のためキーボード入力を安全に取得
+    let kD = typeof keysDown !== 'undefined' ? keysDown : {};
+    
     if (this.st === 'menu') {
-      if (keysDown.select) { this.hideFileUI(); switchApp(Menu); return; }
-      if (keysDown.up || keysDown.down) { 
+      if (kD.select) { this.hideFileUI(); switchApp(Menu); return; }
+      if (kD.up || kD.down) { 
         if (this.mode === 'easy') this.mode = 'normal'; else if (this.mode === 'normal') this.mode = 'hard'; else this.mode = 'easy';
         playSnd('sel'); 
       }
@@ -202,11 +207,10 @@ const Rhythm = {
       let now = audioCtx.currentTime - this.startTime;
       let speed = this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150;
       
-      // ★ 十字キーに加えて、D,F,J,K の入力も受け付ける
-      if (keysDown.left || keysDown.l0) this.hitKey(0);
-      if (keysDown.down || keysDown.l1) this.hitKey(1);
-      if (keysDown.up   || keysDown.l2) this.hitKey(2);
-      if (keysDown.right|| keysDown.l3) this.hitKey(3);
+      if (kD.left || kD.l0) this.hitKey(0);
+      if (kD.down || kD.l1) this.hitKey(1);
+      if (kD.up   || kD.l2) this.hitKey(2);
+      if (kD.right|| kD.l3) this.hitKey(3);
       
       for (let n of this.notes) {
         if (!n.hit && !n.missed) {
@@ -237,11 +241,15 @@ const Rhythm = {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('BEAT BROS', 60, 50);
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('【音楽ファイル読込】', 45, 80);
       const modes = ['easy', 'normal', 'hard'];
+      
+      // ★ クラッシュ対策：データが存在しない場合は仮のオブジェクトを用意する
+      let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0};
+      
       for (let i = 0; i < 3; i++) {
         ctx.fillStyle = this.mode === modes[i] ? '#0f0' : '#666';
         ctx.fillText((this.mode === modes[i] ? '> ' : '  ') + modes[i].toUpperCase(), 65, 125 + i * 35);
         ctx.fillStyle = this.mode === modes[i] ? '#ff0' : '#888'; ctx.font = '8px monospace';
-        ctx.fillText(`HI-SCORE: ${SaveSys.data.rhythm[modes[i]]}`, 65, 137 + i * 35);
+        ctx.fillText(`HI-SCORE: ${rData[modes[i]] || 0}`, 65, 137 + i * 35);
         ctx.font = '10px monospace'; 
       }
       ctx.fillStyle = '#0ff'; ctx.fillText('▼ 曲を選択してプレイ ▼', 25, 230);
@@ -258,14 +266,15 @@ const Rhythm = {
         ctx.beginPath(); ctx.moveTo(0, i * 15 + (Date.now() % 15)); ctx.lineTo(200, i * 15 + (Date.now() % 15)); ctx.stroke(); 
       }
       
+      let k = typeof keys !== 'undefined' ? keys : {};
+      
       for (let i = 0; i < 4; i++) {
          let cx = 25 + i * 50;
          
-         // ★ 押し込み判定のエフェクトを追加
-         let isPressed = (i===0 && (keys.left || keys.l0)) || 
-                         (i===1 && (keys.down || keys.l1)) || 
-                         (i===2 && (keys.up || keys.l2)) || 
-                         (i===3 && (keys.right || keys.l3));
+         let isPressed = (i===0 && (k.left || k.l0)) || 
+                         (i===1 && (k.down || k.l1)) || 
+                         (i===2 && (k.up || k.l2)) || 
+                         (i===3 && (k.right || k.l3));
                          
          ctx.fillStyle = isPressed ? `rgba(255,255,255,0.15)` : `rgba(255,255,255,0.03)`; 
          ctx.fillRect(cx - 25, 0, 50, 400);
@@ -276,7 +285,6 @@ const Rhythm = {
          ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace';
          ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
          
-         // ★ PC用のキーガイドを表示
          ctx.fillStyle = isPressed ? '#fff' : '#666'; ctx.font = '10px monospace';
          ctx.fillText(['[D]', '[F]', '[J]', '[K]'][i], cx - 9, this.lineY + 30);
       }
