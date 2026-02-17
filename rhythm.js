@@ -1,4 +1,4 @@
-// === BEAT BROS - 4 LANES, DIRECT TOUCH & MECHANICAL TRANSFORM ===
+// === BEAT BROS - 4 LANES (PORTRAIT), DIRECT TOUCH & MECHANICAL TRANSFORM ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -7,27 +7,27 @@ const Rhythm = {
   // 4レーンの定義（← ↓ ↑ →）
   arrows: ['←', '↓', '↑', '→'],
   colors: ['#f0f', '#0ff', '#0f0', '#f00'], // ピンク、水色、緑、赤
-  lineY: 200, 
+  lineY: 340, // ★ 縦長画面(400px)の下の方に判定ラインを設置
   
   init() {
     this.st = 'menu'; this.mode = 'normal';
     this.audioBuffer = null; if (this.source) { this.source.stop(); this.source.disconnect(); this.source = null; }
     
-    // 筐体とCanvasを通常状態に戻す
-    document.getElementById('gameboy').classList.remove('mode-wide');
+    // 筐体とCanvasを通常のゲームボーイ縦長(200x300)に戻す
+    document.getElementById('gameboy').classList.remove('mode-tall');
     const cvs = document.getElementById('gameCanvas');
     cvs.width = 200; cvs.height = 300; 
     
     BGM.play('menu');
     this.showFileUI();
     
-    // ★ 画面直接タップ用のイベントリスナーを1度だけ登録
+    // ★ 画面直接タップ用のイベントリスナー
     if (!this.touchBound) {
       this.touchBound = true;
       const handleHit = (e) => {
         if (activeApp !== this) return;
         if (this.st !== 'play' && this.st !== 'result') return;
-        e.preventDefault(); // 画面スクロールを防ぐ
+        e.preventDefault(); 
         
         const rect = cvs.getBoundingClientRect();
         let touches = e.type === 'mousedown' ? [e] : e.changedTouches;
@@ -37,11 +37,11 @@ const Rhythm = {
           let y = (touches[i].clientY - rect.top) / rect.height * cvs.height;
           
           // EXITボタン(左上)の判定
-          if (y < 40 && x < 80) { this.exitGame(); return; }
+          if (y < 40 && x < 60) { this.exitGame(); return; }
           
-          // 画面の下半分をタップしたらレーン判定
-          if (this.st === 'play' && y > 100) {
-             let lane = Math.floor(x / (cvs.width / 4)); // 画面を横に4等分
+          // 画面の下半分をタップしたらレーン判定（画面を縦に4等分）
+          if (this.st === 'play' && y > 150) {
+             let lane = Math.floor(x / (cvs.width / 4)); 
              if (lane >= 0 && lane <= 3) this.hitKey(lane);
           } else if (this.st === 'result') {
              this.exitGame();
@@ -69,12 +69,13 @@ const Rhythm = {
           initAudio(); this.hideFileUI(); 
           this.pendingFile = e.target.files[0];
           e.target.value = ''; 
+          
           // ★ ガシャン！メカニカル変形開始（2秒間＝120フレーム）
           this.st = 'transform_in'; 
           this.transformTimer = 120; 
-          document.getElementById('gameboy').classList.add('mode-wide'); 
+          document.getElementById('gameboy').classList.add('mode-tall'); // 縦に伸びる！
           const cvs = document.getElementById('gameCanvas');
-          cvs.width = 400; cvs.height = 260; // ワイド時の内部解像度
+          cvs.width = 200; cvs.height = 400; // 内部解像度も縦長に
         }
       };
       label.appendChild(input); ui.appendChild(label);
@@ -90,7 +91,7 @@ const Rhythm = {
   exitGame() {
     this.st = 'transform_out'; 
     this.transformTimer = 120; // 2秒かけて戻る
-    document.getElementById('gameboy').classList.remove('mode-wide');
+    document.getElementById('gameboy').classList.remove('mode-tall');
     if (this.source) { this.source.stop(); this.source = null; }
   },
   
@@ -122,7 +123,7 @@ const Rhythm = {
       if (vol > threshold) {
         let t = i / buffer.sampleRate; 
         if (t - lastTime > minGap) {
-          // ★ 4レーンにランダムまたはパターンで配置
+          // ★ 4レーンにランダム配置
           let lane = Math.floor(Math.random() * 4);
           this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
           lastTime = t;
@@ -154,7 +155,7 @@ const Rhythm = {
       if (this.st !== 'play') return;
       let now = audioCtx.currentTime - this.startTime;
       let hitNote = null, minDiff = 999;
-      let cx = 50 + lane * 100; // 該当レーンのX座標 (50, 150, 250, 350)
+      let cx = 25 + lane * 50; // 各レーンのX座標 (25, 75, 125, 175)
       
       for (let n of this.notes) {
         if (!n.hit && !n.missed && n.lane === lane) {
@@ -184,7 +185,7 @@ const Rhythm = {
     }
     else if (this.st === 'transform_in') {
       this.transformTimer--;
-      if (this.transformTimer % 20 === 0) playSnd('hit'); // ガシャン！というメカ音
+      if (this.transformTimer % 20 === 0) playSnd('hit'); // ガシャン！
       if (this.transformTimer % 40 === 0) screenShake(5); 
       if (this.transformTimer <= 0) this.loadFile(this.pendingFile);
     }
@@ -219,7 +220,7 @@ const Rhythm = {
       for (let n of this.notes) {
         if (!n.hit && !n.missed) {
           n.y = this.lineY - (n.time - now) * speed;
-          if (n.y > 240) { 
+          if (n.y > 400) { 
             n.missed = true; this.combo = 0; 
             this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); screenShake(2); 
           }
@@ -232,7 +233,10 @@ const Rhythm = {
   draw() {
     applyShake();
     const cvs = document.getElementById('gameCanvas');
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+    
+    // ★ ここが画像バグの完全修正ポイント！
+    // 画面が揺れた際（マイナス座標へのズレ）の「塗り残し・ゴミ」を防ぐため、画面の枠外まで広めに黒く塗りつぶします
+    ctx.fillStyle = '#000'; ctx.fillRect(-50, -50, cvs.width + 100, cvs.height + 100); 
     
     if (this.st === 'menu') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('BEAT BROS', 60, 50);
@@ -250,93 +254,93 @@ const Rhythm = {
     }
     else if (this.st === 'transform_in' || this.st === 'transform_out') {
       // 変形中のノイズ演出
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 20px monospace'; 
-      ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 80, cvs.height/2 + (Math.random()-0.5)*10);
-      ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()*0.3})`; ctx.fillRect(0, 0, cvs.width, cvs.height);
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; 
+      ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
+      ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()*0.3})`; ctx.fillRect(-50, -50, cvs.width+100, cvs.height+100);
     }
     else if (this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
-      // プレイ画面 (400x260)
+      // プレイ画面 (縦長 200x400)
       
       // 背景エフェクト
       ctx.strokeStyle = '#121'; ctx.lineWidth = 1;
-      for (let i = 0; i < 20; i++) { 
-        ctx.beginPath(); ctx.moveTo(0, i * 20 + (Date.now() % 20)); ctx.lineTo(400, i * 20 + (Date.now() % 20)); ctx.stroke(); 
+      for (let i = 0; i < 30; i++) { 
+        ctx.beginPath(); ctx.moveTo(0, i * 15 + (Date.now() % 15)); ctx.lineTo(200, i * 15 + (Date.now() % 15)); ctx.stroke(); 
       }
       
       // レーンと判定枠の描画（← ↓ ↑ →）
       for (let i = 0; i < 4; i++) {
-         let cx = 50 + i * 100;
+         let cx = 25 + i * 50;
          // レーン背景
-         ctx.fillStyle = `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 40, 0, 80, 260);
+         ctx.fillStyle = `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 25, 0, 50, 400);
          
          // 丸い判定枠（ターゲット）
-         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = 3;
-         ctx.beginPath(); ctx.arc(cx, this.lineY, 25, 0, Math.PI * 2); ctx.stroke();
+         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = 2;
+         ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke();
          
          // 円の中の矢印
-         ctx.fillStyle = this.colors[i]; ctx.font = 'bold 24px monospace';
-         ctx.fillText(this.arrows[i], cx - 12, this.lineY + 8);
+         ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace';
+         ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
       }
       
       // ノーツの描画（丸の中に矢印）
       this.notes.forEach(n => {
-        if (!n.hit && !n.missed && n.y > -30 && n.y < 260) {
-          let cx = 50 + n.lane * 100;
-          ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 22, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(cx, n.y, 22, 0, Math.PI * 2); ctx.stroke();
-          ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 22px monospace';
-          ctx.fillText(this.arrows[n.lane], cx - 11, n.y + 7);
+        if (!n.hit && !n.missed && n.y > -30 && n.y < 420) {
+          let cx = 25 + n.lane * 50;
+          ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace';
+          ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5);
         }
       });
       drawParticles();
       
       // スコア表示
-      ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 10, 20);
-      if (this.combo > 5) { ctx.fillStyle = '#f0f'; ctx.font = 'bold 20px monospace'; ctx.fillText(`${this.combo} COMBO!`, 140, 30); }
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 60, 20);
+      if (this.combo > 5) { ctx.fillStyle = '#f0f'; ctx.font = 'bold 14px monospace'; ctx.fillText(`${this.combo} COMBO!`, 120, 30); }
       
       // 判定文字（各レーンの上に表示）
       for (let j of this.judgements) {
-         ctx.fillStyle = j.color; ctx.font = 'bold 16px monospace'; ctx.globalAlpha = j.life / 30;
-         let jx = (50 + j.lane * 100) - (j.msg.length * 4.5);
-         ctx.fillText(j.msg, jx, this.lineY - 40 - (30 - j.life)); ctx.globalAlpha = 1;
+         ctx.fillStyle = j.color; ctx.font = 'bold 12px monospace'; ctx.globalAlpha = j.life / 30;
+         let jx = (25 + j.lane * 50) - (j.msg.length * 3.5);
+         ctx.fillText(j.msg, jx, this.lineY - 30 - (30 - j.life)); ctx.globalAlpha = 1;
       }
       
       // 退出ボタン（左上）
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(5, 5, 50, 25); ctx.strokeStyle = '#f00'; ctx.strokeRect(5, 5, 50, 25);
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.fillText('EXIT', 15, 23);
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(5, 5, 40, 20); ctx.strokeStyle = '#f00'; ctx.strokeRect(5, 5, 40, 20);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px monospace'; ctx.fillText('EXIT', 12, 18);
       
       // カウントダウン
       let now = audioCtx.currentTime - this.startTime;
       if (this.st === 'play' && now < 0) { 
-          ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 400, 260); 
-          ctx.fillStyle = '#ff0'; ctx.font = 'bold 40px monospace'; ctx.fillText(Math.ceil(-now), 180, 130); 
+          ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 200, 400); 
+          ctx.fillStyle = '#ff0'; ctx.font = 'bold 40px monospace'; ctx.fillText(Math.ceil(-now), 85, 200); 
       }
       
-      // シャッター演出
-      let w = 0;
-      if (this.st === 'loading') w = 200;
-      else if (this.st === 'intro') w = 200 * (1 - Math.pow(Math.min(1, this.transformTimer / 45), 2));
+      // シャッター演出（上下に開く）
+      let h = 0;
+      if (this.st === 'loading') h = 200;
+      else if (this.st === 'intro') h = 200 * (1 - Math.pow(Math.min(1, this.transformTimer / 45), 2));
       
-      if (w > 0) {
-          ctx.fillStyle = '#222'; ctx.fillRect(0, 0, w, 260); ctx.fillRect(400 - w, 0, w, 260);
+      if (h > 0) {
+          ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 200, h); ctx.fillRect(0, 400 - h, 200, h);
           ctx.fillStyle = '#ff0'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff0';
-          ctx.fillRect(w - 2, 0, 4, 260); ctx.fillRect(400 - w - 2, 0, 4, 260); ctx.shadowBlur = 0;
+          ctx.fillRect(0, h - 2, 200, 4); ctx.fillRect(0, 400 - h - 2, 200, 4); ctx.shadowBlur = 0;
           if (this.st === 'loading') {
-              ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(100, 100, 200, 60);
-              ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('ANALYZING DATA...', 125, 125);
-              ctx.fillRect(150, 140, (Date.now() % 1000) / 1000 * 100, 5); 
+              ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 170, 180, 60);
+              ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('ANALYZING DATA...', 25, 195);
+              ctx.fillRect(50, 210, (Date.now() % 1000) / 1000 * 100, 5); 
           }
       }
 
       // リザルト
       if (this.st === 'result') {
-        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(100, 40, 200, 180); ctx.strokeStyle = '#0f0'; ctx.strokeRect(100, 40, 200, 180);
-        ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('TRACK CLEARED!', 130, 70);
-        ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`SCORE:    ${Math.floor(this.score)}`, 120, 110); ctx.fillText(`MAX COMBO:${this.maxCombo}`, 120, 130);
+        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 100, 180, 180); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 100, 180, 180);
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('TRACK CLEARED!', 30, 130);
+        ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`SCORE:    ${Math.floor(this.score)}`, 25, 170); ctx.fillText(`MAX COMBO:${this.maxCombo}`, 25, 190);
         let rank = this.score > this.notes.length * 80 ? 'S' : this.score > this.notes.length * 50 ? 'A' : this.score > this.notes.length * 30 ? 'B' : 'C';
-        ctx.fillStyle = '#ff0'; ctx.font = 'bold 30px monospace'; ctx.fillText(`RANK: ${rank}`, 155, 180);
-        ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('左上の [EXIT] で戻る', 130, 205);
+        ctx.fillStyle = '#ff0'; ctx.font = 'bold 30px monospace'; ctx.fillText(`RANK: ${rank}`, 50, 240);
+        ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('左上の [EXIT] で戻る', 40, 265);
       }
     }
   }
