@@ -12,10 +12,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; user-select: none; overflow: hidden; }
 
-/* ★ 筐体全体のベース（ゆっくり重厚に変形するための transition を追加） */
-#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; 
-  transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); 
-}
+/* 筐体全体のベース */
+#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
 
 #screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
 
@@ -27,15 +25,11 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
 
 /* ゲーム画面 (Canvas) */
-canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; 
-  transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none;
-}
+canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none; }
 
-/* ★ コントローラー領域（変形時に height が 0 になり収納される） */
-#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; 
-  transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; 
-}
-#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+/* コントローラー領域（変形時に height が 0 になり収納される） */
+#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; }
+#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 1.5s ease; }
 #dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; }
 .d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.1s; }
 .d-btn:active { background: #111; transform: translateY(2px); }
@@ -56,10 +50,10 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
 .s-btn:active { background: #333; }
 .s-label { font-size: 10px; color: #555; font-weight: bold; margin-top: 5px; }
 
-/* ★ ワイドモード（リズムゲーム用）の変形状態 */
-.mode-wide { max-width: 650px !important; max-height: 400px !important; } /* 横長＆背が低くなる */
-.mode-wide #controls { height: 0px !important; opacity: 0; } /* コントローラーが完全に消える */
-.mode-wide canvas { max-width: 100%; height: 100%; aspect-ratio: auto; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
+/* ★ 縦長全画面モード（リズムゲーム用） */
+.mode-tall #classic-controls { transform: translateY(50px) scale(0.8); opacity: 0; pointer-events: none; }
+.mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } /* コントローラーが完全に消える */
+.mode-tall canvas { aspect-ratio: 1 / 2; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); } /* スマホの画面に合わせて縦長に伸びる */
 </style>
 </head>
 <body>
