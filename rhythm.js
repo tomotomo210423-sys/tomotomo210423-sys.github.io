@@ -1,4 +1,4 @@
-// === BEAT BROS - HARD MODE BALANCED ===
+// === BEAT BROS - PC KEYBOARD SUPPORT & VISUAL FEEDBACK ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -107,10 +107,7 @@ const Rhythm = {
     let maxVol = 0;
     for (let i = 0; i < raw.length; i += 1000) if (Math.abs(raw[i]) > maxVol) maxVol = Math.abs(raw[i]);
     
-    // ★ ここを丁度いいバランスに調整しました！
-    // ノーマル(0.5)より少しだけ細かい音を拾う(0.35)
     let threshold = maxVol * (this.mode === 'hard' ? 0.35 : this.mode === 'normal' ? 0.5 : 0.85);
-    // 連打の間隔もノーマル(0.25秒)より少しだけ早い(0.15秒)に制限して壁にならないように
     let minGap = this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.25 : 0.5;
     
     let lastTime = 0;
@@ -203,14 +200,13 @@ const Rhythm = {
     }
     else if (this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      
-      // ★ スピードも丁度いい感じに！ (Normal 250 → Hard 320)
       let speed = this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150;
       
-      if (keysDown.left) this.hitKey(0);
-      if (keysDown.down) this.hitKey(1);
-      if (keysDown.up) this.hitKey(2);
-      if (keysDown.right) this.hitKey(3);
+      // ★ 十字キーに加えて、D,F,J,K の入力も受け付ける
+      if (keysDown.left || keysDown.l0) this.hitKey(0);
+      if (keysDown.down || keysDown.l1) this.hitKey(1);
+      if (keysDown.up   || keysDown.l2) this.hitKey(2);
+      if (keysDown.right|| keysDown.l3) this.hitKey(3);
       
       for (let n of this.notes) {
         if (!n.hit && !n.missed) {
@@ -264,11 +260,25 @@ const Rhythm = {
       
       for (let i = 0; i < 4; i++) {
          let cx = 25 + i * 50;
-         ctx.fillStyle = `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 25, 0, 50, 400);
-         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = 2;
+         
+         // ★ 押し込み判定のエフェクトを追加
+         let isPressed = (i===0 && (keys.left || keys.l0)) || 
+                         (i===1 && (keys.down || keys.l1)) || 
+                         (i===2 && (keys.up || keys.l2)) || 
+                         (i===3 && (keys.right || keys.l3));
+                         
+         ctx.fillStyle = isPressed ? `rgba(255,255,255,0.15)` : `rgba(255,255,255,0.03)`; 
+         ctx.fillRect(cx - 25, 0, 50, 400);
+         
+         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = isPressed ? 4 : 2;
          ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke();
+         
          ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace';
          ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
+         
+         // ★ PC用のキーガイドを表示
+         ctx.fillStyle = isPressed ? '#fff' : '#666'; ctx.font = '10px monospace';
+         ctx.fillText(['[D]', '[F]', '[J]', '[K]'][i], cx - 9, this.lineY + 30);
       }
       
       this.notes.forEach(n => {
