@@ -1,4 +1,4 @@
-// === BEAT BROS - BUG FIX & EXTREME HARD MODE ===
+// === BEAT BROS - HARD MODE BALANCED ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -107,9 +107,11 @@ const Rhythm = {
     let maxVol = 0;
     for (let i = 0; i < raw.length; i += 1000) if (Math.abs(raw[i]) > maxVol) maxVol = Math.abs(raw[i]);
     
-    // ★ HARDモードを超高密度に変更（ごくわずかな音も拾い、0.04秒間隔で敷き詰める）
-    let threshold = maxVol * (this.mode === 'hard' ? 0.05 : this.mode === 'normal' ? 0.5 : 0.85);
-    let minGap = this.mode === 'hard' ? 0.04 : this.mode === 'normal' ? 0.25 : 0.5;
+    // ★ ここを丁度いいバランスに調整しました！
+    // ノーマル(0.5)より少しだけ細かい音を拾う(0.35)
+    let threshold = maxVol * (this.mode === 'hard' ? 0.35 : this.mode === 'normal' ? 0.5 : 0.85);
+    // 連打の間隔もノーマル(0.25秒)より少しだけ早い(0.15秒)に制限して壁にならないように
+    let minGap = this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.25 : 0.5;
     
     let lastTime = 0;
     for (let i = 0; i < raw.length; i += 256) {
@@ -201,8 +203,9 @@ const Rhythm = {
     }
     else if (this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      // ★ 落下スピードもハイスピード化
-      let speed = this.mode === 'hard' ? 550 : this.mode === 'normal' ? 250 : 150;
+      
+      // ★ スピードも丁度いい感じに！ (Normal 250 → Hard 320)
+      let speed = this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150;
       
       if (keysDown.left) this.hitKey(0);
       if (keysDown.down) this.hitKey(1);
@@ -224,14 +227,10 @@ const Rhythm = {
   
   draw() {
     const cvs = document.getElementById('gameCanvas');
-    
-    // ★ ここが残像バグの完全な破壊ポイント！
-    // 画面揺れのズレを強制リセットしてから、画面全体を真っ黒に塗りつぶします
     ctx.setTransform(1, 0, 0, 1, 0, 0); 
     ctx.fillStyle = '#000'; 
     ctx.fillRect(0, 0, cvs.width, cvs.height);
     
-    // 自前で安全に揺らす（これでもうゴミは残りません）
     ctx.save();
     if (typeof shakeTimer !== 'undefined' && shakeTimer > 0) {
       ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2);
@@ -326,7 +325,6 @@ const Rhythm = {
         ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('左上の [EXIT] で戻る', 40, 265);
       }
     }
-    // ★ リストアでトランスフォームを戻す
     ctx.restore();
   }
 };
