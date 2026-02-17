@@ -1,8 +1,8 @@
-// === BEAT BROS - 4 LANES (PORTRAIT), FLASH EFFECT & DIFFICULTY ADJUST ===
+// === BEAT BROS - BUG FIX & EXTREME HARD MODE ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
-  touchBound: false, laneFlash: [0, 0, 0, 0], // ★ 発光エフェクト用タイマー
+  touchBound: false,
   
   arrows: ['←', '↓', '↑', '→'],
   colors: ['#f0f', '#0ff', '#0f0', '#f00'],
@@ -11,7 +11,6 @@ const Rhythm = {
   init() {
     this.st = 'menu'; this.mode = 'normal';
     this.audioBuffer = null; if (this.source) { this.source.stop(); this.source.disconnect(); this.source = null; }
-    this.laneFlash = [0, 0, 0, 0];
     
     document.getElementById('gameboy').classList.remove('mode-tall');
     const cvs = document.getElementById('gameCanvas');
@@ -84,7 +83,7 @@ const Rhythm = {
   
   exitGame() {
     this.st = 'transform_out'; 
-    this.transformTimer = 120;
+    this.transformTimer = 120; 
     document.getElementById('gameboy').classList.remove('mode-tall');
     if (this.source) { this.source.stop(); this.source = null; }
   },
@@ -108,9 +107,9 @@ const Rhythm = {
     let maxVol = 0;
     for (let i = 0; i < raw.length; i += 1000) if (Math.abs(raw[i]) > maxVol) maxVol = Math.abs(raw[i]);
     
-    // ★ 難易度調整：ハードモードのノーツを少し減らし、間隔を空けました
-    let threshold = maxVol * (this.mode === 'hard' ? 0.45 : this.mode === 'normal' ? 0.65 : 0.85);
-    let minGap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.3 : 0.5;
+    // ★ HARDモードを超高密度に変更（ごくわずかな音も拾い、0.04秒間隔で敷き詰める）
+    let threshold = maxVol * (this.mode === 'hard' ? 0.05 : this.mode === 'normal' ? 0.5 : 0.85);
+    let minGap = this.mode === 'hard' ? 0.04 : this.mode === 'normal' ? 0.25 : 0.5;
     
     let lastTime = 0;
     for (let i = 0; i < raw.length; i += 256) {
@@ -146,8 +145,6 @@ const Rhythm = {
   
   hitKey(lane) {
       if (this.st !== 'play') return;
-      this.laneFlash[lane] = 12; // ★ タップしたら0.2秒間レーンが光る！
-      
       let now = audioCtx.currentTime - this.startTime;
       let hitNote = null, minDiff = 999;
       let cx = 25 + lane * 50; 
@@ -204,10 +201,8 @@ const Rhythm = {
     }
     else if (this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      let speed = this.mode === 'hard' ? 250 : this.mode === 'normal' ? 180 : 120;
-      
-      // ★ 光の減衰処理
-      for (let i = 0; i < 4; i++) { if (this.laneFlash[i] > 0) this.laneFlash[i]--; }
+      // ★ 落下スピードもハイスピード化
+      let speed = this.mode === 'hard' ? 550 : this.mode === 'normal' ? 250 : 150;
       
       if (keysDown.left) this.hitKey(0);
       if (keysDown.down) this.hitKey(1);
@@ -217,7 +212,7 @@ const Rhythm = {
       for (let n of this.notes) {
         if (!n.hit && !n.missed) {
           n.y = this.lineY - (n.time - now) * speed;
-          if (n.y > 400) { 
+          if (n.y > 420) { 
             n.missed = true; this.combo = 0; 
             this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); screenShake(2); 
           }
@@ -228,11 +223,20 @@ const Rhythm = {
   },
   
   draw() {
-    applyShake();
     const cvs = document.getElementById('gameCanvas');
     
-    // 背景の完全な黒塗りつぶし（画面外のゴミ残り防止）
-    ctx.fillStyle = '#000'; ctx.fillRect(-50, -50, cvs.width + 100, cvs.height + 100); 
+    // ★ ここが残像バグの完全な破壊ポイント！
+    // 画面揺れのズレを強制リセットしてから、画面全体を真っ黒に塗りつぶします
+    ctx.setTransform(1, 0, 0, 1, 0, 0); 
+    ctx.fillStyle = '#000'; 
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    
+    // 自前で安全に揺らす（これでもうゴミは残りません）
+    ctx.save();
+    if (typeof shakeTimer !== 'undefined' && shakeTimer > 0) {
+      ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2);
+      shakeTimer--;
+    }
     
     if (this.st === 'menu') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('BEAT BROS', 60, 50);
@@ -251,10 +255,9 @@ const Rhythm = {
     else if (this.st === 'transform_in' || this.st === 'transform_out') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; 
       ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
-      ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()*0.3})`; ctx.fillRect(-50, -50, cvs.width+100, cvs.height+100);
+      ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()*0.3})`; ctx.fillRect(0, 0, cvs.width, cvs.height);
     }
     else if (this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
-      
       ctx.strokeStyle = '#121'; ctx.lineWidth = 1;
       for (let i = 0; i < 30; i++) { 
         ctx.beginPath(); ctx.moveTo(0, i * 15 + (Date.now() % 15)); ctx.lineTo(200, i * 15 + (Date.now() % 15)); ctx.stroke(); 
@@ -263,15 +266,6 @@ const Rhythm = {
       for (let i = 0; i < 4; i++) {
          let cx = 25 + i * 50;
          ctx.fillStyle = `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 25, 0, 50, 400);
-         
-         // ★ タップ時の発光エフェクト
-         if (this.laneFlash[i] > 0) {
-             ctx.fillStyle = this.colors[i];
-             ctx.globalAlpha = this.laneFlash[i] / 12 * 0.6; // 最大60%の透明度で光る
-             ctx.beginPath(); ctx.arc(cx, this.lineY, 20, 0, Math.PI * 2); ctx.fill();
-             ctx.globalAlpha = 1;
-         }
-         
          ctx.strokeStyle = this.colors[i]; ctx.lineWidth = 2;
          ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke();
          ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace';
@@ -332,5 +326,7 @@ const Rhythm = {
         ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('左上の [EXIT] で戻る', 40, 265);
       }
     }
+    // ★ リストアでトランスフォームを戻す
+    ctx.restore();
   }
 };
