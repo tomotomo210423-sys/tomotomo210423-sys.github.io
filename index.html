@@ -11,20 +11,27 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; user-select: none; overflow: hidden; }
+
+/* 筐体全体のベース */
 #gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; }
+
 #screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
+
+/* 起動画面 */
 #boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; font-family: 'Courier New', monospace; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; }
 #boot.hidden { opacity: 0; pointer-events: none; }
 .boot-text { font-size: 10px; margin: 4px 0; }
 .boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
-canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; }
+
+/* ゲーム画面 (Canvas) */
+canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); border-radius: 4px; }
 
 /* コントローラー領域のベース */
-#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; }
+#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; transition: height 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
 
 /* 既存のクラシックコントローラー */
-#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 0.5s ease; }
 #dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; }
 .d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.1s; }
 .d-btn:active { background: #111; transform: translateY(2px); }
@@ -45,29 +52,27 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
 .s-btn:active { background: #333; }
 .s-label { font-size: 10px; color: #555; font-weight: bold; margin-top: 5px; }
 
-/* ★ 新規追加：リズムゲーム専用コンソール（初期状態は下に隠れている） */
+/* リズムゲーム専用コンソール */
 #rhythm-console { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: translateY(100%); opacity: 0; transition: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); background: linear-gradient(180deg, #222 0%, #000 100%); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; box-shadow: inset 0 10px 20px rgba(0,0,0,0.8); border-top: 5px solid #444; pointer-events: none; }
-
-/* ターンテーブルの装飾 */
-#turntable-wrap { position: relative; width: 120px; height: 120px; background: #333; border-radius: 50%; padding: 5px; box-shadow: 0 10px 15px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.2); border: 2px solid #111; }
+#turntable-wrap { position: relative; width: 110px; height: 110px; background: #333; border-radius: 50%; padding: 5px; box-shadow: 0 10px 15px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.2); border: 2px solid #111; }
 #turntable { width: 100%; height: 100%; border-radius: 50%; background: repeating-radial-gradient(#111 0, #111 4px, #2a2a2a 5px, #111 6px); animation: spin 2s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
-#turntable::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 35px; height: 35px; background: #08f; border-radius: 50%; border: 3px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-#tonearm { position: absolute; top: 15px; right: -5px; width: 12px; height: 70px; background: linear-gradient(90deg, #aaa, #fff, #aaa); transform-origin: top center; transform: rotate(25deg); border-radius: 6px; box-shadow: 3px 3px 5px rgba(0,0,0,0.6); }
-
-/* 大型鍵盤（A/Bボタン）の装飾 */
+#turntable::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; background: #08f; border-radius: 50%; border: 3px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+#tonearm { position: absolute; top: 10px; right: -5px; width: 10px; height: 60px; background: linear-gradient(90deg, #aaa, #fff, #aaa); transform-origin: top center; transform: rotate(25deg); border-radius: 5px; box-shadow: 3px 3px 5px rgba(0,0,0,0.6); }
 #rhythm-keys { display: flex; gap: 15px; }
-.r-key { width: 60px; height: 100px; background: #111; border: 3px solid #444; border-radius: 5px; position: relative; box-shadow: 0 12px 0 #000, 0 15px 15px rgba(0,0,0,0.8); cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; display: flex; flex-direction: column; justify-content: flex-start; }
-.r-key:active { transform: translateY(10px); box-shadow: 0 2px 0 #000, 0 5px 10px rgba(0,0,0,0.8); }
-.r-key-color { width: 100%; height: 60px; border-radius: 2px 2px 0 0; opacity: 0.7; box-shadow: inset 0 5px 10px rgba(255,255,255,0.4); }
+.r-key { width: 60px; height: 90px; background: #111; border: 3px solid #444; border-radius: 5px; position: relative; box-shadow: 0 10px 0 #000, 0 12px 15px rgba(0,0,0,0.8); cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; display: flex; flex-direction: column; justify-content: flex-start; }
+.r-key:active { transform: translateY(8px); box-shadow: 0 2px 0 #000, 0 5px 10px rgba(0,0,0,0.8); }
+.r-key-color { width: 100%; height: 50px; border-radius: 2px 2px 0 0; opacity: 0.7; box-shadow: inset 0 5px 10px rgba(255,255,255,0.4); }
 .r-key:active .r-key-color { opacity: 1; box-shadow: inset 0 5px 15px rgba(255,255,255,0.8), 0 0 25px currentColor; }
-.r-key-label { color: #888; text-align: center; font-weight: bold; margin-top: 10px; font-size: 14px; pointer-events: none; }
+.r-key-label { color: #888; text-align: center; font-weight: bold; margin-top: 5px; font-size: 12px; pointer-events: none; }
 #btn-rhythm-b { color: #08f; } #btn-rhythm-b .r-key-color { background: #08f; }
 #btn-rhythm-a { color: #f00; } #btn-rhythm-a .r-key-color { background: #f00; }
 
-/* ★ 変形用のクラス（JavaScriptで付与されるとガシャン！と入れ替わる） */
-.mode-rhythm #classic-controls { transform: translateY(-50px) scale(0.8); opacity: 0; pointer-events: none; }
+/* ★ 筐体＆画面 「上下（縦）」変形用クラス */
+.mode-rhythm #controls { height: 150px; } /* コントローラーが下に縮む */
+.mode-rhythm #classic-controls { transform: translateY(50px); opacity: 0; pointer-events: none; }
 .mode-rhythm #rhythm-console { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.mode-tall canvas { max-width: 250px; aspect-ratio: 1 / 2; } /* 縦に長いアスペクト比に変形！ */
 </style>
 </head>
 <body>
@@ -109,14 +114,8 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
         <div id="tonearm"></div>
       </div>
       <div id="rhythm-keys">
-        <div class="r-key" id="btn-rhythm-b">
-          <div class="r-key-color"></div>
-          <div class="r-key-label">B(青)</div>
-        </div>
-        <div class="r-key" id="btn-rhythm-a">
-          <div class="r-key-color"></div>
-          <div class="r-key-label">A(赤)</div>
-        </div>
+        <div class="r-key" id="btn-rhythm-b"><div class="r-key-color"></div><div class="r-key-label">B(青)</div></div>
+        <div class="r-key" id="btn-rhythm-a"><div class="r-key-color"></div><div class="r-key-label">A(赤)</div></div>
       </div>
     </div>
   </div>
