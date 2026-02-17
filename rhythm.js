@@ -1,4 +1,4 @@
-　// === BEAT BROS - ERROR FIX & PC KEYBOARD SUPPORT ===
+// === BEAT BROS - ERROR FIX & PC KEYBOARD SUPPORT ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
