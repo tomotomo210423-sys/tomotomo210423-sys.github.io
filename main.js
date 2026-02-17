@@ -1,7 +1,8 @@
 // === CORE SYSTEM - FATAL BUG FIX & ULTIMATE UNIFICATION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
-const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
-const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
+// ★ l0(D), l1(F), l2(J), l3(K) 用のキー設定を追加
+const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
+const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 let prevKeys = {...keys};
 let activeApp = null;
 
@@ -76,19 +77,6 @@ function playSnd(t) {
   }
 }
 
-// ★ 画面揺れバグの完全修正（スタック崩壊の防止）
-let shakeTimer = 0;
-let shakeSaved = false;
-function screenShake(intensity = 2) { shakeTimer = intensity; }
-function applyShake() { 
-  if (shakeTimer > 0) { 
-    ctx.save(); shakeSaved = true;
-    ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2); 
-    shakeTimer--; 
-  } else { shakeSaved = false; }
-}
-function resetShake() { if (shakeSaved) { ctx.restore(); shakeSaved = false; } }
-
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -103,7 +91,6 @@ const SaveSys = {
     if (!d.rankings || typeof d.rankings !== 'object') d.rankings = {n:[], h:[]};
     if (!d.rankings.n) d.rankings.n = [];
     if (!d.rankings.h) d.rankings.h = [];
-    if (!d.rhythm || typeof d.rhythm !== 'object') d.rhythm = {easy: 0, normal: 0, hard: 0};
 
     return {
       playerName: d.playerName || 'PLAYER',
@@ -113,8 +100,7 @@ const SaveSys = {
       actSeed: d.actSeed !== undefined ? d.actSeed : Math.floor(Math.random()*1000),
       rpg: d.rpg || null,
       rankings: d.rankings,
-      bgTheme: d.bgTheme || 0,
-      rhythm: d.rhythm
+      bgTheme: d.bgTheme || 0
     };
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
@@ -136,6 +122,11 @@ const particles = [];
 function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 12 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, life: 30 + Math.random()*10, color: color, size: type === 'explosion' ? 3 : 1 }); } }
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
+
+let shakeTimer = 0;
+function screenShake(intensity = 2) { shakeTimer = intensity; }
+function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2); shakeTimer--; } }
+function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
 const PALETTE = { '2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#00f','8':'#ff0','9':'#842','a':'#aaa','b':'#0ff','c':'#f0f','d':'#80f','e':'#531','f':'#141' };
 const drawSprite = (x, y, color, strData, size = 2.5) => {
@@ -197,27 +188,19 @@ function drawTransition() {
 }
 
 const Menu = {
-  cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
-  selectHoldTimer: 0,
-  
+  cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], selectHoldTimer: 0,
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
   update() {
     if (keys.select) { this.selectHoldTimer++; if (this.selectHoldTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.selectHoldTimer = 0; }
-    if (keysDown.down) { this.cur = (this.cur + 1) % 9; playSnd('sel'); } 
-    if (keysDown.up) { this.cur = (this.cur + 8) % 9; playSnd('sel'); }   
-    if (keysDown.a) { const appObjs = [Guide, Tetri, Action, RPG, Online, Rhythm, Ranking, Settings, DataBackup]; switchApp(appObjs[this.cur]); } 
+    if (keysDown.down) { this.cur = (this.cur + 1) % 9; playSnd('sel'); }
+    if (keysDown.up) { this.cur = (this.cur + 8) % 9; playSnd('sel'); }
+    if (keysDown.a) { const appObjs = [Guide, Tetri, Action, RPG, Online, Rhythm, Ranking, Settings, DataBackup]; switchApp(appObjs[this.cur]); }
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx);
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 30); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v7.0', 60, 45); 
-    
-    for (let i = 0; i < 9; i++) { 
-        ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; 
-        ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 22); 
-    }
-    
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v7.0', 60, 45);
+    for (let i = 0; i < 9; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 68 + i * 22); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
     if (this.selectHoldTimer > 0) { const p = Math.min(30, this.selectHoldTimer); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(10, 265, (180 * p / 30), 5); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 265, 180, 5); }
   }
@@ -362,20 +345,38 @@ const setBtn = (id, k) => {
   const p = (ev) => { ev.preventDefault(); keys[k] = true; initAudio(); }; const r = (ev) => { ev.preventDefault(); keys[k] = false; };
   e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
 };
+['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select'].forEach((id, i) => { setBtn(id, ['up', 'down', 'left', 'right', 'a', 'b', 'select'][i]); });
 
-// ★ リズムゲーム専用の大型鍵盤もタッチ操作にバインド
-['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select', 'btn-rhythm-a', 'btn-rhythm-b'].forEach((id, i) => { 
-  const keysArr = ['up', 'down', 'left', 'right', 'a', 'b', 'select', 'a', 'b'];
-  setBtn(id, keysArr[i]); 
-});
-
+// ★ キーボード入力をD,F,J,Kに対応
 window.addEventListener('keydown', e => {
-  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
-  if (e.key === 'z' || e.key === ' ') { keys.a = true; initAudio(); } if (e.key === 'x') { keys.b = true; initAudio(); } if (e.key === 'Shift') { keys.select = true; initAudio(); }
+  let k = e.key.toLowerCase();
+  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
+  if (k === 'z' || e.key === ' ') { keys.a = true; initAudio(); } 
+  if (k === 'x') { keys.b = true; initAudio(); } 
+  if (e.key === 'Shift') { keys.select = true; initAudio(); }
+  
+  // Rhythm専用キー
+  if (k === 'd') { keys.l0 = true; initAudio(); } 
+  if (k === 'f') { keys.l1 = true; initAudio(); }
+  if (k === 'j') { keys.l2 = true; initAudio(); } 
+  if (k === 'k') { keys.l3 = true; initAudio(); }
 });
+
 window.addEventListener('keyup', e => {
-  if (e.key === 'ArrowUp') keys.up = false; if (e.key === 'ArrowDown') keys.down = false;
-  if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false;
-  if (e.key === 'z' || e.key === ' ') keys.a = false; if (e.key === 'x') keys.b = false; if (e.key === 'Shift') keys.select = false;
+  let k = e.key.toLowerCase();
+  if (e.key === 'ArrowUp') keys.up = false; 
+  if (e.key === 'ArrowDown') keys.down = false;
+  if (e.key === 'ArrowLeft') keys.left = false; 
+  if (e.key === 'ArrowRight') keys.right = false;
+  if (k === 'z' || e.key === ' ') keys.a = false; 
+  if (k === 'x') keys.b = false; 
+  if (e.key === 'Shift') keys.select = false;
+  
+  if (k === 'd') keys.l0 = false; 
+  if (k === 'f') keys.l1 = false;
+  if (k === 'j') keys.l2 = false; 
+  if (k === 'k') keys.l3 = false;
 });
