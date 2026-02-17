@@ -1,4 +1,4 @@
-// === CORE SYSTEM - FATAL BUG FIX & ULTIMATE UNIFICATION ===
+// === CORE SYSTEM - 5in1 ULTIMATE UNIFICATION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 // ★ l0(D), l1(F), l2(J), l3(K) 用のキー設定を追加
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
@@ -77,6 +77,7 @@ function playSnd(t) {
   }
 }
 
+// ★ 鉄壁のエラー回避機能付きセーブシステム
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -91,6 +92,9 @@ const SaveSys = {
     if (!d.rankings || typeof d.rankings !== 'object') d.rankings = {n:[], h:[]};
     if (!d.rankings.n) d.rankings.n = [];
     if (!d.rankings.h) d.rankings.h = [];
+    
+    // ★ ここでリズムゲームのデータ枠を確実に生成（エラーの原因を根本排除）
+    if (!d.rhythm || typeof d.rhythm !== 'object') d.rhythm = {easy: 0, normal: 0, hard: 0};
 
     return {
       playerName: d.playerName || 'PLAYER',
@@ -100,7 +104,8 @@ const SaveSys = {
       actSeed: d.actSeed !== undefined ? d.actSeed : Math.floor(Math.random()*1000),
       rpg: d.rpg || null,
       rankings: d.rankings,
-      bgTheme: d.bgTheme || 0
+      bgTheme: d.bgTheme || 0,
+      rhythm: d.rhythm
     };
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
@@ -188,7 +193,10 @@ function drawTransition() {
 }
 
 const Menu = {
-  cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], selectHoldTimer: 0,
+  cur: 0, 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
+  selectHoldTimer: 0,
+  
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
   update() {
     if (keys.select) { this.selectHoldTimer++; if (this.selectHoldTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.selectHoldTimer = 0; }
@@ -358,7 +366,6 @@ window.addEventListener('keydown', e => {
   if (k === 'x') { keys.b = true; initAudio(); } 
   if (e.key === 'Shift') { keys.select = true; initAudio(); }
   
-  // Rhythm専用キー
   if (k === 'd') { keys.l0 = true; initAudio(); } 
   if (k === 'f') { keys.l1 = true; initAudio(); }
   if (k === 'j') { keys.l2 = true; initAudio(); } 
