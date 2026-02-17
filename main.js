@@ -1,4 +1,4 @@
-// === CORE SYSTEM - 5in1 ULTIMATE UNIFICATION ===
+// === CORE SYSTEM - FATAL BUG FIX & ULTIMATE UNIFICATION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false};
@@ -76,7 +76,19 @@ function playSnd(t) {
   }
 }
 
-// ★ セーブシステム 5in1仕様 (rhythmデータを追加)
+// ★ 画面揺れバグの完全修正（スタック崩壊の防止）
+let shakeTimer = 0;
+let shakeSaved = false;
+function screenShake(intensity = 2) { shakeTimer = intensity; }
+function applyShake() { 
+  if (shakeTimer > 0) { 
+    ctx.save(); shakeSaved = true;
+    ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2); 
+    shakeTimer--; 
+  } else { shakeSaved = false; }
+}
+function resetShake() { if (shakeSaved) { ctx.restore(); shakeSaved = false; } }
+
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -91,8 +103,6 @@ const SaveSys = {
     if (!d.rankings || typeof d.rankings !== 'object') d.rankings = {n:[], h:[]};
     if (!d.rankings.n) d.rankings.n = [];
     if (!d.rankings.h) d.rankings.h = [];
-    
-    // ★ リズムゲームのハイスコア枠
     if (!d.rhythm || typeof d.rhythm !== 'object') d.rhythm = {easy: 0, normal: 0, hard: 0};
 
     return {
@@ -126,11 +136,6 @@ const particles = [];
 function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 12 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, life: 30 + Math.random()*10, color: color, size: type === 'explosion' ? 3 : 1 }); } }
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
-
-let shakeTimer = 0;
-function screenShake(intensity = 2) { shakeTimer = intensity; }
-function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2); shakeTimer--; } }
-function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
 const PALETTE = { '2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#00f','8':'#ff0','9':'#842','a':'#aaa','b':'#0ff','c':'#f0f','d':'#80f','e':'#531','f':'#141' };
 const drawSprite = (x, y, color, strData, size = 2.5) => {
@@ -191,7 +196,6 @@ function drawTransition() {
   if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x+y) < (20 - transTimer)) ctx.fillRect(x*20, y*20, 20, 20); } } }
 }
 
-// ★ 9項目のメニュー構成
 const Menu = {
   cur: 0, 
   apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
