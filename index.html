@@ -12,7 +12,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; }
 
-#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; transition: all 0.5s ease; }
+#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
 
 #screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; }
 
@@ -23,12 +23,13 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 .boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
 
-canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s ease; }
+canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none; }
 
 /* コントローラー領域 */
-#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: all 0.5s ease; }
+#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; z-index: 20; }
+#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 1.5s ease; }
 
-/* ボタンのタッチ感度向上設定 */
+/* ボタン設定（タッチ感度向上） */
 .d-btn, .a-btn, .s-btn { touch-action: none; -webkit-tap-highlight-color: transparent; }
 
 #dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; }
@@ -53,9 +54,10 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
 .s-btn:active { background: #333; }
 .s-label { font-size: 10px; color: #555; font-weight: bold; margin-top: 5px; }
 
-/* リズムゲーム用変形スタイル */
-.mode-tall #controls { height: 0 !important; opacity: 0; }
-.mode-tall canvas { aspect-ratio: 1/2; height: 100%; width: auto; max-width: 100%; box-shadow: 0 0 30px rgba(0,255,0,0.2); }
+/* 縦長全画面モード */
+.mode-tall #classic-controls { transform: translateY(50px) scale(0.8); opacity: 0; pointer-events: none; }
+.mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
+.mode-tall canvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 </style>
 </head>
 <body>
@@ -65,27 +67,29 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
       <div class="boot-text">5in1 RETRO SYSTEM</div>
       <div class="boot-text">SYSTEM REBOOT...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
-      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
+      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Checking Memory...</div>
     </div>
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
   
   <div id="controls">
-    <div id="dpad">
-      <div class="d-center"></div>
-      <div class="d-btn" id="btn-up"></div>
-      <div class="d-btn" id="btn-down"></div>
-      <div class="d-btn" id="btn-left"></div>
-      <div class="d-btn" id="btn-right"></div>
-    </div>
-    <div id="action-buttons">
-      <div class="a-btn" id="btn-b">B</div>
-      <div class="btn-label" id="label-b">B</div>
-      <div class="a-btn" id="btn-a">A</div>
-      <div class="btn-label" id="label-a">A</div>
-    </div>
-    <div id="sys-buttons">
-      <div class="s-btn-wrap"><div class="s-btn" id="btn-select"></div><div class="s-label">SELECT</div></div>
+    <div id="classic-controls">
+      <div id="dpad">
+        <div class="d-center"></div>
+        <div class="d-btn" id="btn-up"></div>
+        <div class="d-btn" id="btn-down"></div>
+        <div class="d-btn" id="btn-left"></div>
+        <div class="d-btn" id="btn-right"></div>
+      </div>
+      <div id="action-buttons">
+        <div class="a-btn" id="btn-b">B</div>
+        <div class="btn-label" id="label-b">B</div>
+        <div class="a-btn" id="btn-a">A</div>
+        <div class="btn-label" id="label-a">A</div>
+      </div>
+      <div id="sys-buttons">
+        <div class="s-btn-wrap"><div class="s-btn" id="btn-select"></div><div class="s-label">SELECT</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -96,7 +100,7 @@ const bootInterval = setInterval(() => {
   bootProgress += Math.random() * 15;
   if (bootProgress > 100) bootProgress = 100;
   document.getElementById('bootProgress').style.width = bootProgress + '%';
-  document.getElementById('bootStatus').textContent = bootProgress < 90 ? 'Checking Memory...' : 'OK!';
+  document.getElementById('bootStatus').textContent = bootProgress < 90 ? 'Loading Modules...' : 'OK!';
   if (bootProgress >= 100) {
     clearInterval(bootInterval);
     setTimeout(() => { document.getElementById('boot').classList.add('hidden'); }, 500);
