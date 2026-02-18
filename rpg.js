@@ -10,6 +10,9 @@ const RPG = {
   monsterTypes: { slime: {name: 'スライム', spr: sprs.slime, c: '#0a0', hp: 15, atk: 3, def: 1, spd: 3, exp: 15, gld: 8, spells: []}, bat: {name: 'コウモリ', spr: sprs.enemyNew, c: '#80f', hp: 20, atk: 5, def: 1, spd: 8, exp: 20, gld: 12, spells: [5]}, skeleton: {name: '骨戦士', spr: sprs.skull, c: '#aaa', hp: 35, atk: 7, def: 3, spd: 6, exp: 30, gld: 20, spells: []}, mage: {name: '魔道士', spr: sprs.mage, c: '#60c', hp: 25, atk: 10, def: 2, spd: 5, exp: 35, gld: 25, spells: [0, 1, 4]}, golem: {name: 'ゴーレム', spr: sprs.boss, c: '#884', hp: 80, atk: 15, def: 10, spd: 2, exp: 100, gld: 80, spells: []}, dragon: {name: 'ドラゴン', spr: sprs.dragon, c: '#f00', hp: 120, atk: 25, def: 8, spd: 15, exp: 200, gld: 150, spells: [0, 1]} },
   encounterTable: { '1,1': ['slime'], '2,1': ['slime', 'bat'], '1,0': ['bat', 'skeleton', 'mage'], '0,1': ['skeleton', 'mage', 'golem'], '0,0': ['mage', 'golem', 'dragon'], '2,2': ['skeleton', 'dragon'] },
 
+  menu: { open: false, cur: 0, items: ['ステータス', 'じゅもん', 'どうぐ', 'セーブ'] },
+  magicMenu: { open: false, cur: 0 }, itemMenu: { open: false, cur: 0 },
+  
   init() { this.st = 'title'; this.mIdx = 0; this.anim = 0; BGM.play('rpg_field'); },
   
   loadSave(slot) {
@@ -57,7 +60,7 @@ const RPG = {
     this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
     this.map[14][4]=15; this.map[14][5]=15; this.map[1][4]=21; this.map[1][5]=21;
-    // ★ 施設とNPCを配置（数字を変えました：4[店], 5[宿], 6[工房], 7[NPC]）
+    // ★ 施設とNPCを配置
     this.map[8][2]=4; this.map[8][7]=5; this.map[11][5]=6;
     this.npcs.forEach(n => { this.map[n.y][n.x] = 7; });
     
@@ -237,7 +240,7 @@ const RPG = {
       }
     }
 
-    if (['battle', 'magic'].includes(this.st)) {
+    if (['battle', 'magic', 'battleProcessing'].includes(this.st)) {
       if (this.st === 'magic') {
         if (keysDown.up) { this.mIdx = Math.max(0, this.mIdx - 1); playSnd('sel'); } if (keysDown.down) { this.mIdx = Math.min(this.p.knownSpells.length, this.mIdx + 1); playSnd('sel'); }
         if (keysDown.a) { if (this.mIdx < this.p.knownSpells.length) { this.executeTurn('magic', this.mIdx); } else { this.st = 'battle'; this.mIdx = 0; } }
