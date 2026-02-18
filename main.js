@@ -30,9 +30,11 @@ const BGM = {
       tetri: { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
       action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
       rpg_field: { t1:[262,294,330,349,392,440,494,523], t2:[131,0,165,0,196,0,247,0], t3:[65,65,73,73,82,82,98,98], n:[0,0,0,0,0,0,0,0], spd: 350 },
+      rpg_town: { t1:[349,392,440,349,392,330,294,330], t2:[174,196,220,174,196,165,147,165], t3:[0,0,0,0,0,0,0,0], n:[0,0,0,0,0,0,0,0], spd: 400 },
+      rpg_dungeon: { t1:[146,130,123,110,146,130,123,110], t2:[73,65,61,55,73,65,61,55], t3:[0,0,0,0,0,0,0,0], n:[1,0,0,0,1,0,0,0], spd: 250 },
       rpg_battle: { t1:[440,494,523,587,659,587,523,494], t2:[220,247,262,294,330,294,262,247], t3:[110,110,110,110,110,110,110,110], n:[1,0,1,0,1,0,1,0], spd: 150 },
       rpg_boss: { t1:[329,311,329,246,293,261,220,0], t2:[164,155,164,123,146,130,110,0], t3:[82,82,82,82,77,77,77,77], n:[1,1,1,1,1,1,1,1], spd: 180 },
-      spell: { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 } // 復活の呪文用BGM
+      spell: { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
     };
     const track = mels[type] || mels.menu; let i = 0;
     
@@ -163,7 +165,7 @@ const sprs = {
     "0000000000000000000000000000000000000000000000000000000000000000000000033000000000000031130000000000031111300000000031111113000000031111111130000003111111111130000311311111131130311303111130311333000033330000330000000000000000000000000000000000000000000000"
   ],
   fighter: "000000033000000000000032230000000000032bb23000000000032bb23000000003332bb23330000032222bb2222300032bb22bb22bb23032bbbb2bb2bbbb233333333bb333333300000322223000000000032bb2300000000000333333300000000005555000000000000055000000000000000000000000000000000000000",
-  banana: "00000000000003300000000000003883000000000003888300000000003888300000000003888300000000003888300000000003888300000000003888300000000038883000000000388830000000003888300000000038883000000000388830000000000388300000000000003300000000000000000000000000000000000",
+  banana: "0000000000000330000000000000388300000000000388830000000000388830000000000388830000000000388830000000000388830000000000388830000000000388830000000003888300000000038883000000000388830000000003888300000000038883000000000388830000000003888300000000038883000000000",
   peperoncino: "000000000000000000000000000000000000000000000000000000033300000000000038583000000000038258300000000038888888300000038898898830000032222222223000003a22a2a2a230000032a2a2a2a2300000032222222230000000333333330000000000000000000000000000000000000000000000000000",
   cannon: "000000000000000000000000000000000000000330000000000000033000000000000003300000000000000330000000000000333300000000000366663000000000036666663000000036666666630000003666666663000003aaaaaaaaaa300003a3a3a3a3a3300003aaaaaaaaaa3000003333333333300000000000000000",
   invader: [
@@ -198,7 +200,7 @@ function drawTransition() {
 
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', '復活の呪文'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
   selectHoldTimer: 0,
   
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
@@ -225,7 +227,7 @@ const Menu = {
 
 const DataBackup = {
   st: 'map', px: 4.5, py: 6, anim: 0, msg: '', backupStr: '',
-  init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('spell'); }, // 呪文BGMに変更
+  init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('menu'); },
   update() {
     if (keysDown.select) { switchApp(Menu); return; }
     if (this.st === 'msg') { if (keysDown.a || keysDown.b) { this.st = 'map'; playSnd('sel'); } return; }
@@ -237,63 +239,37 @@ const DataBackup = {
     nx = Math.max(1, Math.min(8, nx)); ny = Math.max(1.5, Math.min(7, ny)); this.px = nx; this.py = ny;
 
     if (keysDown.a) {
-       // 左の巻物（コピー）
        if (Math.abs(this.px - 2) < 1.5 && Math.abs(this.py - 2) < 1.5) {
            try { 
              this.backupStr = btoa(unescape(encodeURIComponent(JSON.stringify(SaveSys.data))));
              if (navigator.clipboard && window.isSecureContext) {
-                 navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'じゅもんを　クリップボードに\nうつした！\nメモ帳などに　のこしておくのじゃ。'; this.st = 'msg'; playSnd('combo'); 
-                 }).catch(e=> { prompt("じゅもんを　ひかえておくのじゃ。", this.backupStr); this.msg = 'じゅもんを　ひょうじしたぞ。\nわすれずに　メモするのじゃ。'; this.st = 'msg'; playSnd('combo'); });
-             } else { prompt("じゅもんを　ひかえておくのじゃ。", this.backupStr); this.msg = 'じゅもんを　ひょうじしたぞ。\nわすれずに　メモするのじゃ。'; this.st = 'msg'; playSnd('combo'); }
-           } catch(e) { this.msg = 'じゅもんの　さくせいに\nしっぱいした…'; this.st = 'msg'; playSnd('hit'); }
+                 navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); 
+                 }).catch(e=> { prompt("自動コピーがブロックされました。\n以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); });
+             } else { prompt("以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); }
+           } catch(e) { this.msg = 'データ変換エラー'; this.st = 'msg'; playSnd('hit'); }
        } 
-       // 右の巻物（復元）
        else if (Math.abs(this.px - 7) < 1.5 && Math.abs(this.py - 2) < 1.5) {
-           const input = prompt("ふっかつのじゅもんを　にゅうりょく　してください:");
+           const input = prompt("復活の呪文（パスワード）を入力してください:");
            if (input) {
              try {
                const parsed = JSON.parse(decodeURIComponent(escape(atob(input))));
                if (parsed && parsed.playerName) { 
                  SaveSys.data = parsed; SaveSys.save(); 
-                 alert("じゅもんが　ただしく　ききとどけられた！\nゲームを　さいきどう　します。"); location.reload(); 
+                 alert("データの復元に成功しました！\nゲームを再起動します。"); location.reload(); 
                } else throw new Error('Invalid');
-             } catch(e) { this.msg = 'じゅもんが　ちがいます。'; this.st = 'msg'; playSnd('hit'); }
+             } catch(e) { this.msg = '呪文が違います！'; this.st = 'msg'; playSnd('hit'); }
            }
        }
     }
   },
   draw() {
-    // 王様の間のような背景
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300); 
-    ctx.fillStyle = '#400'; ctx.fillRect(20, 20, 160, 260); // 赤い絨毯
-    ctx.strokeStyle = '#fa0'; ctx.lineWidth = 4; ctx.strokeRect(20, 20, 160, 260); ctx.lineWidth = 1;
-    
-    // 柱
-    ctx.fillStyle = '#888'; ctx.fillRect(30, 30, 20, 240); ctx.fillRect(150, 30, 20, 240);
-    
-    // 巻物アイコン
-    const offsetY1 = Math.sin(this.anim * 0.1) * 2; 
-    ctx.fillStyle = '#ffe'; ctx.fillRect(35, 45, 30, 20); ctx.strokeStyle = '#840'; ctx.strokeRect(35, 45, 30, 20);
-    ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('記録', 38, 58 + offsetY1); 
-    
-    const offsetY2 = Math.cos(this.anim * 0.1) * 2; 
-    ctx.fillStyle = '#ffe'; ctx.fillRect(135, 45, 30, 20); ctx.strokeStyle = '#840'; ctx.strokeRect(135, 45, 30, 20);
-    ctx.fillStyle = '#0ff'; ctx.fillText('復活', 138, 58 + offsetY2);
-
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#034'; ctx.fillRect(20, 20, 160, 140); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 160, 140); ctx.lineWidth = 1;
+    for(let i=20; i<180; i+=20) { ctx.beginPath(); ctx.moveTo(i, 20); ctx.lineTo(i, 160); ctx.stroke(); }
+    const offsetY1 = Math.sin(this.anim * 0.1) * 2; ctx.fillStyle = '#0f0'; ctx.fillRect(35, 35, 20, 20); ctx.fillStyle = '#fff'; ctx.fillRect(38, 38, 14, 14); ctx.fillStyle = '#0f0'; ctx.font = '8px monospace'; ctx.fillText('コピー', 32, 28 + offsetY1); ctx.fillText('▲', 42, 65);
+    const offsetY2 = Math.cos(this.anim * 0.1) * 2; ctx.fillStyle = '#f80'; ctx.fillRect(145, 35, 20, 20); ctx.fillStyle = '#fff'; ctx.fillRect(148, 38, 14, 14); ctx.fillStyle = '#f80'; ctx.fillText('復元', 145, 28 + offsetY2); ctx.fillText('▼', 152, 65);
     drawSprite(this.px * 20, this.py * 20, '#0ff', sprs.player || sprs.heroNew, 2.5);
-    
-    // 王様（雰囲気）
-    drawSprite(90, 60, '#fa0', sprs.boss, 2.5);
-    
-    ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('王様に　はなしかけるのだ。', 40, 220); 
-    ctx.fillStyle = '#ccc'; ctx.fillText('SELECT: 城を出る', 60, 280);
-    
-    if (this.st === 'msg') { 
-        ctx.fillStyle = '#000'; ctx.fillRect(10, 150, 180, 80); 
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(10, 150, 180, 80); 
-        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; 
-        let arr = this.msg.split('\n'); for(let i=0; i<arr.length; i++) ctx.fillText(arr[i], 20, 170 + i*15); 
-    }
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('端末の前でAボタンを押すんだ。', 25, 180); ctx.fillStyle = '#666'; ctx.fillText('SELECT: 戻る', 65, 280);
+    if (this.st === 'msg') { ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(10, 100, 180, 60); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 100, 180, 60); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; let arr = this.msg.split('\n'); for(let i=0; i<arr.length; i++) ctx.fillText(arr[i], 20, 120 + i*15); }
   }
 };
 
@@ -346,6 +322,24 @@ const Ranking = {
       const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
       ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText('↑↓←→:選択 A:追加 B:削除', 25, 215);
     }
+  }
+};
+
+const Settings = {
+  menuCursor: 0, init() { this.menuCursor = 0; },
+  update() {
+    if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
+    if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); }
+    if (keysDown.down) { this.menuCursor = 1; playSnd('sel'); }
+    if (keysDown.a) {
+      if (this.menuCursor === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } 
+      else if (this.menuCursor === 1) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
+    }
+  },
+  draw() {
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
+    ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.menuCursor === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.menuCursor === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
+    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
   }
 };
 
@@ -404,3 +398,5 @@ window.addEventListener('keyup', e => {
   if (k === 'j') keys.l2 = false; 
   if (k === 'k') keys.l3 = false;
 });
+
+}
