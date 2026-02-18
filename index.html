@@ -9,17 +9,17 @@
 <link rel="apple-touch-icon" href="icon.png">
 
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; user-select: none; overflow: hidden; }
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; }
 
 /* 筐体全体のベース */
 #gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
 
-#screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
+#screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; }
 
 /* 起動画面 */
-#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; font-family: 'Courier New', monospace; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; }
-#boot.hidden { opacity: 0; pointer-events: none; }
+#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; font-family: 'Courier New', monospace; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
+#boot.hidden { opacity: 0; }
 .boot-text { font-size: 10px; margin: 4px 0; }
 .boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
@@ -27,41 +27,37 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 /* ゲーム画面 (Canvas) */
 canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none; }
 
-/* コントローラー領域 */
-#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; }
+/* コントローラー領域（最前面に配置） */
+#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; z-index: 20; }
 #classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 1.5s ease; }
-#dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; }
-.d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; transition: all 0.1s; }
+
+/* ★ ボタン類に touch-action: none を設定して感度向上 */
+#dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; touch-action: none; }
+.d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; touch-action: none; }
 .d-btn:active { background: #111; transform: translateY(2px); }
 #btn-up { top: 0; left: 40px; width: 40px; height: 40px; border-radius: 5px 5px 0 0; }
 #btn-down { bottom: 0; left: 40px; width: 40px; height: 40px; border-radius: 0 0 5px 5px; }
 #btn-left { top: 40px; left: 0; width: 40px; height: 40px; border-radius: 5px 0 0 5px; }
 #btn-right { top: 40px; right: 0; width: 40px; height: 40px; border-radius: 0 5px 5px 0; }
 .d-center { top: 40px; left: 40px; width: 40px; height: 40px; background: #333; position: absolute; }
-#action-buttons { position: absolute; right: 20px; top: 50px; width: 140px; height: 100px; transform: rotate(-15deg); }
-.a-btn { position: absolute; width: 55px; height: 55px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 20px; text-align: center; line-height: 55px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.1s; }
+
+#action-buttons { position: absolute; right: 20px; top: 50px; width: 140px; height: 100px; transform: rotate(-15deg); touch-action: none; }
+.a-btn { position: absolute; width: 55px; height: 55px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 20px; text-align: center; line-height: 55px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.1s; touch-action: none; -webkit-tap-highlight-color: transparent; }
 .a-btn:active { background: #800; transform: translateY(2px); box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 1px 1px 2px rgba(0,0,0,0.4); }
 #btn-b { left: 0; bottom: 0; } #btn-a { right: 0; top: 0; }
-.btn-label { position: absolute; font-size: 14px; color: #555; font-weight: bold; }
+.btn-label { position: absolute; font-size: 14px; color: #555; font-weight: bold; pointer-events: none; }
 #label-b { left: 20px; bottom: -25px; } #label-a { right: 20px; top: -25px; }
-#sys-buttons { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; }
+
+#sys-buttons { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; touch-action: none; }
 .s-btn-wrap { text-align: center; }
-.s-btn { width: 50px; height: 15px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
+.s-btn { width: 50px; height: 15px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; touch-action: none; }
 .s-btn:active { background: #333; }
 .s-label { font-size: 10px; color: #555; font-weight: bold; margin-top: 5px; }
 
-/* ★ 縦長全画面モード（画面からはみ出さないように修正） */
+/* ★ 縦長全画面モード */
 .mode-tall #classic-controls { transform: translateY(50px) scale(0.8); opacity: 0; pointer-events: none; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
-.mode-tall canvas { 
-    aspect-ratio: 1 / 2; 
-    width: auto; 
-    max-width: 100%; 
-    height: 100%; 
-    max-height: 100%; 
-    border-radius: 8px; 
-    box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); 
-}
+.mode-tall canvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 </style>
 </head>
 <body>
