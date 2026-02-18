@@ -1,6 +1,6 @@
 // === CORE SYSTEM - 5in1 ULTIMATE UNIFICATION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
-// ★ l0(D), l1(F), l2(J), l3(K) 用のキー設定を追加
+// l0(D), l1(F), l2(J), l3(K)
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 let prevKeys = {...keys};
@@ -32,7 +32,7 @@ const BGM = {
       rpg_field: { t1:[262,294,330,349,392,440,494,523], t2:[131,0,165,0,196,0,247,0], t3:[65,65,73,73,82,82,98,98], n:[0,0,0,0,0,0,0,0], spd: 350 },
       rpg_battle: { t1:[440,494,523,587,659,587,523,494], t2:[220,247,262,294,330,294,262,247], t3:[110,110,110,110,110,110,110,110], n:[1,0,1,0,1,0,1,0], spd: 150 },
       rpg_boss: { t1:[329,311,329,246,293,261,220,0], t2:[164,155,164,123,146,130,110,0], t3:[82,82,82,82,77,77,77,77], n:[1,1,1,1,1,1,1,1], spd: 180 },
-      spell: { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
+      spell: { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 } // 復活の呪文用BGM
     };
     const track = mels[type] || mels.menu; let i = 0;
     
@@ -78,7 +78,6 @@ function playSnd(t) {
   }
 }
 
-// ★ 鉄壁のエラー回避機能付きセーブシステム
 const SaveSys = {
   data: (function() {
     let d = {};
@@ -164,7 +163,7 @@ const sprs = {
     "0000000000000000000000000000000000000000000000000000000000000000000000033000000000000031130000000000031111300000000031111113000000031111111130000003111111111130000311311111131130311303111130311333000033330000330000000000000000000000000000000000000000000000"
   ],
   fighter: "000000033000000000000032230000000000032bb23000000000032bb23000000003332bb23330000032222bb2222300032bb22bb22bb23032bbbb2bb2bbbb233333333bb333333300000322223000000000032bb2300000000000333333300000000005555000000000000055000000000000000000000000000000000000000",
-  banana: "0000000000000330000000000000388300000000000388830000000000388830000000000388830000000000388830000000000388830000000000388830000000000388830000000003888300000000038883000000000388830000000003888300000000038883000000000388830000000003888300000000038883000000000",
+  banana: "00000000000003300000000000003883000000000003888300000000003888300000000003888300000000003888300000000003888300000000003888300000000038883000000000388830000000003888300000000038883000000000388830000000000388300000000000003300000000000000000000000000000000000",
   peperoncino: "000000000000000000000000000000000000000000000000000000033300000000000038583000000000038258300000000038888888300000038898898830000032222222223000003a22a2a2a230000032a2a2a2a2300000032222222230000000333333330000000000000000000000000000000000000000000000000000",
   cannon: "000000000000000000000000000000000000000330000000000000033000000000000003300000000000000330000000000000333300000000000366663000000000036666663000000036666666630000003666666663000003aaaaaaaaaa300003a3a3a3a3a3300003aaaaaaaaaa3000003333333333300000000000000000",
   invader: [
@@ -199,7 +198,7 @@ function drawTransition() {
 
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', '復活の呪文'], 
   selectHoldTimer: 0,
   
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
@@ -347,24 +346,6 @@ const Ranking = {
       const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
       ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText('↑↓←→:選択 A:追加 B:削除', 25, 215);
     }
-  }
-};
-
-const Settings = {
-  menuCursor: 0, init() { this.menuCursor = 0; },
-  update() {
-    if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
-    if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); }
-    if (keysDown.down) { this.menuCursor = 1; playSnd('sel'); }
-    if (keysDown.a) {
-      if (this.menuCursor === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } 
-      else if (this.menuCursor === 1) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
-    }
-  },
-  draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
-    ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.menuCursor === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.menuCursor === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
-    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
   }
 };
 
