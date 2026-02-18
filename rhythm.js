@@ -1,4 +1,4 @@
-// === BEAT BROS - BUTTON POSITION FIX ===
+// === BEAT BROS - UI POSITION FIX ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -54,14 +54,13 @@ const Rhythm = {
       ui = document.createElement('div');
       ui.id = 'rhythm-file-ui';
       ui.style.position = 'absolute';
-      // ★ 修正箇所：ボタンの位置を少し上に上げました (40px -> 65px)
-      ui.style.bottom = '65px'; 
+      // ★ 修正：ボタン位置を上に移動 (文字被り回避)
+      ui.style.bottom = '80px'; 
       ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
       let label = document.createElement('label');
       label.style.display = 'inline-block'; label.style.background = '#ff0'; label.style.color = '#000'; label.style.padding = '10px 15px'; label.style.fontFamily = 'monospace'; label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; label.style.cursor = 'pointer'; label.style.border = '2px solid #fff'; label.style.boxShadow = '0 0 15px #ff0';
       label.innerHTML = '📁 曲ファイルを選ぶ';
       
-      // スマホ対策：ボタンに触れた瞬間にオーディオのロックを解除する
       label.onclick = () => { initAudio(); };
       label.ontouchstart = () => { initAudio(); };
       
@@ -270,7 +269,6 @@ const Rhythm = {
         ctx.font = '10px monospace'; 
       }
       
-      // ★ 修正：ボタンの位置を上げたので、案内テキストは消す（ボタン自体が案内になる）か、下にずらす
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if (this.st === 'transform_in' || this.st === 'transform_out') {
