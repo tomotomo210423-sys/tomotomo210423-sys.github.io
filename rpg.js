@@ -1,8 +1,9 @@
-// === MICRO QUEST - FULL RESTORE & NPC UPDATE ===
+// === MICRO QUEST - BUG FIX (PX->SX) ===
 const RPG = {
   st: 'title', msg: '', msgNextSt: null, mIdx: 0, map: [], dungeons: [], p: null, en: null, anim: 0, saveSlot: 0, battleText: '', battleWaitTimer: 0, chests: [], customBosses: [], isArena: false,
   fieldMonsters: [], fightingMonsterIdx: -1, 
-  // ★ 追加：会話可能なNPCリスト
+  
+  // 会話可能なNPCリスト
   npcs: [ {x: 8, y: 10, msg: "ようこそ！\nこのまちは　へいわだよ。"}, {x: 15, y: 5, msg: "みなみの　どうくつには\nおそろしい　まものが\nすんでいるらしい..."}, {x: 5, y: 15, msg: "ぶきや　ぼうぐは\nこうぼうで　きょうかできるよ。"} ],
   
   spells: [ {name: 'ファイア', mp: 5, dmg: 15, type: 'atk'}, {name: 'サンダー', mp: 8, dmg: 25, type: 'atk'}, {name: 'ブリザド', mp: 12, dmg: 35, type: 'atk'}, {name: 'ヒール', mp: 10, dmg: -30, type: 'heal'}, {name: 'ポイズン', mp: 8, dmg: 0, type: 'poison'}, {name: 'ドレイン', mp: 15, dmg: 20, type: 'drain'} ],
@@ -59,7 +60,7 @@ const RPG = {
     this.worldMap = this.map.map(r => [...r]); this.map = Array(15).fill().map(() => Array(10).fill(0));
     for (let r = 0; r < 15; r++) { for (let c = 0; c < 10; c++) { this.map[r][c] = (r===0||r===14||c===0||c===9) ? 1 : 15; } }
     this.map[14][4]=15; this.map[14][5]=15; this.map[1][4]=21; this.map[1][5]=21;
-    // ★ 施設とNPCを配置（数字を変えました：17->4[店], 18->5[宿], 19->6[工房], 7[NPC]）
+    // 施設とNPCを配置
     this.map[8][2]=4; this.map[8][7]=5; this.map[11][5]=6;
     this.npcs.forEach(n => { this.map[n.y][n.x] = 7; });
     
@@ -141,7 +142,6 @@ const RPG = {
           else if (this.mIdx === 3) { this.st = 'townMap'; this.mIdx = 0; }
         }
         else if (this.st === 'spellMenu') {
-           // 魔法使用処理（フィールド）
            let s = this.p.spells[this.mIdx];
            if (this.p.mp >= s.mp && s.type === 'heal') {
               this.p.mp -= s.mp; this.p.hp = Math.min(this.p.mhp, this.p.hp - s.dmg);
@@ -187,11 +187,9 @@ const RPG = {
         } else if (['townMap', 'castle'].includes(this.st)) {
           const adj = [ this.map[this.p.y][this.p.x], this.p.y>0?this.map[this.p.y-1][this.p.x]:0, this.p.y<14?this.map[this.p.y+1][this.p.x]:0, this.p.x>0?this.map[this.p.y][this.p.x-1]:0, this.p.x<9?this.map[this.p.y][this.p.x+1]:0 ];
           if (adj.includes(16)) { this.msgBox(this.p.story===0?"王様「東の洞窟へ行け！」":this.p.story===1?"王様「北の塔へ向かえ！」":this.p.story===2?"王様「北西の魔王城へ！」":"王様「世界に平和が！」"); }
-          // ★ 建物・NPCへの接触判定 (4:店, 5:宿, 6:工房, 7:NPC)
           else if (adj.includes(5)) { if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りない。"); }
           else if (adj.includes(4)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox(`50Gで魔法を習得した！`); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
           else if (adj.includes(6)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
-          // ★ NPC会話
           else if (adj.includes(7)) {
              let tx = this.p.x, ty = this.p.y;
              if (this.p.dir === 0) ty++; if (this.p.dir === 3) ty--; if (this.p.dir === 1) tx--; if (this.p.dir === 2) tx++;
@@ -218,13 +216,11 @@ const RPG = {
             let t = this.map[ny][nx]; 
             if (this.st === 'townMap' && t === 21) { this.st = 'castle'; this.genCastleMap(); playSnd('jmp'); } 
             else if (this.st === 'castle') { if ([15, 22].includes(t)) { this.p.x = nx; this.p.y = ny; playSnd('sel'); moved = true; } }
-            // ★ 4,5,6,7は建物・NPCなので入れない
             else if (![1,10,12,13,16,4,5,6,7,21].includes(t)) { this.p.x = nx; this.p.y = ny; playSnd('sel'); moved = true; }
           }
         }
       }
       
-      // シンボルモンスター移動
       if (moved && this.fieldMonsters.length > 0) {
           for (let i = 0; i < this.fieldMonsters.length; i++) {
               let m = this.fieldMonsters[i];
@@ -423,7 +419,7 @@ const RPG = {
           else if (v === 21) { drawSprite(sx, sy, '', sprs.wall, 2.5); ctx.fillStyle = '#000'; ctx.fillRect(sx+4, sy+8, 12, 12); }
           else if (v === 22) { drawSprite(sx, sy, '', sprs.floor, 2.5); ctx.fillStyle = 'rgba(200,0,0,0.5)'; ctx.fillRect(sx, sy, 20, 20); }
           else ctx.fillStyle = '#333';
-          if (v === 0 || v === 1) ctx.fillRect(px, py, 20, 20); // 念のため
+          if (v === 0 || v === 1) ctx.fillRect(sx, sy, 20, 20); // ★バグ修正：px -> sx
         }
       }
       for (let m of this.fieldMonsters) {
