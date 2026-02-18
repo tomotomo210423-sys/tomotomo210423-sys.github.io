@@ -2,17 +2,22 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>5in1 RETRO SYSTEM</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>4in1 RETRO SYSTEM</title>
 
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; }
+<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIjRpbjEgUkVUUk8gU1lTVEVNIiwKICAic2hvcnRfbmFtZSI6ICI0aW4xIiwKICAic3RhcnRfdXJsIjogIi4vaW5kZXguaHRtbCIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29xvciI6ICIjMDAwMDAwIiwKICAidGhlbWVfY29sb3IiOiAiIzAwMDAwMCIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaWNvbi5wbmciLAogICAgICAic2l6ZXMiOiAiMTkyeDE5MiIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIKICAgIH0KICBdCn0=">
 
-#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
+
+#gameboy { width: 100%; max-width: 400px; height: 100vh; max-height: 850px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
 
 #screen-container { flex: 1; background: #444; margin: 20px 20px 10px 20px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 15px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; }
 
@@ -25,11 +30,9 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 
 canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none; }
 
-/* コントローラー領域 */
-#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; z-index: 20; }
+#controls { height: 280px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; }
 #classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 1.5s ease; }
 
-/* ボタン設定（タッチ感度向上） */
 .d-btn, .a-btn, .s-btn { touch-action: none; -webkit-tap-highlight-color: transparent; }
 
 #dpad { position: absolute; left: 30px; top: 30px; width: 120px; height: 120px; }
@@ -54,7 +57,6 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
 .s-btn:active { background: #333; }
 .s-label { font-size: 10px; color: #555; font-weight: bold; margin-top: 5px; }
 
-/* 縦長全画面モード */
 .mode-tall #classic-controls { transform: translateY(50px) scale(0.8); opacity: 0; pointer-events: none; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
 .mode-tall canvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
@@ -64,10 +66,10 @@ canvas { background: #000; width: 100%; max-width: 280px; aspect-ratio: 1 / 1.5;
 <div id="gameboy">
   <div id="screen-container">
     <div id="boot">
-      <div class="boot-text">5in1 RETRO SYSTEM</div>
+      <div class="boot-text">4in1 RETRO SYSTEM</div>
       <div class="boot-text">SYSTEM REBOOT...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
-      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Checking Memory...</div>
+      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
     </div>
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
@@ -100,7 +102,7 @@ const bootInterval = setInterval(() => {
   bootProgress += Math.random() * 15;
   if (bootProgress > 100) bootProgress = 100;
   document.getElementById('bootProgress').style.width = bootProgress + '%';
-  document.getElementById('bootStatus').textContent = bootProgress < 90 ? 'Loading Modules...' : 'OK!';
+  document.getElementById('bootStatus').textContent = bootProgress < 90 ? 'Checking Memory...' : 'OK!';
   if (bootProgress >= 100) {
     clearInterval(bootInterval);
     setTimeout(() => { document.getElementById('boot').classList.add('hidden'); }, 500);
@@ -112,8 +114,6 @@ const bootInterval = setInterval(() => {
 <script src="guide.js"></script>
 <script src="tetri.js"></script>
 <script src="action.js"></script>
-<script src="rpg.js"></script>
-<script src="arena.js"></script>
 <script src="online.js"></script>
 <script src="rhythm.js"></script>
 
