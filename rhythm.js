@@ -1,4 +1,4 @@
-　// === BEAT BROS - ULTIMATE GENERATOR FIX & PC SUPPORT ===
+// === BEAT BROS - BUTTON POSITION FIX ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -53,12 +53,15 @@ const Rhythm = {
     if (!ui) {
       ui = document.createElement('div');
       ui.id = 'rhythm-file-ui';
-      ui.style.position = 'absolute'; ui.style.bottom = '40px'; ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
+      ui.style.position = 'absolute';
+      // ★ 修正箇所：ボタンの位置を少し上に上げました (40px -> 65px)
+      ui.style.bottom = '65px'; 
+      ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
       let label = document.createElement('label');
       label.style.display = 'inline-block'; label.style.background = '#ff0'; label.style.color = '#000'; label.style.padding = '10px 15px'; label.style.fontFamily = 'monospace'; label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; label.style.cursor = 'pointer'; label.style.border = '2px solid #fff'; label.style.boxShadow = '0 0 15px #ff0';
       label.innerHTML = '📁 曲ファイルを選ぶ';
       
-      // ★ スマホ対策：ボタンに触れた瞬間にオーディオのロックを解除する
+      // スマホ対策：ボタンに触れた瞬間にオーディオのロックを解除する
       label.onclick = () => { initAudio(); };
       label.ontouchstart = () => { initAudio(); };
       
@@ -109,14 +112,12 @@ const Rhythm = {
     const raw = buffer.getChannelData(0);
     this.notes = [];
     
-    // ★ 大進化：曲の「平均音量」をベースに解析するアルゴリズムに変更！
     let sum = 0, count = 0;
     for (let i = 0; i < raw.length; i += 1000) { sum += Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // 曲の大小に関わらず、必ず一定数のノーツが生成されるように調整
     let threshold = avgVol * (this.mode === 'hard' ? 1.2 : this.mode === 'normal' ? 2.0 : 3.0);
-    if (threshold < 0.01) threshold = 0.01; // 無音でも無理やりノーツを置く
+    if (threshold < 0.01) threshold = 0.01;
     
     let minGap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.25 : 0.5;
     
@@ -133,7 +134,6 @@ const Rhythm = {
       }
     }
     
-    // ★ 究極のフェイルセーフ：万が一ノーツが10個以下しか作れなかったら、強制的に等間隔で配置する！
     if (this.notes.length < 10) {
        this.notes = []; 
        for (let t = 2; t < buffer.duration; t += minGap * 1.5) {
@@ -269,7 +269,8 @@ const Rhythm = {
         ctx.fillText(`HI-SCORE: ${rData[modes[i]] || 0}`, 65, 137 + i * 35);
         ctx.font = '10px monospace'; 
       }
-      ctx.fillStyle = '#0ff'; ctx.fillText('▼ 曲を選択してプレイ ▼', 25, 230);
+      
+      // ★ 修正：ボタンの位置を上げたので、案内テキストは消す（ボタン自体が案内になる）か、下にずらす
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if (this.st === 'transform_in' || this.st === 'transform_out') {
