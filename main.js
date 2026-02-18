@@ -1,6 +1,6 @@
 // === CORE SYSTEM - 5in1 ULTIMATE ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
-// PC操作(D,F,J,K)対応
+// l0(D), l1(F), l2(J), l3(K)
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 let prevKeys = {...keys};
@@ -135,14 +135,15 @@ const drawSprite = (x, y, color, strData, size = 2.5) => {
   }
 };
 
-// ★ 新しい建物の絵などを追加
 const sprs = {
   player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
   heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
+  // ★ 追加：村人、宿屋、店、工房のドット絵
   villager: "0000003333000000000003eeee30000000003e2222e30000000032e22e2e000000003222222200000000032222300000000036666663000000036666666630000036666666663000033366666633300000a036666300000000a036666300000000a033333300000008880330330000000080033033000000000033303330000",
   inn: "00000033333300000003999999993000003939393939930000393939393993000039999999999300003922222222930000392a2a2a2a29300003922222222930000392a2a2a2a293000039999229999300003999922999930000399992299993000039999229999300003333333333330000",
   shop: "000000003333000000000003e2e230000000003eeeeee3000000003e2e2e2e300000003e2e2e2e23000003eeeeeeeeee300003e44444444e300003e44444444e300003e4e4e4e4e300003eeeeeeeee300003e99e33e99e300003e99e33e99e300003e99e33e99e300003333333333330000",
   forge: "000000333333000000038888888830000038838383883000003883838388300000388888888830000039999999993000039f9f9f9f9f930000399999999993000039f9f9f9f9f9300003999933999930000399993399993000039999339999300003333333333330000",
+  
   slime: ["000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
   boss: "000033333333000000031111111130000031131111311300003138311383130000311311113113000031111331111300000311111111300000003333333300000033a111111a330003aa31111113aa3003a3311111133a3003303111111303300000311331130000000031133113000000003330033300000000000000000000",
   skull: "0000033333300000000032222223000000032222222230000003233223323000000323322332300000032223322230000000322222230000000003233230000000000322223000000000003333000000000033a22a33000000032a2222a230000003222332223000000033300333000000003230032300000000333003330000",
@@ -153,7 +154,7 @@ const sprs = {
     "0000000000000000000000000000000000000000000000000000000000000000000000033000000000000031130000000000031111300000000031111113000000031111111130000003111111111130000311311111131130311303111130311333000033330000330000000000000000000000000000000000000000000000"
   ],
   fighter: "000000033000000000000032230000000000032bb23000000000032bb23000000003332bb23330000032222bb2222300032bb22bb22bb23032bbbb2bb2bbbb233333333bb333333300000322223000000000032bb2300000000000333333300000000005555000000000000055000000000000000000000000000000000000000",
-  banana: "00000000000003300000000000003883000000000003888300000000003888300000000003888300000000003888300000000003888300000000003888300000000038883000000000388830000000003888300000000038883000000000388830000000000388300000000000003300000000000000000000000000000000000",
+  banana: "000000000000033000000000000038830000000000038883000000000038883000000000038883000000000038883000000000038883000000000038883000000000388830000000003888300000000038883000000000388830000000003888300000000038883000000000388830000000003888300000000038883000000000",
   peperoncino: "000000000000000000000000000000000000000000000000000000033300000000000038583000000000038258300000000038888888300000038898898830000032222222223000003a22a2a2a230000032a2a2a2a2300000032222222230000000333333330000000000000000000000000000000000000000000000000000",
   cannon: "000000000000000000000000000000000000000330000000000000033000000000000003300000000000000330000000000000333300000000000366663000000000036666663000000036666666630000003666666663000003aaaaaaaaaa300003a3a3a3a3a3300003aaaaaaaaaa3000003333333333300000000000000000",
   invader: [
@@ -188,7 +189,7 @@ function drawTransition() {
 
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', '復活の呪文'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'マイクロクエスト', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
   selectHoldTimer: 0,
   
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
@@ -213,10 +214,9 @@ const Menu = {
   }
 };
 
-// ★ 復活の呪文（データ引継ぎ）機能
 const DataBackup = {
   st: 'map', px: 4.5, py: 6, anim: 0, msg: '', backupStr: '',
-  init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('spell'); }, // 呪文BGMに変更
+  init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('menu'); },
   update() {
     if (keysDown.select) { switchApp(Menu); return; }
     if (this.st === 'msg') { if (keysDown.a || keysDown.b) { this.st = 'map'; playSnd('sel'); } return; }
@@ -228,63 +228,37 @@ const DataBackup = {
     nx = Math.max(1, Math.min(8, nx)); ny = Math.max(1.5, Math.min(7, ny)); this.px = nx; this.py = ny;
 
     if (keysDown.a) {
-       // 左の巻物（コピー）
        if (Math.abs(this.px - 2) < 1.5 && Math.abs(this.py - 2) < 1.5) {
            try { 
              this.backupStr = btoa(unescape(encodeURIComponent(JSON.stringify(SaveSys.data))));
              if (navigator.clipboard && window.isSecureContext) {
-                 navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'じゅもんを　クリップボードに\nうつした！\nメモ帳などに　のこしておくのじゃ。'; this.st = 'msg'; playSnd('combo'); 
-                 }).catch(e=> { prompt("じゅもんを　ひかえておくのじゃ。", this.backupStr); this.msg = 'じゅもんを　ひょうじしたぞ。\nわすれずに　メモするのじゃ。'; this.st = 'msg'; playSnd('combo'); });
-             } else { prompt("じゅもんを　ひかえておくのじゃ。", this.backupStr); this.msg = 'じゅもんを　ひょうじしたぞ。\nわすれずに　メモするのじゃ。'; this.st = 'msg'; playSnd('combo'); }
-           } catch(e) { this.msg = 'じゅもんの　さくせいに\nしっぱいした…'; this.st = 'msg'; playSnd('hit'); }
+                 navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); 
+                 }).catch(e=> { prompt("自動コピーがブロックされました。\n以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); });
+             } else { prompt("以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); }
+           } catch(e) { this.msg = 'データ変換エラー'; this.st = 'msg'; playSnd('hit'); }
        } 
-       // 右の巻物（復元）
        else if (Math.abs(this.px - 7) < 1.5 && Math.abs(this.py - 2) < 1.5) {
-           const input = prompt("ふっかつのじゅもんを　にゅうりょく　してください:");
+           const input = prompt("復活の呪文（パスワード）を入力してください:");
            if (input) {
              try {
                const parsed = JSON.parse(decodeURIComponent(escape(atob(input))));
                if (parsed && parsed.playerName) { 
                  SaveSys.data = parsed; SaveSys.save(); 
-                 alert("じゅもんが　ただしく　ききとどけられた！\nゲームを　さいきどう　します。"); location.reload(); 
+                 alert("データの復元に成功しました！\nゲームを再起動します。"); location.reload(); 
                } else throw new Error('Invalid');
-             } catch(e) { this.msg = 'じゅもんが　ちがいます。'; this.st = 'msg'; playSnd('hit'); }
+             } catch(e) { this.msg = '呪文が違います！'; this.st = 'msg'; playSnd('hit'); }
            }
        }
     }
   },
   draw() {
-    // 王様の間のような背景
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300); 
-    ctx.fillStyle = '#400'; ctx.fillRect(20, 20, 160, 260); // 赤い絨毯
-    ctx.strokeStyle = '#fa0'; ctx.lineWidth = 4; ctx.strokeRect(20, 20, 160, 260); ctx.lineWidth = 1;
-    
-    // 柱
-    ctx.fillStyle = '#888'; ctx.fillRect(30, 30, 20, 240); ctx.fillRect(150, 30, 20, 240);
-    
-    // 巻物アイコン
-    const offsetY1 = Math.sin(this.anim * 0.1) * 2; 
-    ctx.fillStyle = '#ffe'; ctx.fillRect(35, 45, 30, 20); ctx.strokeStyle = '#840'; ctx.strokeRect(35, 45, 30, 20);
-    ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('記録', 38, 58 + offsetY1); 
-    
-    const offsetY2 = Math.cos(this.anim * 0.1) * 2; 
-    ctx.fillStyle = '#ffe'; ctx.fillRect(135, 45, 30, 20); ctx.strokeStyle = '#840'; ctx.strokeRect(135, 45, 30, 20);
-    ctx.fillStyle = '#0ff'; ctx.fillText('復活', 138, 58 + offsetY2);
-
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#034'; ctx.fillRect(20, 20, 160, 140); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 160, 140); ctx.lineWidth = 1;
+    for(let i=20; i<180; i+=20) { ctx.beginPath(); ctx.moveTo(i, 20); ctx.lineTo(i, 160); ctx.stroke(); }
+    const offsetY1 = Math.sin(this.anim * 0.1) * 2; ctx.fillStyle = '#0f0'; ctx.fillRect(35, 35, 20, 20); ctx.fillStyle = '#fff'; ctx.fillRect(38, 38, 14, 14); ctx.fillStyle = '#0f0'; ctx.font = '8px monospace'; ctx.fillText('コピー', 32, 28 + offsetY1); ctx.fillText('▲', 42, 65);
+    const offsetY2 = Math.cos(this.anim * 0.1) * 2; ctx.fillStyle = '#f80'; ctx.fillRect(145, 35, 20, 20); ctx.fillStyle = '#fff'; ctx.fillRect(148, 38, 14, 14); ctx.fillStyle = '#f80'; ctx.fillText('復元', 145, 28 + offsetY2); ctx.fillText('▼', 152, 65);
     drawSprite(this.px * 20, this.py * 20, '#0ff', sprs.player || sprs.heroNew, 2.5);
-    
-    // 王様（雰囲気）
-    drawSprite(90, 60, '#fa0', sprs.boss, 2.5);
-    
-    ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('王様に　はなしかけるのだ。', 40, 220); 
-    ctx.fillStyle = '#ccc'; ctx.fillText('SELECT: 城を出る', 60, 280);
-    
-    if (this.st === 'msg') { 
-        ctx.fillStyle = '#000'; ctx.fillRect(10, 150, 180, 80); 
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(10, 150, 180, 80); 
-        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; 
-        let arr = this.msg.split('\n'); for(let i=0; i<arr.length; i++) ctx.fillText(arr[i], 20, 170 + i*15); 
-    }
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('端末の前でAボタンを押すんだ。', 25, 180); ctx.fillStyle = '#666'; ctx.fillText('SELECT: 戻る', 65, 280);
+    if (this.st === 'msg') { ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(10, 100, 180, 60); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 100, 180, 60); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; let arr = this.msg.split('\n'); for(let i=0; i<arr.length; i++) ctx.fillText(arr[i], 20, 120 + i*15); }
   }
 };
 
@@ -379,37 +353,21 @@ const setBtn = (id, k) => {
   const p = (ev) => { ev.preventDefault(); keys[k] = true; initAudio(); }; const r = (ev) => { ev.preventDefault(); keys[k] = false; };
   e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
 };
-['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select'].forEach((id, i) => { setBtn(id, ['up', 'down', 'left', 'right', 'a', 'b', 'select'][i]); });
 
-// ★ キーボード入力をD,F,J,Kに対応
+// ★ リズムゲーム専用の大型鍵盤もタッチ操作にバインド
+['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select', 'btn-rhythm-a', 'btn-rhythm-b'].forEach((id, i) => { 
+  const keysArr = ['up', 'down', 'left', 'right', 'a', 'b', 'select', 'a', 'b'];
+  setBtn(id, keysArr[i]); 
+});
+
 window.addEventListener('keydown', e => {
-  let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } 
-  if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } 
-  if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
-  if (k === 'z' || e.key === ' ') { keys.a = true; initAudio(); } 
-  if (k === 'x') { keys.b = true; initAudio(); } 
-  if (e.key === 'Shift') { keys.select = true; initAudio(); }
-  
-  if (k === 'd') { keys.l0 = true; initAudio(); } 
-  if (k === 'f') { keys.l1 = true; initAudio(); }
-  if (k === 'j') { keys.l2 = true; initAudio(); } 
-  if (k === 'k') { keys.l3 = true; initAudio(); }
+  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
+  if (e.key === 'z' || e.key === ' ') { keys.a = true; initAudio(); } if (e.key === 'x') { keys.b = true; initAudio(); } if (e.key === 'Shift') { keys.select = true; initAudio(); }
 });
-
 window.addEventListener('keyup', e => {
-  let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') keys.up = false; 
-  if (e.key === 'ArrowDown') keys.down = false;
-  if (e.key === 'ArrowLeft') keys.left = false; 
-  if (e.key === 'ArrowRight') keys.right = false;
-  if (k === 'z' || e.key === ' ') keys.a = false; 
-  if (k === 'x') keys.b = false; 
-  if (e.key === 'Shift') keys.select = false;
-  
-  if (k === 'd') keys.l0 = false; 
-  if (k === 'f') keys.l1 = false;
-  if (k === 'j') keys.l2 = false; 
-  if (k === 'k') keys.l3 = false;
+  if (e.key === 'ArrowUp') keys.up = false; if (e.key === 'ArrowDown') keys.down = false;
+  if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false;
+  if (e.key === 'z' || e.key === ' ') keys.a = false; if (e.key === 'x') keys.b = false; if (e.key === 'Shift') keys.select = false;
 });
+}
