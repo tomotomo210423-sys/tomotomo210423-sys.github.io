@@ -17,10 +17,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
 
-/* 筐体全体のベース（サイズ制限を緩和して大きく） */
+/* 筐体全体のベース */
 #gameboy { width: 100%; max-width: 450px; height: 100vh; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
 
-/* 画面エリア（余白を詰めて画面を大きく） */
+/* 画面エリア */
 #screen-container { flex: 1; background: #444; margin: 15px 15px 5px 15px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 10px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; }
 
 /* 起動画面 */
@@ -33,36 +33,39 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 /* ゲーム画面 (Canvas) */
 canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none; }
 
-/* コントローラー領域（高さを少し増やして操作しやすく） */
+/* コントローラー領域 */
 #controls { height: 300px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; }
 #classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 1.5s ease; }
 
-/* ボタン類（サイズと配置を微調整） */
+/* ボタン類の設定（サイズアップ） */
 .d-btn, .a-btn, .s-btn { touch-action: none; -webkit-tap-highlight-color: transparent; }
 
-#dpad { position: absolute; left: 35px; top: 35px; width: 130px; height: 130px; }
+/* 十字キー（120px -> 150px） */
+#dpad { position: absolute; left: 35px; top: 35px; width: 150px; height: 150px; }
 .d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; }
 .d-btn:active { background: #111; transform: translateY(2px); }
-#btn-up { top: 0; left: 43px; width: 44px; height: 44px; border-radius: 5px 5px 0 0; }
-#btn-down { bottom: 0; left: 43px; width: 44px; height: 44px; border-radius: 0 0 5px 5px; }
-#btn-left { top: 43px; left: 0; width: 44px; height: 44px; border-radius: 5px 0 0 5px; }
-#btn-right { top: 43px; right: 0; width: 44px; height: 44px; border-radius: 0 5px 5px 0; }
-.d-center { top: 43px; left: 43px; width: 44px; height: 44px; background: #333; position: absolute; }
+#btn-up { top: 0; left: 50px; width: 50px; height: 50px; border-radius: 5px 5px 0 0; }
+#btn-down { bottom: 0; left: 50px; width: 50px; height: 50px; border-radius: 0 0 5px 5px; }
+#btn-left { top: 50px; left: 0; width: 50px; height: 50px; border-radius: 5px 0 0 5px; }
+#btn-right { top: 50px; right: 0; width: 50px; height: 50px; border-radius: 0 5px 5px 0; }
+.d-center { top: 50px; left: 50px; width: 50px; height: 50px; background: #333; position: absolute; }
 
-#action-buttons { position: absolute; right: 25px; top: 55px; width: 150px; height: 110px; transform: rotate(-15deg); }
-.a-btn { position: absolute; width: 60px; height: 60px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 22px; text-align: center; line-height: 60px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.1s; }
+/* アクションボタン（55px -> 70px） */
+#action-buttons { position: absolute; right: 25px; top: 55px; width: 160px; height: 120px; transform: rotate(-15deg); }
+.a-btn { position: absolute; width: 70px; height: 70px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.1s; }
 .a-btn:active { background: #800; transform: translateY(2px); box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 1px 1px 2px rgba(0,0,0,0.4); }
 #btn-b { left: 0; bottom: 0; } #btn-a { right: 0; top: 0; }
-.btn-label { position: absolute; font-size: 14px; color: #555; font-weight: bold; pointer-events: none; }
-#label-b { left: 22px; bottom: -25px; } #label-a { right: 22px; top: -25px; }
+.btn-label { position: absolute; font-size: 16px; color: #555; font-weight: bold; pointer-events: none; }
+#label-b { left: 25px; bottom: -28px; } #label-a { right: 25px; top: -28px; }
 
+/* SELECTボタン（50px -> 70px） */
 #sys-buttons { position: absolute; bottom: 35px; width: 100%; display: flex; justify-content: center; }
 .s-btn-wrap { text-align: center; }
-.s-btn { width: 55px; height: 16px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
+.s-btn { width: 70px; height: 20px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
 .s-btn:active { background: #333; }
-.s-label { font-size: 11px; color: #555; font-weight: bold; margin-top: 6px; }
+.s-label { font-size: 12px; color: #555; font-weight: bold; margin-top: 8px; }
 
-/* 縦長全画面モード（リズムゲーム用） */
+/* 縦長全画面モード */
 .mode-tall #classic-controls { transform: translateY(50px) scale(0.8); opacity: 0; pointer-events: none; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
 .mode-tall canvas { 
