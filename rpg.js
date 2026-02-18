@@ -187,9 +187,11 @@ const RPG = {
         } else if (['townMap', 'castle'].includes(this.st)) {
           const adj = [ this.map[this.p.y][this.p.x], this.p.y>0?this.map[this.p.y-1][this.p.x]:0, this.p.y<14?this.map[this.p.y+1][this.p.x]:0, this.p.x>0?this.map[this.p.y][this.p.x-1]:0, this.p.x<9?this.map[this.p.y][this.p.x+1]:0 ];
           if (adj.includes(16)) { this.msgBox(this.p.story===0?"王様「東の洞窟へ行け！」":this.p.story===1?"王様「北の塔へ向かえ！」":this.p.story===2?"王様「北西の魔王城へ！」":"王様「世界に平和が！」"); }
+          // ★ 建物・NPCへの接触判定 (4:店, 5:宿, 6:工房, 7:NPC)
           else if (adj.includes(5)) { if (this.p.gld >= 15) { this.p.gld -= 15; this.p.hp = this.p.mhp; this.p.mp = this.p.mmp; playSnd('combo'); this.msgBox("15GでHP/MPが全回復した！"); } else this.msgBox("お金が足りない。"); }
           else if (adj.includes(4)) { const un = [0,1,2,3,4,5].filter(x => !this.p.knownSpells.includes(x)); if (un.length > 0) { if (this.p.gld >= 50) { this.p.gld -= 50; const l = un[Math.floor(Math.random()*un.length)]; this.p.knownSpells.push(l); playSnd('combo'); this.msgBox(`50Gで魔法を習得した！`); } else this.msgBox("50G必要だ。"); } else this.msgBox("全て習得済みだ。"); }
           else if (adj.includes(6)) { this.st = 'customMenu'; this.mIdx = 0; playSnd('sel'); }
+          // ★ NPC会話
           else if (adj.includes(7)) {
              let tx = this.p.x, ty = this.p.y;
              if (this.p.dir === 0) ty++; if (this.p.dir === 3) ty--; if (this.p.dir === 1) tx--; if (this.p.dir === 2) tx++;
@@ -216,11 +218,13 @@ const RPG = {
             let t = this.map[ny][nx]; 
             if (this.st === 'townMap' && t === 21) { this.st = 'castle'; this.genCastleMap(); playSnd('jmp'); } 
             else if (this.st === 'castle') { if ([15, 22].includes(t)) { this.p.x = nx; this.p.y = ny; playSnd('sel'); moved = true; } }
+            // ★ 4,5,6,7は建物・NPCなので入れない
             else if (![1,10,12,13,16,4,5,6,7,21].includes(t)) { this.p.x = nx; this.p.y = ny; playSnd('sel'); moved = true; }
           }
         }
       }
       
+      // シンボルモンスター移動
       if (moved && this.fieldMonsters.length > 0) {
           for (let i = 0; i < this.fieldMonsters.length; i++) {
               let m = this.fieldMonsters[i];
