@@ -1,20 +1,28 @@
-// === BLOCK CRAFT (3D) - MINECRAFT UI/UX OVERHAUL ===
+// === BLOCK CRAFT (3D) - MINECRAFT PHYSICS & UX PERFECTED ===
 const Mine = {
   st: 'init',
   scene: null, camera: null, renderer: null,
   textureAtlas: null, geometries: {}, materials: {},
   
-  player: { x: 8, y: 15, z: 8, vy: 0, isGrounded: false, speed: 0.05, jumpPower: 0.15, isCrouching: false },
+  // ★ 究極調整1：身長(1.8)、目の高さ(1.62)、歩行速度(0.07)、しゃがみ速度(0.025)
+  player: { 
+      x: 8, y: 15, z: 8, vy: 0, isGrounded: false, 
+      speed: 0.07, crouchSpeed: 0.025, jumpPower: 0.16, 
+      isCrouching: false, currentEyeHeight: 1.62 
+  },
   controls: { moveX: 0, moveZ: 0, yaw: 0, pitch: -0.5 },
   
   blocks: [], blockMeshes: [], drops: [],
   
-  // ★ ターゲット選択と破壊用の変数
-  targetHighlight: null,   // 黒い枠線メッシュ
-  currentTarget: null,     // 今狙っているブロックのMesh
-  currentIntersect: null,  // Raycasterの交差情報
-  digging: false,          // 画面長押し中フラグ
-  digProgress: 0,          // 破壊の進行度
+  // ★ 究極調整2：ブロックの硬さ（破壊にかかるフレーム数）
+  hardness: {
+      grass: 15, dirt: 15, sand: 15, leaves: 10, glass: 10,
+      wood: 30, plank: 30, crafting: 30,
+      stone: 45, cobblestone: 45, coal: 50, iron: 50, diamond: 60
+  },
+  
+  targetHighlight: null, currentTarget: null, currentIntersect: null,
+  digging: false, digProgress: 0,
   
   joystick: { active: false, pointerId: null },
   touchZone: { active: false, pointerId: null, lastX: 0, lastY: 0, startT: 0, moved: false },
@@ -31,9 +39,11 @@ const Mine = {
     }
     
     this.st = 'play';
+    // 初期位置（Yは足元の座標）
     this.player.x = 8; this.player.y = 15; this.player.z = 8;
     this.player.vy = 0;
     this.player.isCrouching = false;
+    this.player.currentEyeHeight = 1.62;
     this.controls.yaw = 0; this.controls.pitch = -0.5; 
     
     setTimeout(() => this.resize(), 50);
@@ -52,9 +62,8 @@ const Mine = {
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
     
     const canvas = this.renderer.domElement;
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0'; canvas.style.left = '0'; canvas.style.zIndex = '1';
-    canvas.style.width = '100vw'; canvas.style.height = '100vh';
+    canvas.style.position = 'absolute'; canvas.style.top = '0'; canvas.style.left = '0'; 
+    canvas.style.zIndex = '1'; canvas.style.width = '100vw'; canvas.style.height = '100vh';
     document.getElementById('mine-container').insertBefore(canvas, document.getElementById('mine-ui'));
     
     const light = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -99,8 +108,8 @@ const Mine = {
         coal: createGeo(Array(6).fill({c:1,r:3}))
     };
 
-    // ★ 選択ブロックを囲む黒い枠線（本家のハイライト）を作成
-    const edgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.02, 1.02, 1.02));
+    // 本家仕様の極細ハイライト枠線
+    const edgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.005, 1.005, 1.005));
     const edgesMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
     this.targetHighlight = new THREE.LineSegments(edgesGeo, edgesMat);
     this.targetHighlight.visible = false;
@@ -138,16 +147,19 @@ const Mine = {
     const mat = (type === 'leaves' || type === 'glass') ? this.materials.transparent : this.materials.opaque;
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
-    mesh.userData = { x, y, z, type }; 
+    mesh.userData = { x, y, z, type, matCloned: false }; 
     this.scene.add(mesh);
     this.blockMeshes.push(mesh);
     this.blocks.push({ x, y, z, mesh, type });
   },
 
-  // ★ 破壊処理
   breakBlock(mesh) {
     const type = mesh.userData.type;
     const pos = mesh.position.clone();
+    
+    // クローンしたマテリアルはメモリリーク防止のため破棄
+    if(mesh.userData.matCloned) mesh.material.dispose();
+    
     this.scene.remove(mesh);
     this.blockMeshes = this.blockMeshes.filter(m => m !== mesh);
     this.blocks = this.blocks.filter(b => b.mesh !== mesh);
@@ -157,12 +169,10 @@ const Mine = {
     
     this.spawnDrop(type, pos.x, pos.y, pos.z);
     
-    // 破壊後、ハイライトを消す
     this.targetHighlight.visible = false;
     this.currentTarget = null;
   },
 
-  // ★ 設置処理
   placeBlock() {
     if (!this.currentIntersect) return;
     const normal = this.currentIntersect.face.normal;
@@ -171,16 +181,14 @@ const Mine = {
     const ny = pos.y + normal.y;
     const nz = pos.z + normal.z;
 
-    // プレイヤーが重なっている場所には置けない
     const px = this.player.x, py = this.player.y, pz = this.player.z;
-    const pSize = 0.3, pHeight = 1.6;
+    const pSize = 0.3, pHeight = 1.8;
     if (nx + 0.5 > px - pSize && nx - 0.5 < px + pSize &&
         nz + 0.5 > pz - pSize && nz - 0.5 < pz + pSize &&
-        ny + 0.5 > py - pHeight && ny - 0.5 < py + 0.5) {
+        ny + 0.5 > py && ny - 0.5 < py + pHeight) {
         return; 
     }
     
-    // （※インベントリが未実装なので、置くのはとりあえず「丸石」で固定）
     this.addBlock(nx, ny, nz, 'cobblestone');
     if(typeof playSnd === 'function') playSnd('jmp');
   },
@@ -237,7 +245,7 @@ const Mine = {
     };
     joyZone.addEventListener('pointerup', endJoy); joyZone.addEventListener('pointercancel', endJoy); joyZone.addEventListener('pointerout', endJoy); 
     
-    // ★ 右画面（視点・タップ・長押し）
+    // ★ 右画面（タッチ操作）
     const touchZone = document.getElementById('touch-zone');
     
     touchZone.addEventListener('pointerdown', (e) => {
@@ -251,9 +259,8 @@ const Mine = {
         this.touchZone.startT = Date.now();
         this.touchZone.moved = false;
         
-        // タッチ開始と同時に「掘る」フラグをONにする
+        // 常に掘り始める（視点移動で狙いが外れるとキャンセルされる）
         this.digging = true;
-        this.digProgress = 0;
     });
     
     touchZone.addEventListener('pointermove', (e) => {
@@ -262,14 +269,10 @@ const Mine = {
         const dx = e.clientX - this.touchZone.lastX;
         const dy = e.clientY - this.touchZone.lastY;
         
-        // 指が大きく動いたら「視点移動」とみなし、掘るのをやめる
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-            this.touchZone.moved = true;
-            this.digging = false;
-        }
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.touchZone.moved = true;
         
-        this.controls.yaw -= dx * 0.006; 
-        this.controls.pitch -= dy * 0.006; 
+        this.controls.yaw -= dx * 0.005; 
+        this.controls.pitch -= dy * 0.005; 
         this.controls.pitch = Math.max(-Math.PI/2.1, Math.min(Math.PI/2.1, this.controls.pitch));
         
         this.touchZone.lastX = e.clientX;
@@ -280,8 +283,8 @@ const Mine = {
         if (!this.touchZone.active || this.touchZone.pointerId !== e.pointerId) return;
         e.preventDefault();
         
-        // ★ 指を離した時、時間が短くて動いていなければ「置く」アクション！
-        if (!this.touchZone.moved && (Date.now() - this.touchZone.startT < 200)) {
+        // 短くタップし、視点がほぼ動いていなければ「置く」
+        if (!this.touchZone.moved && (Date.now() - this.touchZone.startT < 250)) {
             this.placeBlock();
         }
         
@@ -316,13 +319,27 @@ const Mine = {
     this.joystick.active = false; this.touchZone.active = false; this.digging = false;
     document.getElementById('joystick-knob').style.transform = `translate(0px, 0px)`;
     this.controls.moveX = 0; this.controls.moveZ = 0;
+    
+    // マテリアルを元に戻す
+    if (this.currentTarget && this.currentTarget.userData.matCloned) {
+        this.currentTarget.material.color.setScalar(1.0);
+    }
     switchApp(Menu);
   },
   
+  // ★ 究極調整：足のY座標を基準にした完璧なAABB当たり判定
   getCollidingBlock(nx, ny, nz, isWall = false) {
-    const pSize = 0.3; const pHeight = 1.6; const yOffset = isWall ? 0.05 : 0; 
+    const pSize = 0.3; 
+    const pHeight = 1.8; 
+    // 横移動の壁判定時は、足元の極わずかな段差(0.1マス)を乗り越える
+    const footY = isWall ? ny + 0.1 : ny; 
+    
     for (let b of this.blocks) {
-      if (nx + pSize > b.x - 0.5 && nx - pSize < b.x + 0.5 && nz + pSize > b.z - 0.5 && nz - pSize < b.z + 0.5 && ny > b.y - 0.5 && (ny - pHeight + yOffset) < b.y + 0.5) return b;
+      if (nx - pSize < b.x + 0.5 && nx + pSize > b.x - 0.5 &&
+          nz - pSize < b.z + 0.5 && nz + pSize > b.z - 0.5 &&
+          footY < b.y + 0.5 && ny + pHeight > b.y - 0.5) {
+        return b;
+      }
     }
     return null;
   },
@@ -334,30 +351,44 @@ const Mine = {
     this.camera.rotation.y = this.controls.yaw;
     this.camera.rotation.x = this.controls.pitch;
     
-    const currentSpeed = this.player.isCrouching ? this.player.speed * 0.4 : this.player.speed;
+    const currentSpeed = this.player.isCrouching ? this.player.crouchSpeed : this.player.speed;
     const dir = new THREE.Vector3(this.controls.moveX, 0, this.controls.moveZ);
     dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.controls.yaw);
     
     let nx = this.player.x + dir.x * currentSpeed;
     let nz = this.player.z + dir.z * currentSpeed;
+    
     if (!this.getCollidingBlock(nx, this.player.y, this.player.z, true)) { this.player.x = nx; }
     if (!this.getCollidingBlock(this.player.x, this.player.y, nz, true)) { this.player.z = nz; }
     
-    this.player.vy -= 0.006; let ny = this.player.y + this.player.vy;
+    // 本家準拠の重力加速度
+    this.player.vy -= 0.008; 
+    let ny = this.player.y + this.player.vy;
+    
     let hitBlock = this.getCollidingBlock(this.player.x, ny, this.player.z, false);
     if (hitBlock) {
-        if (this.player.vy < 0) { this.player.vy = 0; this.player.isGrounded = true; ny = hitBlock.y + 0.5 + 1.6; } 
-        else { this.player.vy = 0; ny = hitBlock.y - 0.5; }
-    } else { this.player.isGrounded = false; }
+        if (this.player.vy < 0) {
+            this.player.vy = 0;
+            this.player.isGrounded = true;
+            ny = hitBlock.y + 0.5; // 足がブロックの上面にピッタリつく
+        } else {
+            this.player.vy = 0;
+            ny = hitBlock.y - 0.5 - 1.8; // 頭がブロックの底面にぶつかる
+        }
+    } else {
+        this.player.isGrounded = false;
+    }
     
     if (ny < -10) { ny = 15; this.player.x = 8; this.player.z = 8; this.player.vy = 0; }
     this.player.y = ny;
     
-    const eyeHeight = this.player.isCrouching ? -0.4 : 0;
-    this.camera.position.set(this.player.x, this.player.y + eyeHeight, this.player.z);
+    // スムーズな視点移動（しゃがむとスーッと下がる）
+    const targetEyeHeight = this.player.isCrouching ? 1.27 : 1.62;
+    this.player.currentEyeHeight += (targetEyeHeight - this.player.currentEyeHeight) * 0.3;
+    this.camera.position.set(this.player.x, this.player.y + this.player.currentEyeHeight, this.player.z);
     
     // ==========================================
-    // ★ ターゲット探索（Raycast）と破壊アニメーション
+    // ★ 本家仕様の採掘システム（Raycast）
     // ==========================================
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
@@ -365,19 +396,20 @@ const Mine = {
     
     let newTarget = null;
     let newIntersect = null;
-    if (intersects.length > 0 && intersects[0].distance < 6) {
+    // 腕が届く距離（5マス）
+    if (intersects.length > 0 && intersects[0].distance < 5) {
         newTarget = intersects[0].object;
         newIntersect = intersects[0];
     }
 
-    // 狙っているブロックが変わったらハイライトを移動＆破壊リセット
+    // 狙いが外れたり、別のブロックを見たらリセット
     if (newTarget !== this.currentTarget) {
+        if (this.currentTarget && this.currentTarget.userData.matCloned) {
+            this.currentTarget.material.color.setScalar(1.0); // 色を元に戻す
+        }
         this.currentTarget = newTarget;
         this.currentIntersect = newIntersect;
         this.digProgress = 0;
-        
-        // 前のブロックの揺れを元に戻す
-        for(let b of this.blocks) { b.mesh.position.set(b.x, b.y, b.z); }
         
         if (newTarget) {
             this.targetHighlight.position.copy(newTarget.position);
@@ -387,25 +419,28 @@ const Mine = {
         }
     }
     
-    // 長押し中の破壊アニメーション
+    // 長押し中の破壊進行（ダメージ表現）
     if (this.digging && this.currentTarget) {
         this.digProgress++;
+        const type = this.currentTarget.userData.type;
+        const maxDig = this.hardness[type] || 30;
         
-        // 激しくガタガタ揺れる（壊れかけの表現）
-        const intensity = (this.digProgress / 30) * 0.05;
-        this.currentTarget.position.x = this.currentTarget.userData.x + (Math.random()-0.5)*intensity;
-        this.currentTarget.position.y = this.currentTarget.userData.y + (Math.random()-0.5)*intensity;
-        this.currentTarget.position.z = this.currentTarget.userData.z + (Math.random()-0.5)*intensity;
-        
-        // 約0.5秒(30フレーム)で破壊！
-        if (this.digProgress > 30) {
+        // 叩かれているブロックを徐々に暗くする
+        const darken = 1.0 - (this.digProgress / maxDig) * 0.5;
+        if (!this.currentTarget.userData.matCloned) {
+            this.currentTarget.material = this.currentTarget.material.clone();
+            this.currentTarget.userData.matCloned = true;
+        }
+        this.currentTarget.material.color.setScalar(darken);
+
+        if (this.digProgress >= maxDig) {
             this.breakBlock(this.currentTarget);
-            this.digProgress = 0; // そのまま次のブロックを連続で掘れる
+            this.digProgress = 0; // 次のブロックの連続掘りへ
         }
     } else {
         this.digProgress = 0;
-        if (this.currentTarget) {
-            this.currentTarget.position.set(this.currentTarget.userData.x, this.currentTarget.userData.y, this.currentTarget.userData.z);
+        if (this.currentTarget && this.currentTarget.userData.matCloned) {
+            this.currentTarget.material.color.setScalar(1.0);
         }
     }
 
@@ -425,7 +460,8 @@ const Mine = {
         
         d.time += 0.05; d.mesh.rotation.y += 0.05; d.mesh.position.y += Math.sin(d.time) * 0.005; 
         
-        const dist = Math.hypot(d.mesh.position.x - this.player.x, d.mesh.position.y - this.player.y, d.mesh.position.z - this.player.z);
+        // 回収判定（体の中心からの距離）
+        const dist = Math.hypot(d.mesh.position.x - this.player.x, d.mesh.position.y - (this.player.y + 0.9), d.mesh.position.z - this.player.z);
         if (dist < 1.5) {
             this.scene.remove(d.mesh); this.drops.splice(i, 1);
             if(typeof playSnd === 'function') playSnd('jmp'); 
