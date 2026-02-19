@@ -15,10 +15,10 @@
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
+body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100vh; }
 
 /* 2Dゲーム機全体のベース */
-#gameboy { width: 100%; max-width: 450px; height: 100vh; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: opacity 0.3s; }
+#gameboy { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: opacity 0.3s; }
 #screen-container { flex: 1; background: #444; margin: 15px 15px 5px 15px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 10px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; }
 #boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
 #boot.hidden { opacity: 0; }
@@ -57,27 +57,31 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
 /* =========================================
    ★ 新規追加：3Dマイクラ用 横画面フルスクリーンUI
    ========================================= */
-#mine-container { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1000; background: #000; overflow: hidden; }
+#mine-container { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; background: #000; overflow: hidden; }
 #mine-container.active { display: block; }
 #mine-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
 
+/* 縦画面時の警告表示 */
+#rotate-warning { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #fff; z-index: 2000; justify-content: center; align-items: center; flex-direction: column; text-align: center; font-size: 20px; font-weight: bold; font-family: sans-serif; pointer-events: auto; }
+.icon-rotate { font-size: 50px; margin-bottom: 20px; display: block; transform: rotate(-90deg); }
+
 /* 左下：移動用ジョイスティック */
-#joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; background: rgba(255,255,255,0.15); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); pointer-events: auto; touch-action: none; }
-#joystick-knob { position: absolute; top: 40px; left: 40px; width: 60px; height: 60px; background: rgba(255,255,255,0.7); border-radius: 50%; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+#joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 160px; height: 160px; background: rgba(255,255,255,0.15); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); pointer-events: auto; touch-action: none; }
+#joystick-knob { position: absolute; top: 40px; left: 40px; width: 80px; height: 80px; background: rgba(255,255,255,0.7); border-radius: 50%; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 
 /* 右側：視点移動スワイプ領域 */
 #touch-zone { position: absolute; top: 0; right: 0; width: 50%; height: 100%; pointer-events: auto; touch-action: none; }
 
 /* 右下：ジャンプボタン */
-.mine-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.5); color: #fff; text-align: center; font-weight: bold; pointer-events: auto; user-select: none; border-radius: 8px; }
+.mine-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.5); color: #fff; text-align: center; font-weight: bold; pointer-events: auto; user-select: none; border-radius: 8px; font-family: sans-serif; }
 .mine-btn:active { background: rgba(255,255,255,0.3); }
-#btn-jump { bottom: 40px; right: 40px; width: 70px; height: 70px; line-height: 66px; font-size: 28px; }
+#btn-jump { bottom: 40px; right: 40px; width: 80px; height: 80px; line-height: 76px; font-size: 32px; border-radius: 50%; }
 
 /* 右上：一時停止（EXIT）ボタン */
-#btn-mine-exit { top: 20px; right: 20px; width: 40px; height: 40px; line-height: 36px; font-size: 16px; border-radius: 4px; }
+#btn-mine-exit { top: 20px; right: 20px; width: 50px; height: 50px; line-height: 46px; font-size: 20px; border-radius: 8px; }
 
 /* 中央：照準（クロスヘア） */
-#crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.8); font-size: 24px; pointer-events: none; text-shadow: 1px 1px 2px #000; }
+#crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.8); font-size: 28px; pointer-events: none; text-shadow: 1px 1px 2px #000; font-family: sans-serif; }
 </style>
 </head>
 <body>
@@ -115,6 +119,12 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
 </div>
 
 <div id="mine-container">
+  <div id="rotate-warning">
+    <span class="icon-rotate">📱</span>
+    スマホを横向きに<br>持ち替えてください<br><br>
+    <span style="font-size:12px; font-weight:normal;">※画面の回転ロックを解除してください</span>
+  </div>
+
   <div id="mine-ui">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
     <div id="touch-zone"></div>
@@ -146,7 +156,9 @@ const bootInterval = setInterval(() => {
 <script src="arena.js"></script>
 <script src="online.js"></script>
 <script src="rhythm.js"></script>
-<script src="mine.js"></script> <script>
+<script src="mine.js"></script>
+
+<script>
 window.onload = () => {
   activeApp = Menu;
   activeApp.init();
