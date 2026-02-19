@@ -1,4 +1,4 @@
-// === BLOCK CRAFT (3D) - FIX COLLISION & RESIZE ===
+// === BLOCK CRAFT (3D) - FIX CANVAS CSS CONFLICT ===
 const Mine = {
   st: 'init',
   scene: null, camera: null, renderer: null,
@@ -21,12 +21,10 @@ const Mine = {
     }
     
     this.st = 'play';
-    // ★ 確実に空中の安全な位置からスタートさせ、下を向かせる
     this.player.x = 8; this.player.y = 10; this.player.z = 8;
     this.player.vy = 0;
     this.controls.yaw = 0; this.controls.pitch = -0.5; 
     
-    // ★ リサイズ処理を複数回呼び出して、スマホの画面回転の遅延に対応する
     setTimeout(() => this.resize(), 50);
     setTimeout(() => this.resize(), 500); 
   },
@@ -42,10 +40,17 @@ const Mine = {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
     
+    // ★ 修正：キャンバスのスタイルを強制的に100%に固定し、CSSの干渉を上書きする
     const canvas = this.renderer.domElement;
     canvas.style.position = 'absolute';
-    canvas.style.top = '0'; canvas.style.left = '0'; canvas.style.zIndex = '1';
-    canvas.style.width = '100%'; canvas.style.height = '100%';
+    canvas.style.top = '0'; 
+    canvas.style.left = '0'; 
+    canvas.style.zIndex = '1';
+    canvas.style.width = '100vw'; 
+    canvas.style.height = '100vh';
+    canvas.style.maxWidth = 'none';  // max-widthの制限を無効化
+    canvas.style.maxHeight = 'none';
+    canvas.style.aspectRatio = 'auto'; // アスペクト比固定を無効化
     document.getElementById('mine-container').insertBefore(canvas, document.getElementById('mine-ui'));
     
     const light = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -175,7 +180,6 @@ const Mine = {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     
-    // ★ スマホが縦向きの時は警告画面を出す
     const warn = document.getElementById('rotate-warning');
     if (warn) {
         if (h > w) warn.style.display = 'flex';
@@ -190,7 +194,6 @@ const Mine = {
     switchApp(Menu);
   },
   
-  // ★ 当たり判定の修正：一番高いブロックに正しく乗るように
   getCollidingBlock(nx, ny, nz) {
     const pSize = 0.3; 
     const pHeight = 1.6; 
@@ -226,12 +229,10 @@ const Mine = {
     let hitBlock = this.getCollidingBlock(this.player.x, ny, this.player.z);
     if (hitBlock) {
         if (this.player.vy < 0) {
-            // ★ 床に着地
             this.player.vy = 0;
             this.player.isGrounded = true;
             ny = hitBlock.y + 0.5 + 1.6; // ブロックの上面＋身長
         } else {
-            // ★ 天井に頭をぶつけた
             this.player.vy = 0;
             ny = hitBlock.y - 0.5; 
         }
@@ -239,7 +240,7 @@ const Mine = {
         this.player.isGrounded = false;
     }
     
-    // 奈落落下防止（落ちたら空から降ってくる）
+    // 奈落落下防止
     if (ny < -10) { ny = 10; this.player.x = 8; this.player.z = 8; this.player.vy = 0; }
     this.player.y = ny;
     
