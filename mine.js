@@ -1,9 +1,10 @@
-// === BLOCK CRAFT (3D) - SENSITIVITY & JOYSTICK FIX ===
+// === BLOCK CRAFT (3D) - COLLISION BUG FIX & SPEED TWEAK ===
 const Mine = {
   st: 'init',
   scene: null, camera: null, renderer: null,
   textureAtlas: null, materials: [],
-  player: { x: 8, y: 10, z: 8, vy: 0, isGrounded: false, speed: 0.07, jumpPower: 0.12 },
+  // ★ 修正：移動速度を落として制御しやすくした (0.07 -> 0.05)
+  player: { x: 8, y: 10, z: 8, vy: 0, isGrounded: false, speed: 0.05, jumpPower: 0.12 },
   controls: { moveX: 0, moveZ: 0, yaw: 0, pitch: -0.5 },
   blocks: [], 
   joystick: { active: false, pointerId: null },
@@ -110,7 +111,6 @@ const Mine = {
       } 
     });
 
-    // ===== 左手：ジョイスティック =====
     const joyZone = document.getElementById('joystick-zone');
     const joyKnob = document.getElementById('joystick-knob');
     let joyRect = null;
@@ -143,7 +143,6 @@ const Mine = {
         updateJoy(e);
     });
     
-    // ★ 修正：暴走を防ぐため、どんな理由で指が離れても確実にリセットする
     const endJoy = (e) => {
         if (!this.joystick.active || this.joystick.pointerId !== e.pointerId) return;
         e.preventDefault();
@@ -156,9 +155,8 @@ const Mine = {
     };
     joyZone.addEventListener('pointerup', endJoy);
     joyZone.addEventListener('pointercancel', endJoy);
-    joyZone.addEventListener('pointerout', endJoy); // エリア外に出た時も念のため止める
+    joyZone.addEventListener('pointerout', endJoy); 
     
-    // ===== 右手：視点移動（カメラ） =====
     const touchZone = document.getElementById('touch-zone');
     
     touchZone.addEventListener('pointerdown', (e) => {
@@ -176,7 +174,6 @@ const Mine = {
         const dx = e.clientX - this.touchZone.lastX;
         const dy = e.clientY - this.touchZone.lastY;
         
-        // ★ 修正：カメラの感度を少し高くした (0.003 -> 0.006)
         this.controls.yaw -= dx * 0.006; 
         this.controls.pitch -= dy * 0.006; 
         this.controls.pitch = Math.max(-Math.PI/2.1, Math.min(Math.PI/2.1, this.controls.pitch));
@@ -195,7 +192,6 @@ const Mine = {
     touchZone.addEventListener('pointercancel', endTouch);
     touchZone.addEventListener('pointerout', endTouch);
 
-    // ★ 究極の暴走対策：画面のどこで指を離しても、紐づいている操作を強制終了する
     window.addEventListener('pointerup', (e) => {
         if (this.joystick.active && this.joystick.pointerId === e.pointerId) endJoy(e);
         if (this.touchZone.active && this.touchZone.pointerId === e.pointerId) endTouch(e);
@@ -222,7 +218,6 @@ const Mine = {
     document.getElementById('mine-container').classList.remove('active');
     document.getElementById('gameboy').style.display = 'flex';
     
-    // 戻る時にスティックを完全リセット
     this.joystick.active = false;
     this.touchZone.active = false;
     document.getElementById('joystick-knob').style.transform = `translate(0px, 0px)`;
@@ -231,13 +226,17 @@ const Mine = {
     switchApp(Menu);
   },
   
-  getCollidingBlock(nx, ny, nz) {
+  // ★ 修正：壁判定（横移動）の時は、現在乗っている床に引っかからないように「判定を少し浮かす」
+  getCollidingBlock(nx, ny, nz, isWall = false) {
     const pSize = 0.3; 
     const pHeight = 1.6; 
+    // 壁にぶつかるかチェックする時だけ、足元から0.05ミリ上を基準にする
+    const yOffset = isWall ? 0.05 : 0; 
+    
     for (let b of this.blocks) {
       if (nx + pSize > b.x - 0.5 && nx - pSize < b.x + 0.5 &&
           nz + pSize > b.z - 0.5 && nz - pSize < b.z + 0.5 &&
-          ny > b.y - 0.5 && ny - pHeight < b.y + 0.5) {
+          ny > b.y - 0.5 && (ny - pHeight + yOffset) < b.y + 0.5) {
         return b;
       }
     }
@@ -257,13 +256,15 @@ const Mine = {
     let nx = this.player.x + dir.x * this.player.speed;
     let nz = this.player.z + dir.z * this.player.speed;
     
-    if (!this.getCollidingBlock(nx, this.player.y, this.player.z)) { this.player.x = nx; }
-    if (!this.getCollidingBlock(this.player.x, this.player.y, nz)) { this.player.z = nz; }
+    // ★ 修正：横移動の時は「isWall=true」を渡して、足元のミリ単位の引っかかりを無視する
+    if (!this.getCollidingBlock(nx, this.player.y, this.player.z, true)) { this.player.x = nx; }
+    if (!this.getCollidingBlock(this.player.x, this.player.y, nz, true)) { this.player.z = nz; }
     
     this.player.vy -= 0.006; 
     let ny = this.player.y + this.player.vy;
     
-    let hitBlock = this.getCollidingBlock(this.player.x, ny, this.player.z);
+    // ★ 床の判定は従来通り（ピッタリ着地させる）
+    let hitBlock = this.getCollidingBlock(this.player.x, ny, this.player.z, false);
     if (hitBlock) {
         if (this.player.vy < 0) {
             this.player.vy = 0;
