@@ -54,9 +54,7 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
 .mode-tall canvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 
-/* =========================================
-   ★ 新規追加：3Dマイクラ用 横画面フルスクリーンUI
-   ========================================= */
+/* 3Dマイクラ用 横画面フルスクリーンUI */
 #mine-container { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; background: #000; overflow: hidden; }
 #mine-container.active { display: block; }
 #mine-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
@@ -65,22 +63,14 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
 #rotate-warning { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #fff; z-index: 2000; justify-content: center; align-items: center; flex-direction: column; text-align: center; font-size: 20px; font-weight: bold; font-family: sans-serif; pointer-events: auto; }
 .icon-rotate { font-size: 50px; margin-bottom: 20px; display: block; transform: rotate(-90deg); }
 
-/* 左下：移動用ジョイスティック */
+/* コントローラー */
 #joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 160px; height: 160px; background: rgba(255,255,255,0.15); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); pointer-events: auto; touch-action: none; }
 #joystick-knob { position: absolute; top: 40px; left: 40px; width: 80px; height: 80px; background: rgba(255,255,255,0.7); border-radius: 50%; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-
-/* 右側：視点移動スワイプ領域 */
 #touch-zone { position: absolute; top: 0; right: 0; width: 50%; height: 100%; pointer-events: auto; touch-action: none; }
-
-/* 右下：ジャンプボタン */
 .mine-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.5); color: #fff; text-align: center; font-weight: bold; pointer-events: auto; user-select: none; border-radius: 8px; font-family: sans-serif; }
 .mine-btn:active { background: rgba(255,255,255,0.3); }
 #btn-jump { bottom: 40px; right: 40px; width: 80px; height: 80px; line-height: 76px; font-size: 32px; border-radius: 50%; }
-
-/* 右上：一時停止（EXIT）ボタン */
 #btn-mine-exit { top: 20px; right: 20px; width: 50px; height: 50px; line-height: 46px; font-size: 20px; border-radius: 8px; }
-
-/* 中央：照準（クロスヘア） */
 #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.8); font-size: 28px; pointer-events: none; text-shadow: 1px 1px 2px #000; font-family: sans-serif; }
 </style>
 </head>
@@ -124,7 +114,6 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
     スマホを横向きに<br>持ち替えてください<br><br>
     <span style="font-size:12px; font-weight:normal;">※画面の回転ロックを解除してください</span>
   </div>
-
   <div id="mine-ui">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
     <div id="touch-zone"></div>
