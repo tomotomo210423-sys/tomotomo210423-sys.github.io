@@ -1,6 +1,5 @@
-// === CORE SYSTEM - BUG FIX & MENU UPDATE ===
+// === CORE SYSTEM - 5in1 ULTIMATE UNIFICATION ===
 const ctx = document.getElementById('gameCanvas').getContext('2d');
-// l0(D), l1(F), l2(J), l3(K)
 const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
 let prevKeys = {...keys};
@@ -29,10 +28,11 @@ const BGM = {
       menu: { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
       tetri: { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
       action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
-      spell: { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
+      rpg_field: { t1:[262,294,330,349,392,440,494,523], t2:[131,0,165,0,196,0,247,0], t3:[65,65,73,73,82,82,98,98], n:[0,0,0,0,0,0,0,0], spd: 350 },
+      rpg_battle: { t1:[440,494,523,587,659,587,523,494], t2:[220,247,262,294,330,294,262,247], t3:[110,110,110,110,110,110,110,110], n:[1,0,1,0,1,0,1,0], spd: 150 },
+      rpg_boss: { t1:[329,311,329,246,293,261,220,0], t2:[164,155,164,123,146,130,110,0], t3:[82,82,82,82,77,77,77,77], n:[1,1,1,1,1,1,1,1], spd: 180 }
     };
     const track = mels[type] || mels.menu; let i = 0;
-    
     bgmInterval = setInterval(() => {
       const now = audioCtx.currentTime; const duration = track.spd / 1000;
       const playNote = (freq, wave, vol) => {
@@ -40,18 +40,15 @@ const BGM = {
         const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
         o.type = wave; o.frequency.value = freq;
         g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + duration);
-        o.connect(g); g.connect(audioCtx.destination); 
-        o.start(now); o.stop(now + duration + 0.1); 
+        o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + duration + 0.1); 
       };
       playNote(track.t1[i % track.t1.length], 'square', 0.05);
       playNote(track.t2[i % track.t2.length], 'square', 0.03);
       playNote(track.t3[i % track.t3.length], 'triangle', 0.08);
-      
       if (track.n[i % track.n.length] > 0 && noiseBuffer) {
         const src = audioCtx.createBufferSource(); const g = audioCtx.createGain();
         src.buffer = noiseBuffer; g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-        src.connect(g); g.connect(audioCtx.destination); 
-        src.start(now); src.stop(now + 0.2); 
+        src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
       }
       i++;
     }, track.spd);
@@ -65,39 +62,21 @@ function playSnd(t) {
   if (!audioCtx) return; const osc = audioCtx.createOscillator(); const gn = audioCtx.createGain(); osc.connect(gn); gn.connect(audioCtx.destination); const n = audioCtx.currentTime;
   if (t === 'sel') { osc.type = 'sine'; osc.frequency.setValueAtTime(880, n); gn.gain.setValueAtTime(0.1, n); osc.start(n); osc.stop(n + 0.05); } 
   else if (t === 'jmp') { osc.type = 'square'; osc.frequency.setValueAtTime(300, n); osc.frequency.exponentialRampToValueAtTime(600, n+0.1); gn.gain.setValueAtTime(0.05, n); osc.start(n); osc.stop(n+0.1); } 
-  else if (t === 'hit') { 
-    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, n); osc.frequency.exponentialRampToValueAtTime(20, n+0.15); gn.gain.setValueAtTime(0.1, n); osc.start(n); osc.stop(n+0.15); 
-    screenShake(4); hitStop(3);
-  } 
-  else if (t === 'combo') { 
-    osc.type = 'sine'; osc.frequency.setValueAtTime(440, n); osc.frequency.setValueAtTime(880, n + 0.05); gn.gain.setValueAtTime(0.15, n); osc.start(n); osc.stop(n+0.15); 
-    screenShake(2); hitStop(2);
-  }
+  else if (t === 'hit') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, n); osc.frequency.exponentialRampToValueAtTime(20, n+0.15); gn.gain.setValueAtTime(0.1, n); osc.start(n); osc.stop(n+0.15); screenShake(4); hitStop(3); } 
+  else if (t === 'combo') { osc.type = 'sine'; osc.frequency.setValueAtTime(440, n); osc.frequency.setValueAtTime(880, n + 0.05); gn.gain.setValueAtTime(0.15, n); osc.start(n); osc.stop(n+0.15); screenShake(2); hitStop(2); }
 }
 
 const SaveSys = {
   data: (function() {
-    let d = {};
-    try { let parsed = JSON.parse(localStorage.getItem('4in1_ultimate')); if (parsed && typeof parsed === 'object') d = parsed; } catch(e) {}
-    if (!d.scores) d.scores = {n:0, h:0};
-    if (!d.rankings) d.rankings = {n:[], h:[]};
-    if (!d.rhythm) d.rhythm = {easy: 0, normal: 0, hard: 0};
-    return {
-      playerName: d.playerName || 'PLAYER',
-      scores: d.scores,
-      actStage: d.actStage || 1, actLives: d.actLives || 5, actSeed: d.actSeed || 1,
-      rpg: d.rpg || null,
-      rankings: d.rankings,
-      bgTheme: d.bgTheme || 0,
-      rhythm: d.rhythm
-    };
+    let d = {}; try { let parsed = JSON.parse(localStorage.getItem('4in1_ultimate')); if (parsed && typeof parsed === 'object') d = parsed; } catch(e) {}
+    if (!d.scores) d.scores = {n:0, h:0}; if (!d.rankings) d.rankings = {n:[], h:[]}; if (!d.rhythm) d.rhythm = {easy: 0, normal: 0, hard: 0};
+    return { playerName: d.playerName || 'PLAYER', scores: d.scores, actStage: d.actStage || 1, actLives: d.actLives || 5, actSeed: d.actSeed || 1, rpg: d.rpg || null, rankings: d.rankings, bgTheme: d.bgTheme || 0, rhythm: d.rhythm };
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
   addScore(mode, score) { 
     const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
     rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
-    rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); 
-    this.save(); 
+    rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); 
   }
 };
 
@@ -119,22 +98,15 @@ function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
 const PALETTE = { '2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#00f','8':'#ff0','9':'#842','a':'#aaa','b':'#0ff','c':'#f0f','d':'#80f','e':'#531','f':'#141' };
 const drawSprite = (x, y, color, strData, size = 2.5) => {
-  if (!strData) return;
-  const str = Array.isArray(strData) ? strData[Math.floor(Date.now() / 300) % strData.length] : strData;
-  const len = str.length > 100 ? 16 : 8; const dotSize = (8 / len) * size;
-  for (let i = 0; i < str.length; i++) {
-    if (i >= len * len) break;
-    const char = str[i]; if (char === '0') continue;
-    ctx.fillStyle = (char === '1') ? color : (PALETTE[char] || color);
-    ctx.fillRect(x + (i % len) * dotSize, y + Math.floor(i / len) * dotSize, dotSize, dotSize);
-  }
+  if (!strData) return; const str = Array.isArray(strData) ? strData[Math.floor(Date.now() / 300) % strData.length] : strData; const len = str.length > 100 ? 16 : 8; const dotSize = (8 / len) * size;
+  for (let i = 0; i < str.length; i++) { if (i >= len * len) break; const char = str[i]; if (char === '0') continue; ctx.fillStyle = (char === '1') ? color : (PALETTE[char] || color); ctx.fillRect(x + (i % len) * dotSize, y + Math.floor(i / len) * dotSize, dotSize, dotSize); }
 };
 
 const sprs = {
   player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
   heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
   block: "999999999eeeeee99eeeeee99eeeeee99eeeeee99eeeeee99eeeeee999999999",
-  slime: ["000000000000000000000000000000000000000000000000000000011000000000000011110000000000011211100000000011111111000000011111111110000001131111311000001113111131110000111111111111000011111111111100011111111111111001111111111111100011111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
+  slime: ["00000000000000000000000000000000000000000000000000000001100000000000001111000000000001121110000000001111111100000001111111111000000113111131100000111311113111000011111111111100001111111111110001111111111111100111111111111110001111111111100000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000000011111000000000011211110000000011111111100000001131111311000001113111131110001111111111111100111111111111110011111111111111011111111111111110111111111111110"],
   boss: "000033333333000000031111111130000031131111311300003138311383130000311311113113000031111331111300000311111111300000003333333300000033a111111a330003aa31111113aa3003a3311111133a3003303111111303300000311331130000000031133113000000003330033300000000000000000000",
   skull: "0000033333300000000032222223000000032222222230000003233223323000000323322332300000032223322230000000322222230000000003233230000000000322223000000000003333000000000033a22a33000000032a2222a230000003222332223000000033300333000000003230032300000000333003330000",
   mage: "0000003333000000000003111130000000003111111300000003111111113000003133333333130000000344443000000000343443430000000034444443000000000311113080000000311111138000000311111111390000031311113139000003331111333900000003333330090000000330033009000000033003300000",
@@ -152,8 +124,22 @@ const sprs = {
     "000000333300000000003311113300000003113113113000003111111111130003113111111311300311311111131130031111111111113000031131111311300000330000003300000300300003003000300000000000030000000000000000000000000000000000000000000000000000000000000000"
   ],
   grass: ["0000000000600666006000000000000000000000000000000000000000000000", "0000000000060066000000000000000000000000000000000000000000000000"],
+  tree: "0003300000366300036666300366663003666630003663000009900000099000",
+  mount: "000000000033000003aa30003aaaa3003aaa3aa33aa33aa33999999339999993",
+  water: ["0000022000000000000000000002200000000000000000000000000000000000", "0000000000002200000000000000000000000000022000000000000000000000"],
+  town: "0003300003ff30003ffff303ffffff3033333330032230000322300003330000",
+  cave: "0033330003aaaa303aaaaaa33aaa3aa33aa33aa33aa33aa33aa33aa333333333",
+  tower: "0022000002aa20002aaaa2002aaaa2002a22a2002aaaa2002aaaa2002a22a200",
+  ruins: "0a000a000aa0aa00aaaaaa00aa33aa00aa33aa00aaaaaa000aa0aa000a000a00",
+  demon: "0033000003553000355553003533530035555300355553003533530035555300",
+  floor: "9999e9e99999e9e99999e9e99999e9e99999e9e99999e9e99999e9e99999e9e9",
+  wall: "aaaaaaaa22222222aaaaaaaa22222222aaaaaaaa22222222aaaaaaaa22222222",
+  stairs_up: "00000000000000000000000066666666a6666666aa666666aaa66666aaaa6666",
+  stairs_dn: "000000000000000000000000333333333333333a333333aa3333aaa333aaaa33",
+  sign: "00000000e99999e09222229092222290e99999e0009000000090000000900000",
   star: "0001000000111000011111001111111001111100001110000001000000000000",
   coin: ["0003300000388300038888300383830003838300038383000038830000033000", "00033000003883000388883003888830038888300038830000033000"],
+  pipe: "033333303666666336f6f663366666630333333003666630036f663003666630",
   spike: "000000000030030003aa33aa03aaaaaa0aaaaaaa3aaa3aaa3aa3aaaa3aaaaaaa"
 };
 
@@ -165,33 +151,34 @@ function drawTransition() {
 
 const Menu = {
   cur: 0, 
-  // ★ 削除要望を確実に反映し、アプリ一覧からマイクロクエストを撤去
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ'], 
+  // ★ ブロッククラフトを追加し、全9個のアプリに
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ', 'ブロッククラフト'], 
   selectHoldTimer: 0,
   
   init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
   update() {
     if (keys.select) { this.selectHoldTimer++; if (this.selectHoldTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.selectHoldTimer = 0; }
-    // ★ 8個のアプリでループするように修正
-    if (keysDown.down) { this.cur = (this.cur + 1) % 8; playSnd('sel'); } 
-    if (keysDown.up) { this.cur = (this.cur + 7) % 8; playSnd('sel'); }   
+    // ★ 9個のアプリでループ
+    if (keysDown.down) { this.cur = (this.cur + 1) % 9; playSnd('sel'); }
+    if (keysDown.up) { this.cur = (this.cur + 8) % 9; playSnd('sel'); }
     if (keysDown.a) { 
-      const appObjs = [Guide, Tetri, Action, Online, Rhythm, Ranking, Settings, DataBackup]; 
+      const appObjs = [Guide, Tetri, Action, Online, Rhythm, Ranking, Settings, DataBackup, Mine]; 
       switchApp(appObjs[this.cur]); 
-    } 
+    }
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx);
-    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 30); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v7.0', 60, 45); 
+    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 25); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v8.0', 60, 40); 
     
-    for (let i = 0; i < 8; i++) { 
+    // ★ 行間を調整してすべて画面内に収まるように
+    for (let i = 0; i < 9; i++) { 
         ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; 
-        ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 75 + i * 22); 
+        ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 20); 
     }
     
-    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 280); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 290);
-    if (this.selectHoldTimer > 0) { const p = Math.min(30, this.selectHoldTimer); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(10, 265, (180 * p / 30), 5); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 265, 180, 5); }
+    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
+    if (this.selectHoldTimer > 0) { const p = Math.min(30, this.selectHoldTimer); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(10, 260, (180 * p / 30), 5); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 260, 180, 5); }
   }
 };
 
@@ -346,7 +333,6 @@ const setBtn = (id, k) => {
 };
 ['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select'].forEach((id, i) => { setBtn(id, ['up', 'down', 'left', 'right', 'a', 'b', 'select'][i]); });
 
-// ★ キーボード入力をD,F,J,Kに対応
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
   if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } 
