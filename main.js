@@ -1,476 +1,313 @@
-// === BLOCK CRAFT (3D) - MINECRAFT PHYSICS & UX PERFECTED ===
-const Mine = {
-  st: 'init',
-  scene: null, camera: null, renderer: null,
-  textureAtlas: null, geometries: {}, materials: {},
-  
-  // ★ 究極調整1：身長(1.8)、目の高さ(1.62)、歩行速度(0.07)、しゃがみ速度(0.025)
-  player: { 
-      x: 8, y: 15, z: 8, vy: 0, isGrounded: false, 
-      speed: 0.07, crouchSpeed: 0.025, jumpPower: 0.16, 
-      isCrouching: false, currentEyeHeight: 1.62 
-  },
-  controls: { moveX: 0, moveZ: 0, yaw: 0, pitch: -0.5 },
-  
-  blocks: [], blockMeshes: [], drops: [],
-  
-  // ★ 究極調整2：ブロックの硬さ（破壊にかかるフレーム数）
-  hardness: {
-      grass: 15, dirt: 15, sand: 15, leaves: 10, glass: 10,
-      wood: 30, plank: 30, crafting: 30,
-      stone: 45, cobblestone: 45, coal: 50, iron: 50, diamond: 60
-  },
-  
-  targetHighlight: null, currentTarget: null, currentIntersect: null,
-  digging: false, digProgress: 0,
-  
-  joystick: { active: false, pointerId: null },
-  touchZone: { active: false, pointerId: null, lastX: 0, lastY: 0, startT: 0, moved: false },
-  initialized: false,
-  
-  init() {
-    document.getElementById('gameboy').style.display = 'none';
-    document.getElementById('mine-container').classList.add('active');
-    
-    if (!this.initialized) {
-      this.setup3D();
-      this.bindEvents();
-      this.initialized = true;
-    }
-    
-    this.st = 'play';
-    // 初期位置（Yは足元の座標）
-    this.player.x = 8; this.player.y = 15; this.player.z = 8;
-    this.player.vy = 0;
-    this.player.isCrouching = false;
-    this.player.currentEyeHeight = 1.62;
-    this.controls.yaw = 0; this.controls.pitch = -0.5; 
-    
-    setTimeout(() => this.resize(), 50);
-    setTimeout(() => this.resize(), 500); 
-  },
-  
-  setup3D() {
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87CEEB); 
-    this.scene.fog = new THREE.Fog(0x87CEEB, 10, 30);
-    
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-    
-    this.renderer = new THREE.WebGLRenderer({ antialias: false });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio || 1);
-    
-    const canvas = this.renderer.domElement;
-    canvas.style.position = 'absolute'; canvas.style.top = '0'; canvas.style.left = '0'; 
-    canvas.style.zIndex = '1'; canvas.style.width = '100vw'; canvas.style.height = '100vh';
-    document.getElementById('mine-container').insertBefore(canvas, document.getElementById('mine-ui'));
-    
-    const light = new THREE.DirectionalLight(0xffffff, 1.0);
-    light.position.set(10, 20, 10);
-    this.scene.add(light);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    
-    const loader = new THREE.TextureLoader();
-    this.textureAtlas = loader.load('atlas.png');
-    this.textureAtlas.magFilter = THREE.NearestFilter;
-    this.textureAtlas.minFilter = THREE.NearestFilter;
-    
-    this.materials.opaque = new THREE.MeshLambertMaterial({ map: this.textureAtlas });
-    this.materials.transparent = new THREE.MeshLambertMaterial({ map: this.textureAtlas, transparent: true, alphaTest: 0.5 });
-    
-    const getUVs = (col, row) => {
-      const u = col * 0.25; const v = 0.75 - row * 0.25; 
-      return [ u, v+0.25, u+0.25, v+0.25, u, v, u+0.25, v ];
+　// === CORE SYSTEM - BUG FIX & CLEAN UPDATE ===
+const ctx = document.getElementById('gameCanvas').getContext('2d');
+const keys = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
+const keysDown = {up:false, down:false, left:false, right:false, a:false, b:false, select:false, l0:false, l1:false, l2:false, l3:false};
+let prevKeys = {...keys};
+let activeApp = null;
+
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+let noiseBuffer = null;
+function initAudio() { 
+  if (!audioCtx) {
+    audioCtx = new AudioContext(); 
+    const bufferSize = audioCtx.sampleRate * 2;
+    noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume(); 
+}
+
+let bgmOsc = [], bgmInterval = null;
+const BGM = {
+  stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
+  play(type) {
+    this.stop(); if (!audioCtx) return;
+    const mels = {
+      menu: { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
+      tetri: { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
+      action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
+      spell: { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
     };
-    const createGeo = (faces) => {
-        const geo = new THREE.BoxGeometry(1, 1, 1);
-        faces.forEach((f, i) => {
-            const u = getUVs(f.c, f.r);
-            geo.attributes.uv.setXY(i*4+0, u[0], u[1]); geo.attributes.uv.setXY(i*4+1, u[2], u[3]);
-            geo.attributes.uv.setXY(i*4+2, u[4], u[5]); geo.attributes.uv.setXY(i*4+3, u[6], u[7]);
-        });
-        return geo;
-    };
-
-    this.geometries = {
-        grass: createGeo([{c:1,r:0}, {c:1,r:0}, {c:0,r:0}, {c:2,r:0}, {c:1,r:0}, {c:1,r:0}]),
-        dirt: createGeo(Array(6).fill({c:2,r:0})),
-        stone: createGeo(Array(6).fill({c:3,r:0})),
-        cobblestone: createGeo(Array(6).fill({c:0,r:1})),
-        wood: createGeo([{c:1,r:1}, {c:1,r:1}, {c:2,r:1}, {c:2,r:1}, {c:1,r:1}, {c:1,r:1}]),
-        leaves: createGeo(Array(6).fill({c:3,r:1})),
-        plank: createGeo(Array(6).fill({c:0,r:2})),
-        sand: createGeo(Array(6).fill({c:1,r:2})),
-        glass: createGeo(Array(6).fill({c:2,r:2})),
-        diamond: createGeo(Array(6).fill({c:3,r:2})),
-        iron: createGeo(Array(6).fill({c:0,r:3})),
-        coal: createGeo(Array(6).fill({c:1,r:3}))
-    };
-
-    // 本家仕様の極細ハイライト枠線
-    const edgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.005, 1.005, 1.005));
-    const edgesMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
-    this.targetHighlight = new THREE.LineSegments(edgesGeo, edgesMat);
-    this.targetHighlight.visible = false;
-    this.scene.add(this.targetHighlight);
-
-    this.generateTerrain();
-  },
-
-  generateTerrain() {
-    for (let x = 0; x < 16; x++) {
-      for (let z = 0; z < 16; z++) {
-        for (let y = 0; y <= 4; y++) {
-          let type = 'stone';
-          if (y === 4) type = 'grass';
-          else if (y === 3) type = 'dirt';
-          else if (y < 3 && Math.random() < 0.1) type = 'coal'; 
-          this.addBlock(x, y, z, type);
-        }
+    const track = mels[type] || mels.menu; let i = 0;
+    bgmInterval = setInterval(() => {
+      const now = audioCtx.currentTime; const duration = track.spd / 1000;
+      const playNote = (freq, wave, vol) => {
+        if (!freq) return;
+        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        o.type = wave; o.frequency.value = freq;
+        g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + duration + 0.1); 
+      };
+      playNote(track.t1[i % track.t1.length], 'square', 0.05);
+      playNote(track.t2[i % track.t2.length], 'square', 0.03);
+      playNote(track.t3[i % track.t3.length], 'triangle', 0.08);
+      if (track.n[i % track.n.length] > 0 && noiseBuffer) {
+        const src = audioCtx.createBufferSource(); const g = audioCtx.createGain();
+        src.buffer = noiseBuffer; g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
       }
-    }
-    this.addBlock(8, 5, 8, 'wood'); this.addBlock(8, 6, 8, 'wood'); this.addBlock(8, 7, 8, 'wood');
-    for (let lx = 7; lx <= 9; lx++) {
-      for (let lz = 7; lz <= 9; lz++) {
-        for (let ly = 7; ly <= 8; ly++) {
-          if (lx === 8 && lz === 8 && ly === 7) continue;
-          this.addBlock(lx, ly, lz, 'leaves');
-        }
-      }
-    }
-    this.addBlock(8, 9, 8, 'leaves');
-  },
-
-  addBlock(x, y, z, type) {
-    const geo = this.geometries[type];
-    const mat = (type === 'leaves' || type === 'glass') ? this.materials.transparent : this.materials.opaque;
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y, z);
-    mesh.userData = { x, y, z, type, matCloned: false }; 
-    this.scene.add(mesh);
-    this.blockMeshes.push(mesh);
-    this.blocks.push({ x, y, z, mesh, type });
-  },
-
-  breakBlock(mesh) {
-    const type = mesh.userData.type;
-    const pos = mesh.position.clone();
-    
-    // クローンしたマテリアルはメモリリーク防止のため破棄
-    if(mesh.userData.matCloned) mesh.material.dispose();
-    
-    this.scene.remove(mesh);
-    this.blockMeshes = this.blockMeshes.filter(m => m !== mesh);
-    this.blocks = this.blocks.filter(b => b.mesh !== mesh);
-    
-    if(typeof playSnd === 'function') playSnd('sel');
-    if(navigator.vibrate) navigator.vibrate(50);
-    
-    this.spawnDrop(type, pos.x, pos.y, pos.z);
-    
-    this.targetHighlight.visible = false;
-    this.currentTarget = null;
-  },
-
-  placeBlock() {
-    if (!this.currentIntersect) return;
-    const normal = this.currentIntersect.face.normal;
-    const pos = this.currentIntersect.object.position;
-    const nx = pos.x + normal.x;
-    const ny = pos.y + normal.y;
-    const nz = pos.z + normal.z;
-
-    const px = this.player.x, py = this.player.y, pz = this.player.z;
-    const pSize = 0.3, pHeight = 1.8;
-    if (nx + 0.5 > px - pSize && nx - 0.5 < px + pSize &&
-        nz + 0.5 > pz - pSize && nz - 0.5 < pz + pSize &&
-        ny + 0.5 > py && ny - 0.5 < py + pHeight) {
-        return; 
-    }
-    
-    this.addBlock(nx, ny, nz, 'cobblestone');
-    if(typeof playSnd === 'function') playSnd('jmp');
-  },
-
-  spawnDrop(type, x, y, z) {
-    let dropType = type;
-    if (type === 'stone') dropType = 'cobblestone'; 
-    const geo = this.geometries[dropType];
-    const mat = (dropType === 'leaves' || dropType === 'glass') ? this.materials.transparent : this.materials.opaque;
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, y, z);
-    mesh.scale.set(0.25, 0.25, 0.25); 
-    this.scene.add(mesh);
-    this.drops.push({ mesh: mesh, type: dropType, vx: (Math.random()-0.5)*0.1, vy: 0.15, vz: (Math.random()-0.5)*0.1, time: 0 });
-  },
-  
-  bindEvents() {
-    window.addEventListener('resize', () => { setTimeout(() => this.resize(), 100); }, false);
-    document.getElementById('btn-mine-exit').addEventListener('pointerdown', (e) => { e.preventDefault(); this.exitGame(); });
-    
-    document.getElementById('btn-jump').addEventListener('pointerdown', (e) => { 
-      e.preventDefault(); if (this.player.isGrounded) { this.player.vy = this.player.jumpPower; this.player.isGrounded = false; } 
-    });
-
-    const crouchBtn = document.getElementById('btn-crouch');
-    crouchBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.player.isCrouching = true; crouchBtn.style.background = 'rgba(255,255,255,0.6)'; });
-    const crouchEnd = (e) => { e.preventDefault(); this.player.isCrouching = false; crouchBtn.style.background = 'rgba(0,0,0,0.4)'; };
-    crouchBtn.addEventListener('pointerup', crouchEnd); crouchBtn.addEventListener('pointercancel', crouchEnd); crouchBtn.addEventListener('pointerout', crouchEnd);
-
-    // ジョイスティック
-    const joyZone = document.getElementById('joystick-zone');
-    const joyKnob = document.getElementById('joystick-knob');
-    let joyRect = null;
-    
-    const updateJoy = (e) => {
-        const centerX = joyRect.left + joyRect.width / 2; const centerY = joyRect.top + joyRect.height / 2;
-        let dx = e.clientX - centerX; let dy = e.clientY - centerY;
-        const distance = Math.min(35, Math.hypot(dx, dy)); const angle = Math.atan2(dy, dx);
-        joyKnob.style.transform = `translate(${Math.cos(angle)*distance}px, ${Math.sin(angle)*distance}px)`;
-        this.controls.moveX = (Math.cos(angle)*distance) / 35; this.controls.moveZ = (Math.sin(angle)*distance) / 35;
-    };
-
-    joyZone.addEventListener('pointerdown', (e) => {
-        if (this.joystick.active) return;
-        e.preventDefault(); joyZone.setPointerCapture(e.pointerId); this.joystick.active = true; this.joystick.pointerId = e.pointerId;
-        joyRect = joyZone.getBoundingClientRect(); updateJoy(e);
-    });
-    joyZone.addEventListener('pointermove', (e) => { if (!this.joystick.active || this.joystick.pointerId !== e.pointerId) return; e.preventDefault(); updateJoy(e); });
-    const endJoy = (e) => {
-        if (!this.joystick.active || this.joystick.pointerId !== e.pointerId) return;
-        e.preventDefault(); try { joyZone.releasePointerCapture(e.pointerId); } catch(err) {}
-        this.joystick.active = false; this.joystick.pointerId = null;
-        joyKnob.style.transform = `translate(0px, 0px)`; this.controls.moveX = 0; this.controls.moveZ = 0;
-    };
-    joyZone.addEventListener('pointerup', endJoy); joyZone.addEventListener('pointercancel', endJoy); joyZone.addEventListener('pointerout', endJoy); 
-    
-    // ★ 右画面（タッチ操作）
-    const touchZone = document.getElementById('touch-zone');
-    
-    touchZone.addEventListener('pointerdown', (e) => {
-        if (this.touchZone.active) return;
-        e.preventDefault();
-        touchZone.setPointerCapture(e.pointerId);
-        this.touchZone.active = true;
-        this.touchZone.pointerId = e.pointerId;
-        this.touchZone.lastX = e.clientX;
-        this.touchZone.lastY = e.clientY;
-        this.touchZone.startT = Date.now();
-        this.touchZone.moved = false;
-        
-        // 常に掘り始める（視点移動で狙いが外れるとキャンセルされる）
-        this.digging = true;
-    });
-    
-    touchZone.addEventListener('pointermove', (e) => {
-        if (!this.touchZone.active || this.touchZone.pointerId !== e.pointerId) return;
-        e.preventDefault();
-        const dx = e.clientX - this.touchZone.lastX;
-        const dy = e.clientY - this.touchZone.lastY;
-        
-        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.touchZone.moved = true;
-        
-        this.controls.yaw -= dx * 0.005; 
-        this.controls.pitch -= dy * 0.005; 
-        this.controls.pitch = Math.max(-Math.PI/2.1, Math.min(Math.PI/2.1, this.controls.pitch));
-        
-        this.touchZone.lastX = e.clientX;
-        this.touchZone.lastY = e.clientY;
-    });
-    
-    const endTouch = (e) => {
-        if (!this.touchZone.active || this.touchZone.pointerId !== e.pointerId) return;
-        e.preventDefault();
-        
-        // 短くタップし、視点がほぼ動いていなければ「置く」
-        if (!this.touchZone.moved && (Date.now() - this.touchZone.startT < 250)) {
-            this.placeBlock();
-        }
-        
-        try { touchZone.releasePointerCapture(e.pointerId); } catch(err) {}
-        this.touchZone.active = false;
-        this.touchZone.pointerId = null;
-        this.digging = false;
-    };
-    touchZone.addEventListener('pointerup', endTouch);
-    touchZone.addEventListener('pointercancel', endTouch);
-    touchZone.addEventListener('pointerout', endTouch);
-
-    window.addEventListener('pointerup', (e) => {
-        if (this.joystick.active && this.joystick.pointerId === e.pointerId) endJoy(e);
-        if (this.touchZone.active && this.touchZone.pointerId === e.pointerId) endTouch(e);
-        crouchEnd(e);
-    });
-  },
-  
-  resize() {
-    if (!this.camera || !this.renderer) return;
-    const w = window.innerWidth; const h = window.innerHeight;
-    this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h);
-    const warn = document.getElementById('rotate-warning');
-    if (warn) { if (h > w) warn.style.display = 'flex'; else warn.style.display = 'none'; }
-  },
-  
-  exitGame() {
-    this.st = 'exit';
-    document.getElementById('mine-container').classList.remove('active');
-    document.getElementById('gameboy').style.display = 'flex';
-    this.joystick.active = false; this.touchZone.active = false; this.digging = false;
-    document.getElementById('joystick-knob').style.transform = `translate(0px, 0px)`;
-    this.controls.moveX = 0; this.controls.moveZ = 0;
-    
-    // マテリアルを元に戻す
-    if (this.currentTarget && this.currentTarget.userData.matCloned) {
-        this.currentTarget.material.color.setScalar(1.0);
-    }
-    switchApp(Menu);
-  },
-  
-  // ★ 究極調整：足のY座標を基準にした完璧なAABB当たり判定
-  getCollidingBlock(nx, ny, nz, isWall = false) {
-    const pSize = 0.3; 
-    const pHeight = 1.8; 
-    // 横移動の壁判定時は、足元の極わずかな段差(0.1マス)を乗り越える
-    const footY = isWall ? ny + 0.1 : ny; 
-    
-    for (let b of this.blocks) {
-      if (nx - pSize < b.x + 0.5 && nx + pSize > b.x - 0.5 &&
-          nz - pSize < b.z + 0.5 && nz + pSize > b.z - 0.5 &&
-          footY < b.y + 0.5 && ny + pHeight > b.y - 0.5) {
-        return b;
-      }
-    }
-    return null;
-  },
-
-  update() {
-    if (this.st !== 'play') return;
-    
-    this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.controls.yaw;
-    this.camera.rotation.x = this.controls.pitch;
-    
-    const currentSpeed = this.player.isCrouching ? this.player.crouchSpeed : this.player.speed;
-    const dir = new THREE.Vector3(this.controls.moveX, 0, this.controls.moveZ);
-    dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.controls.yaw);
-    
-    let nx = this.player.x + dir.x * currentSpeed;
-    let nz = this.player.z + dir.z * currentSpeed;
-    
-    if (!this.getCollidingBlock(nx, this.player.y, this.player.z, true)) { this.player.x = nx; }
-    if (!this.getCollidingBlock(this.player.x, this.player.y, nz, true)) { this.player.z = nz; }
-    
-    // 本家準拠の重力加速度
-    this.player.vy -= 0.008; 
-    let ny = this.player.y + this.player.vy;
-    
-    let hitBlock = this.getCollidingBlock(this.player.x, ny, this.player.z, false);
-    if (hitBlock) {
-        if (this.player.vy < 0) {
-            this.player.vy = 0;
-            this.player.isGrounded = true;
-            ny = hitBlock.y + 0.5; // 足がブロックの上面にピッタリつく
-        } else {
-            this.player.vy = 0;
-            ny = hitBlock.y - 0.5 - 1.8; // 頭がブロックの底面にぶつかる
-        }
-    } else {
-        this.player.isGrounded = false;
-    }
-    
-    if (ny < -10) { ny = 15; this.player.x = 8; this.player.z = 8; this.player.vy = 0; }
-    this.player.y = ny;
-    
-    // スムーズな視点移動（しゃがむとスーッと下がる）
-    const targetEyeHeight = this.player.isCrouching ? 1.27 : 1.62;
-    this.player.currentEyeHeight += (targetEyeHeight - this.player.currentEyeHeight) * 0.3;
-    this.camera.position.set(this.player.x, this.player.y + this.player.currentEyeHeight, this.player.z);
-    
-    // ==========================================
-    // ★ 本家仕様の採掘システム（Raycast）
-    // ==========================================
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-    const intersects = raycaster.intersectObjects(this.blockMeshes);
-    
-    let newTarget = null;
-    let newIntersect = null;
-    // 腕が届く距離（5マス）
-    if (intersects.length > 0 && intersects[0].distance < 5) {
-        newTarget = intersects[0].object;
-        newIntersect = intersects[0];
-    }
-
-    // 狙いが外れたり、別のブロックを見たらリセット
-    if (newTarget !== this.currentTarget) {
-        if (this.currentTarget && this.currentTarget.userData.matCloned) {
-            this.currentTarget.material.color.setScalar(1.0); // 色を元に戻す
-        }
-        this.currentTarget = newTarget;
-        this.currentIntersect = newIntersect;
-        this.digProgress = 0;
-        
-        if (newTarget) {
-            this.targetHighlight.position.copy(newTarget.position);
-            this.targetHighlight.visible = true;
-        } else {
-            this.targetHighlight.visible = false;
-        }
-    }
-    
-    // 長押し中の破壊進行（ダメージ表現）
-    if (this.digging && this.currentTarget) {
-        this.digProgress++;
-        const type = this.currentTarget.userData.type;
-        const maxDig = this.hardness[type] || 30;
-        
-        // 叩かれているブロックを徐々に暗くする
-        const darken = 1.0 - (this.digProgress / maxDig) * 0.5;
-        if (!this.currentTarget.userData.matCloned) {
-            this.currentTarget.material = this.currentTarget.material.clone();
-            this.currentTarget.userData.matCloned = true;
-        }
-        this.currentTarget.material.color.setScalar(darken);
-
-        if (this.digProgress >= maxDig) {
-            this.breakBlock(this.currentTarget);
-            this.digProgress = 0; // 次のブロックの連続掘りへ
-        }
-    } else {
-        this.digProgress = 0;
-        if (this.currentTarget && this.currentTarget.userData.matCloned) {
-            this.currentTarget.material.color.setScalar(1.0);
-        }
-    }
-
-    // ドロップアイテムの処理
-    for (let i = this.drops.length - 1; i >= 0; i--) {
-        let d = this.drops[i];
-        d.vy -= 0.005; d.mesh.position.x += d.vx; d.mesh.position.y += d.vy; d.mesh.position.z += d.vz;
-        
-        let floorY = -999;
-        const bx = Math.round(d.mesh.position.x); const bz = Math.round(d.mesh.position.z);
-        for(let b of this.blocks) { if(b.x === bx && b.z === bz && b.y <= d.mesh.position.y) { if(b.y > floorY) floorY = b.y; } }
-        
-        if (d.mesh.position.y < floorY + 0.5 + 0.125) {
-            d.mesh.position.y = floorY + 0.5 + 0.125;
-            d.vy = 0; d.vx *= 0.5; d.vz *= 0.5; 
-        }
-        
-        d.time += 0.05; d.mesh.rotation.y += 0.05; d.mesh.position.y += Math.sin(d.time) * 0.005; 
-        
-        // 回収判定（体の中心からの距離）
-        const dist = Math.hypot(d.mesh.position.x - this.player.x, d.mesh.position.y - (this.player.y + 0.9), d.mesh.position.z - this.player.z);
-        if (dist < 1.5) {
-            this.scene.remove(d.mesh); this.drops.splice(i, 1);
-            if(typeof playSnd === 'function') playSnd('jmp'); 
-        }
-    }
-  },
-  
-  draw() {
-    if (this.st !== 'play' || !this.renderer) return;
-    this.renderer.render(this.scene, this.camera);
+      i++;
+    }, track.spd);
   }
 };
+
+let hitStopTimer = 0;
+function hitStop(frames) { hitStopTimer = frames; }
+
+function playSnd(t) {
+  if (!audioCtx) return; const osc = audioCtx.createOscillator(); const gn = audioCtx.createGain(); osc.connect(gn); gn.connect(audioCtx.destination); const n = audioCtx.currentTime;
+  if (t === 'sel') { osc.type = 'sine'; osc.frequency.setValueAtTime(880, n); gn.gain.setValueAtTime(0.1, n); osc.start(n); osc.stop(n + 0.05); } 
+  else if (t === 'jmp') { osc.type = 'square'; osc.frequency.setValueAtTime(300, n); osc.frequency.exponentialRampToValueAtTime(600, n+0.1); gn.gain.setValueAtTime(0.05, n); osc.start(n); osc.stop(n+0.1); } 
+  else if (t === 'hit') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, n); osc.frequency.exponentialRampToValueAtTime(20, n+0.15); gn.gain.setValueAtTime(0.1, n); osc.start(n); osc.stop(n+0.15); screenShake(4); hitStop(3); } 
+  else if (t === 'combo') { osc.type = 'sine'; osc.frequency.setValueAtTime(440, n); osc.frequency.setValueAtTime(880, n + 0.05); gn.gain.setValueAtTime(0.15, n); osc.start(n); osc.stop(n+0.15); screenShake(2); hitStop(2); }
+}
+
+const SaveSys = {
+  data: (function() {
+    let d = {}; try { let parsed = JSON.parse(localStorage.getItem('4in1_ultimate')); if (parsed && typeof parsed === 'object') d = parsed; } catch(e) {}
+    if (!d.scores) d.scores = {n:0, h:0}; if (!d.rankings) d.rankings = {n:[], h:[]}; if (!d.rhythm) d.rhythm = {easy: 0, normal: 0, hard: 0};
+    return { playerName: d.playerName || 'PLAYER', scores: d.scores, actStage: d.actStage || 1, actLives: d.actLives || 5, actSeed: d.actSeed || 1, rpg: d.rpg || null, rankings: d.rankings, bgTheme: d.bgTheme || 0, rhythm: d.rhythm };
+  })(),
+  save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
+  addScore(mode, score) { 
+    const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
+    rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
+    rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); 
+  }
+};
+
+const bgThemes = [
+  { name: 'MATRIX', draw: (ctx) => { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = '10px monospace'; for (let i = 0; i < 20; i++) { ctx.fillText(String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96)), (i * 10) + (Date.now() / 50) % 10, (Date.now() / 20 + i * 15) % 300); } } },
+  { name: 'STARS', draw: (ctx) => { ctx.fillStyle = '#000822'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#fff'; for (let i = 0; i < 50; i++) { const s = 1 + (i % 3); ctx.fillRect((i * 37) % 200, (i * 67 + Date.now() / 10) % 300, s, s); } } },
+  { name: 'GAMEBOY', draw: (ctx) => { ctx.fillStyle = '#8bac0f'; ctx.fillRect(0, 0, 200, 300); ctx.strokeStyle = '#9bbc0f'; ctx.lineWidth = 1; for (let i = 0; i < 200; i += 4) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 300); ctx.stroke(); } for (let i = 0; i < 300; i += 4) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(200, i); ctx.stroke(); } ctx.fillStyle = '#306230'; ctx.fillRect(0, 0, 6, 300); ctx.fillRect(194, 0, 6, 300); ctx.fillRect(0, 0, 200, 6); ctx.fillRect(0, 294, 200, 6); } }
+];
+
+const particles = [];
+function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 12 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, life: 30 + Math.random()*10, color: color, size: type === 'explosion' ? 3 : 1 }); } }
+function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
+function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
+
+let shakeTimer = 0;
+function screenShake(intensity = 2) { shakeTimer = intensity; }
+function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random() - 0.5) * shakeTimer * 2, (Math.random() - 0.5) * shakeTimer * 2); shakeTimer--; } }
+function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
+
+const PALETTE = { '2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#00f','8':'#ff0','9':'#842','a':'#aaa','b':'#0ff','c':'#f0f','d':'#80f','e':'#531','f':'#141' };
+const drawSprite = (x, y, color, strData, size = 2.5) => {
+  if (!strData) return; const str = Array.isArray(strData) ? strData[Math.floor(Date.now() / 300) % strData.length] : strData; const len = str.length > 100 ? 16 : 8; const dotSize = (8 / len) * size;
+  for (let i = 0; i < str.length; i++) { if (i >= len * len) break; const char = str[i]; if (char === '0') continue; ctx.fillStyle = (char === '1') ? color : (PALETTE[char] || color); ctx.fillRect(x + (i % len) * dotSize, y + Math.floor(i / len) * dotSize, dotSize, dotSize); }
+};
+
+const sprs = {
+  player: ["0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000", "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000003111130a00000003111130a00000003333330a00000330330888000003303300800000033303330000000"],
+  heroNew: "0000003333000000000003999930000000003944449300000000343443430000000034444443000000000344443000000000311111130000000341111114300000344111111443000033311111133300000a031111300000000a031111300000000a033333300000008880330330000000080033033000000000033303330000",
+  block: "999999999eeeeee99eeeeee99eeeeee99eeeeee99eeeeee99eeeeee999999999",
+  star: "0001000000111000011111001111111001111100001110000001000000000000",
+  coin: ["0003300000388300038888300383830003838300038383000038830000033000", "00033000003883000388883003888830038888300038830000033000"],
+  spike: "000000000030030003aa33aa03aaaaaa0aaaaaaa3aaa3aaa3aa3aaaa3aaaaaaa"
+};
+
+let transTimer = 0; let nextApp = null;
+function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
+function drawTransition() {
+  if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x+y) < (20 - transTimer)) ctx.fillRect(x*20, y*20, 20, 20); } } }
+}
+
+const Menu = {
+  cur: 0, 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'ローカルランキング', '設定', 'データ引継ぎ', 'ブロッククラフト'], 
+  selectHoldTimer: 0,
+  
+  init() { this.cur = 0; this.selectHoldTimer = 0; BGM.play('menu'); },
+  update() {
+    if (keys.select) { this.selectHoldTimer++; if (this.selectHoldTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.selectHoldTimer = 0; }
+    if (keysDown.down) { this.cur = (this.cur + 1) % 9; playSnd('sel'); }
+    if (keysDown.up) { this.cur = (this.cur + 8) % 9; playSnd('sel'); }
+    if (keysDown.a) { 
+      const appObjs = [Guide, Tetri, Action, Online, Rhythm, Ranking, Settings, DataBackup, Mine]; 
+      switchApp(appObjs[this.cur]); 
+    }
+  },
+  draw() {
+    bgThemes[SaveSys.data.bgTheme].draw(ctx);
+    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 25); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v8.0', 60, 40); 
+    for (let i = 0; i < 9; i++) { 
+        ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; 
+        ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 20); 
+    }
+    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
+    if (this.selectHoldTimer > 0) { const p = Math.min(30, this.selectHoldTimer); ctx.fillStyle = 'rgba(0,255,0,0.3)'; ctx.fillRect(10, 260, (180 * p / 30), 5); ctx.strokeStyle = '#0f0'; ctx.strokeRect(10, 260, 180, 5); }
+  }
+};
+
+const DataBackup = {
+  st: 'map', px: 4.5, py: 6, anim: 0, msg: '', backupStr: '',
+  init() { this.st = 'map'; this.px = 4.5; this.py = 6; this.msg = ''; this.anim = 0; BGM.play('spell'); }, 
+  update() {
+    if (keysDown.select) { switchApp(Menu); return; }
+    if (this.st === 'msg') { if (keysDown.a || keysDown.b) { this.st = 'map'; playSnd('sel'); } return; }
+    this.anim++;
+    let nx = this.px, ny = this.py;
+    if (keys.left) nx -= 0.15; if (keys.right) nx += 0.15;
+    if (keys.up) ny -= 0.15; if (keys.down) ny += 0.15;
+    nx = Math.max(1, Math.min(8, nx)); ny = Math.max(1.5, Math.min(7, ny)); this.px = nx; this.py = ny;
+    if (keysDown.a) {
+       if (Math.abs(this.px - 2) < 1.5 && Math.abs(this.py - 2) < 1.5) {
+           try { 
+             this.backupStr = btoa(unescape(encodeURIComponent(JSON.stringify(SaveSys.data))));
+             if (navigator.clipboard && window.isSecureContext) {
+                 navigator.clipboard.writeText(this.backupStr).then(()=> { this.msg = 'データをコピーした！\nメモ帳などに保存せよ。'; this.st = 'msg'; playSnd('combo'); 
+                 }).catch(e=> { prompt("自動コピーがブロックされました。\n以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); });
+             } else { prompt("以下の呪文を手動でコピーしてください:", this.backupStr); this.msg = '呪文を表示したぞ。\n手動でコピーせよ。'; this.st = 'msg'; playSnd('combo'); }
+           } catch(e) { this.msg = 'データ変換エラー'; this.st = 'msg'; playSnd('hit'); }
+       } 
+       else if (Math.abs(this.px - 7) < 1.5 && Math.abs(this.py - 2) < 1.5) {
+           const input = prompt("復活の呪文（パスワード）を入力してください:");
+           if (input) {
+             try {
+               const parsed = JSON.parse(decodeURIComponent(escape(atob(input))));
+               if (parsed && parsed.playerName) { SaveSys.data = parsed; SaveSys.save(); alert("データの復元に成功しました！\nゲームを再起動します。"); location.reload(); } else throw new Error('Invalid');
+             } catch(e) { this.msg = '呪文が違います！'; this.st = 'msg'; playSnd('hit'); }
+           }
+       }
+    }
+  },
+  draw() {
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#400'; ctx.fillRect(20, 20, 160, 260); 
+    ctx.strokeStyle = '#fa0'; ctx.lineWidth = 4; ctx.strokeRect(20, 20, 160, 260); ctx.lineWidth = 1;
+    ctx.fillStyle = '#888'; ctx.fillRect(30, 30, 20, 240); ctx.fillRect(150, 30, 20, 240);
+    const offsetY1 = Math.sin(this.anim * 0.1) * 2; ctx.fillStyle = '#ffe'; ctx.fillRect(35, 45, 30, 20); ctx.strokeStyle = '#840'; ctx.strokeRect(35, 45, 30, 20); ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('記録', 38, 58 + offsetY1); 
+    const offsetY2 = Math.cos(this.anim * 0.1) * 2; ctx.fillStyle = '#ffe'; ctx.fillRect(135, 45, 30, 20); ctx.strokeStyle = '#840'; ctx.strokeRect(135, 45, 30, 20); ctx.fillStyle = '#0ff'; ctx.fillText('復活', 138, 58 + offsetY2);
+    drawSprite(this.px * 20, this.py * 20, '#0ff', sprs.player || sprs.heroNew, 2.5);
+    ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('王様に　はなしかけるのだ。', 40, 220); ctx.fillStyle = '#ccc'; ctx.fillText('SELECT: 城を出る', 60, 280);
+    if (this.st === 'msg') { ctx.fillStyle = '#000'; ctx.fillRect(10, 150, 180, 80); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(10, 150, 180, 80); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; let arr = this.msg.split('\n'); for(let i=0; i<arr.length; i++) ctx.fillText(arr[i], 20, 170 + i*15); }
+  }
+};
+
+const Ranking = {
+  mode: 'normal', input: false, name: '', cursor: 0, menuCursor: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
+  init() { if (!this.input) this.mode = 'normal'; this.cursor = 0; this.menuCursor = 0; },
+  update() {
+    if (!this.input && (keysDown.select || keysDown.b)) { switchApp(Menu); return; }
+    if (this.input && keysDown.select) { this.input = false; this.name = ''; switchApp(Menu); return; }
+    if (!this.input) {
+      if (keysDown.left || keysDown.right) { this.mode = this.mode === 'normal' ? 'hard' : 'normal'; playSnd('sel'); }
+      if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.cursor = 0; this.menuCursor = 0; playSnd('jmp'); }
+    } else {
+      if (this.menuCursor === 0) {
+        if (keysDown.right) { this.cursor = (this.cursor + 1) % this.chars.length; playSnd('sel'); }
+        if (keysDown.left) { this.cursor = (this.cursor + this.chars.length - 1) % this.chars.length; playSnd('sel'); }
+        if (keysDown.down) { let nC = this.cursor + 10; if (nC >= this.chars.length) this.menuCursor = 1; else this.cursor = nC; playSnd('sel'); }
+        if (keysDown.up) { let nC = this.cursor - 10; if (nC >= 0) { this.cursor = nC; playSnd('sel'); } }
+        if (keysDown.a) { if (this.name.length < 10) { this.name += this.chars[this.cursor]; playSnd('jmp'); } else playSnd('hit'); }
+        if (keysDown.b) { if (this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } }
+      } else if (this.menuCursor === 1) {
+        if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); }
+        if (keysDown.down) { this.menuCursor = 2; playSnd('sel'); }
+        if (keysDown.a) { if (this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } }
+      } else if (this.menuCursor === 2) {
+        if (keysDown.up) { this.menuCursor = 1; playSnd('sel'); }
+        if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Menu); }
+      }
+    }
+  },
+  draw() {
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
+    if (!this.input) {
+      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mode === 'normal' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'hard' ? '[HARD]' : '<HARD>'), 120, 40);
+      const rank = this.mode === 'normal' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa';
+        if (rank[i]) { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ${rank[i].name.padEnd(10, ' ')} ${String(rank[i].score).padStart(6, ' ')}`, 15, 76 + i * 18); } 
+        else { ctx.fillText(`${String(i + 1).padStart(2, ' ')}. ----------  ----`, 15, 76 + i * 18); }
+      }
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('プレイヤー名: ' + SaveSys.data.playerName, 15, 270); ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
+    } else {
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
+      for (let i = 0; i < this.chars.length; i++) {
+        const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18;
+        if (i === this.cursor && this.menuCursor === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; }
+        ctx.fillText(this.chars[i], x, y);
+      }
+      ctx.fillStyle = this.menuCursor === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 1 ? '#fff' : '#666'; ctx.lineWidth = 2; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.menuCursor === 1 ? '#fff' : '#ccc'; ctx.font = 'bold 11px monospace'; ctx.fillText('DELETE', 30, 191);
+      const okEn = this.name.length > 0; ctx.fillStyle = this.menuCursor === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.menuCursor === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.menuCursor === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
+      ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText('↑↓←→:選択 A:追加 B:削除', 25, 215);
+    }
+  }
+};
+
+const Settings = {
+  menuCursor: 0, init() { this.menuCursor = 0; },
+  update() {
+    if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
+    if (keysDown.up) { this.menuCursor = 0; playSnd('sel'); }
+    if (keysDown.down) { this.menuCursor = 1; playSnd('sel'); }
+    if (keysDown.a) {
+      if (this.menuCursor === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } 
+      else if (this.menuCursor === 1) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
+    }
+  },
+  draw() {
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
+    ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.menuCursor === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.menuCursor === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
+    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
+  }
+};
+
+function loop() {
+  try {
+    if (hitStopTimer <= 0) { for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; } }
+    if (transTimer > 0) { transTimer--; if (transTimer === 0 && nextApp) { activeApp = nextApp; activeApp.init(); nextApp = null; } } 
+    else if (hitStopTimer > 0) { hitStopTimer--; } 
+    else { if (activeApp && activeApp.update) activeApp.update(); }
+    if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
+  } catch (err) {
+    console.error("Game Loop Error:", err);
+    ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = "#fff"; ctx.font = "10px monospace";
+    ctx.fillText("ERROR CRASHED", 10, 50); ctx.fillText(err.message.substring(0, 30), 10, 70);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+const setBtn = (id, k) => {
+  const e = document.getElementById(id); if (!e) return;
+  const p = (ev) => { ev.preventDefault(); keys[k] = true; initAudio(); }; const r = (ev) => { ev.preventDefault(); keys[k] = false; };
+  e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
+};
+['btn-up', 'btn-down', 'btn-left', 'btn-right', 'btn-a', 'btn-b', 'btn-select'].forEach((id, i) => { setBtn(id, ['up', 'down', 'left', 'right', 'a', 'b', 'select'][i]); });
+
+window.addEventListener('keydown', e => {
+  let k = e.key.toLowerCase();
+  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
+  if (k === 'z' || e.key === ' ') { keys.a = true; initAudio(); } 
+  if (k === 'x') { keys.b = true; initAudio(); } 
+  if (e.key === 'Shift') { keys.select = true; initAudio(); }
+  
+  if (k === 'd') { keys.l0 = true; initAudio(); } 
+  if (k === 'f') { keys.l1 = true; initAudio(); }
+  if (k === 'j') { keys.l2 = true; initAudio(); } 
+  if (k === 'k') { keys.l3 = true; initAudio(); }
+});
+
+window.addEventListener('keyup', e => {
+  let k = e.key.toLowerCase();
+  if (e.key === 'ArrowUp') keys.up = false; 
+  if (e.key === 'ArrowDown') keys.down = false;
+  if (e.key === 'ArrowLeft') keys.left = false; 
+  if (e.key === 'ArrowRight') keys.right = false;
+  if (k === 'z' || e.key === ' ') keys.a = false; 
+  if (k === 'x') keys.b = false; 
+  if (e.key === 'Shift') keys.select = false;
+  
+  if (k === 'd') keys.l0 = false; 
+  if (k === 'f') keys.l1 = false;
+  if (k === 'j') keys.l2 = false; 
+  if (k === 'k') keys.l3 = false;
+});
