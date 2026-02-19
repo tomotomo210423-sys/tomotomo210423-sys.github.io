@@ -1,13 +1,11 @@
-// === BLOCK CRAFT (3D) - CONTROLS & PHYSICS OVERHAUL ===
+// === BLOCK CRAFT (3D) - SENSITIVITY & JOYSTICK FIX ===
 const Mine = {
   st: 'init',
   scene: null, camera: null, renderer: null,
   textureAtlas: null, materials: [],
-  // ★ 修正：スピードを落とし、重力とジャンプ力をマイクラらしく「ずっしり」調整
   player: { x: 8, y: 10, z: 8, vy: 0, isGrounded: false, speed: 0.07, jumpPower: 0.12 },
   controls: { moveX: 0, moveZ: 0, yaw: 0, pitch: -0.5 },
   blocks: [], 
-  // ★ 修正：指ごとのID（pointerId）を記憶して混線を防ぐ
   joystick: { active: false, pointerId: null },
   touchZone: { active: false, pointerId: null, lastX: 0, lastY: 0 },
   initialized: false,
@@ -100,7 +98,6 @@ const Mine = {
     window.addEventListener('resize', () => { setTimeout(() => this.resize(), 100); }, false);
     window.addEventListener('orientationchange', () => { setTimeout(() => this.resize(), 200); }, false);
     
-    // ★ Pointer Event を使った完璧なマルチタッチ制御
     const btnExit = document.getElementById('btn-mine-exit');
     btnExit.addEventListener('pointerdown', (e) => { e.preventDefault(); this.exitGame(); });
     
@@ -145,10 +142,12 @@ const Mine = {
         e.preventDefault();
         updateJoy(e);
     });
+    
+    // ★ 修正：暴走を防ぐため、どんな理由で指が離れても確実にリセットする
     const endJoy = (e) => {
         if (!this.joystick.active || this.joystick.pointerId !== e.pointerId) return;
         e.preventDefault();
-        joyZone.releasePointerCapture(e.pointerId);
+        try { joyZone.releasePointerCapture(e.pointerId); } catch(err) {}
         this.joystick.active = false;
         this.joystick.pointerId = null;
         joyKnob.style.transform = `translate(0px, 0px)`;
@@ -157,6 +156,7 @@ const Mine = {
     };
     joyZone.addEventListener('pointerup', endJoy);
     joyZone.addEventListener('pointercancel', endJoy);
+    joyZone.addEventListener('pointerout', endJoy); // エリア外に出た時も念のため止める
     
     // ===== 右手：視点移動（カメラ） =====
     const touchZone = document.getElementById('touch-zone');
@@ -176,9 +176,9 @@ const Mine = {
         const dx = e.clientX - this.touchZone.lastX;
         const dy = e.clientY - this.touchZone.lastY;
         
-        // ★ 修正：カメラの感度を少しマイルドにして酔いにくくした
-        this.controls.yaw -= dx * 0.003; 
-        this.controls.pitch -= dy * 0.003; 
+        // ★ 修正：カメラの感度を少し高くした (0.003 -> 0.006)
+        this.controls.yaw -= dx * 0.006; 
+        this.controls.pitch -= dy * 0.006; 
         this.controls.pitch = Math.max(-Math.PI/2.1, Math.min(Math.PI/2.1, this.controls.pitch));
         
         this.touchZone.lastX = e.clientX;
@@ -187,12 +187,19 @@ const Mine = {
     const endTouch = (e) => {
         if (!this.touchZone.active || this.touchZone.pointerId !== e.pointerId) return;
         e.preventDefault();
-        touchZone.releasePointerCapture(e.pointerId);
+        try { touchZone.releasePointerCapture(e.pointerId); } catch(err) {}
         this.touchZone.active = false;
         this.touchZone.pointerId = null;
     };
     touchZone.addEventListener('pointerup', endTouch);
     touchZone.addEventListener('pointercancel', endTouch);
+    touchZone.addEventListener('pointerout', endTouch);
+
+    // ★ 究極の暴走対策：画面のどこで指を離しても、紐づいている操作を強制終了する
+    window.addEventListener('pointerup', (e) => {
+        if (this.joystick.active && this.joystick.pointerId === e.pointerId) endJoy(e);
+        if (this.touchZone.active && this.touchZone.pointerId === e.pointerId) endTouch(e);
+    });
   },
   
   resize() {
@@ -215,10 +222,11 @@ const Mine = {
     document.getElementById('mine-container').classList.remove('active');
     document.getElementById('gameboy').style.display = 'flex';
     
-    // リセット処理
+    // 戻る時にスティックを完全リセット
     this.joystick.active = false;
     this.touchZone.active = false;
     document.getElementById('joystick-knob').style.transform = `translate(0px, 0px)`;
+    this.controls.moveX = 0; this.controls.moveZ = 0;
     
     switchApp(Menu);
   },
@@ -252,7 +260,6 @@ const Mine = {
     if (!this.getCollidingBlock(nx, this.player.y, this.player.z)) { this.player.x = nx; }
     if (!this.getCollidingBlock(this.player.x, this.player.y, nz)) { this.player.z = nz; }
     
-    // ★ 修正：重力を緩やかにして、浮遊感をなくした
     this.player.vy -= 0.006; 
     let ny = this.player.y + this.player.vy;
     
