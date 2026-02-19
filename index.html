@@ -11,36 +11,25 @@
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 
-<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIjVpbjEgUkVUUk8gU1lTVEVNIiwKICAic2hvcnRfbmFtZSI6ICI1aW4xIiwKICAic3RhcnRfdXJsIjogIi4vaW5kZXguaHRtbCIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29xvciI6ICIjMDAwMDAwIiwKICAidGhlbWVfY29sb3IiOiAiIzAwMDAwMCIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaWNvbi5wbmciLAogICAgICAic2l6ZXMiOiAiMTkyeDE5MiIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIKICAgIH0KICBdCn0=">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
 
-/* 筐体全体のベース */
-#gameboy { width: 100%; max-width: 450px; height: 100vh; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: max-width 2s cubic-bezier(0.7, 0, 0.3, 1), max-height 2s cubic-bezier(0.7, 0, 0.3, 1); }
-
-/* 画面エリア */
+/* 2Dゲーム機全体のベース */
+#gameboy { width: 100%; max-width: 450px; height: 100vh; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: opacity 0.3s; }
 #screen-container { flex: 1; background: #444; margin: 15px 15px 5px 15px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 10px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; }
-
-/* 起動画面 */
-#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; font-family: 'Courier New', monospace; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
+#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
 #boot.hidden { opacity: 0; }
 .boot-text { font-size: 10px; margin: 4px 0; }
 .boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
+canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; }
+#controls { height: 300px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: height 1s; }
+#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-/* ゲーム画面 (Canvas) */
-canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; transition: all 2s cubic-bezier(0.7, 0, 0.3, 1); border-radius: 2px; touch-action: none; }
-
-/* コントローラー領域 */
-#controls { height: 300px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: height 2s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.5s; }
-#classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 1.5s ease; }
-
-/* ボタン類の設定（サイズアップ） */
 .d-btn, .a-btn, .s-btn { touch-action: none; -webkit-tap-highlight-color: transparent; }
-
-/* 十字キー（120px -> 150px） */
 #dpad { position: absolute; left: 35px; top: 35px; width: 150px; height: 150px; }
 .d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; }
 .d-btn:active { background: #111; transform: translateY(2px); }
@@ -50,33 +39,45 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
 #btn-right { top: 50px; right: 0; width: 50px; height: 50px; border-radius: 0 5px 5px 0; }
 .d-center { top: 50px; left: 50px; width: 50px; height: 50px; background: #333; position: absolute; }
 
-/* アクションボタン（55px -> 70px） */
 #action-buttons { position: absolute; right: 25px; top: 55px; width: 160px; height: 120px; transform: rotate(-15deg); }
-.a-btn { position: absolute; width: 70px; height: 70px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.1s; }
-.a-btn:active { background: #800; transform: translateY(2px); box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 1px 1px 2px rgba(0,0,0,0.4); }
+.a-btn { position: absolute; width: 70px; height: 70px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; }
+.a-btn:active { background: #800; transform: translateY(2px); }
 #btn-b { left: 0; bottom: 0; } #btn-a { right: 0; top: 0; }
 .btn-label { position: absolute; font-size: 16px; color: #555; font-weight: bold; pointer-events: none; }
 #label-b { left: 25px; bottom: -28px; } #label-a { right: 25px; top: -28px; }
 
-/* SELECTボタン（50px -> 70px） */
 #sys-buttons { position: absolute; bottom: 35px; width: 100%; display: flex; justify-content: center; }
 .s-btn-wrap { text-align: center; }
 .s-btn { width: 70px; height: 20px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
 .s-btn:active { background: #333; }
 .s-label { font-size: 12px; color: #555; font-weight: bold; margin-top: 8px; }
-
-/* 縦長全画面モード */
-.mode-tall #classic-controls { transform: translateY(50px) scale(0.8); opacity: 0; pointer-events: none; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
-.mode-tall canvas { 
-    aspect-ratio: 1 / 2; 
-    width: auto; 
-    max-width: 100%; 
-    height: 100%; 
-    max-height: 100%; 
-    border-radius: 8px; 
-    box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); 
-}
+.mode-tall canvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
+
+/* =========================================
+   ★ 新規追加：3Dマイクラ用 横画面フルスクリーンUI
+   ========================================= */
+#mine-container { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1000; background: #000; overflow: hidden; }
+#mine-container.active { display: block; }
+#mine-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+
+/* 左下：移動用ジョイスティック */
+#joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; background: rgba(255,255,255,0.15); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); pointer-events: auto; touch-action: none; }
+#joystick-knob { position: absolute; top: 40px; left: 40px; width: 60px; height: 60px; background: rgba(255,255,255,0.7); border-radius: 50%; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+/* 右側：視点移動スワイプ領域 */
+#touch-zone { position: absolute; top: 0; right: 0; width: 50%; height: 100%; pointer-events: auto; touch-action: none; }
+
+/* 右下：ジャンプボタン */
+.mine-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.5); color: #fff; text-align: center; font-weight: bold; pointer-events: auto; user-select: none; border-radius: 8px; }
+.mine-btn:active { background: rgba(255,255,255,0.3); }
+#btn-jump { bottom: 40px; right: 40px; width: 70px; height: 70px; line-height: 66px; font-size: 28px; }
+
+/* 右上：一時停止（EXIT）ボタン */
+#btn-mine-exit { top: 20px; right: 20px; width: 40px; height: 40px; line-height: 36px; font-size: 16px; border-radius: 4px; }
+
+/* 中央：照準（クロスヘア） */
+#crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.8); font-size: 24px; pointer-events: none; text-shadow: 1px 1px 2px #000; }
 </style>
 </head>
 <body>
@@ -84,7 +85,7 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
   <div id="screen-container">
     <div id="boot">
       <div class="boot-text">5in1 RETRO SYSTEM</div>
-      <div class="boot-text">SYSTEM REBOOT...</div>
+      <div class="boot-text">SYSTEM BOOTING...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
       <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
     </div>
@@ -113,6 +114,16 @@ canvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5;
   </div>
 </div>
 
+<div id="mine-container">
+  <div id="mine-ui">
+    <div id="joystick-zone"><div id="joystick-knob"></div></div>
+    <div id="touch-zone"></div>
+    <div class="mine-btn" id="btn-jump">▲</div>
+    <div class="mine-btn" id="btn-mine-exit">II</div>
+    <div id="crosshair">+</div>
+  </div>
+</div>
+
 <script>
 let bootProgress = 0;
 const bootInterval = setInterval(() => {
@@ -135,8 +146,7 @@ const bootInterval = setInterval(() => {
 <script src="arena.js"></script>
 <script src="online.js"></script>
 <script src="rhythm.js"></script>
-
-<script>
+<script src="mine.js"></script> <script>
 window.onload = () => {
   activeApp = Menu;
   activeApp.init();
