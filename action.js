@@ -1,4 +1,4 @@
-// === UNREASONABLE BROS - BUG FIX & SAVE UNIFICATION ===
+// === UNREASONABLE BROS - TEXTURE RESTORE & DATA FIX ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1}, score: 0, camX: 0, coyoteTime: 0, stageTheme: 'grass',
@@ -6,8 +6,11 @@ const Action = {
   
   init() { 
     this.st = 'title'; BGM.play('action'); 
+    // ★ データ自動修復機能：不正な値が入っていたらリセットする
+    if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
+    if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
     if (SaveSys.data.actLives === undefined) {
-      SaveSys.data.actLives = 5; SaveSys.data.actStage = 1; SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save();
+      SaveSys.data.actLives = 5; SaveSys.save();
     }
   },
   
@@ -16,6 +19,10 @@ const Action = {
     this.map = []; this.platforms = []; this.coins = []; this.spikes = []; this.enemies = []; this.invisibleBlocks = []; this.fakeCoins = [];
     this.score = 0; this.camX = 0; this.coyoteTime = 0; this.deathReason = '';
     
+    // データ安全チェック
+    if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
+    if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
+
     const stage = SaveSys.data.actStage; 
     this.stageTheme = stage % 3 === 1 ? 'grass' : stage % 3 === 2 ? 'desert' : 'lava';
     for (let i = 0; i < 100; i++) this.map.push({x: i * 20, y: 270, w: 20, h: 30, type: 'ground'});
@@ -163,8 +170,8 @@ const Action = {
     for (let m of this.map) {
       if (m.x - this.camX > -50 && m.x - this.camX < 250) {
         if (m.type === 'ground') {
-          ctx.fillStyle = this.stageTheme === 'grass' ? '#8b4513' : this.stageTheme === 'desert' ? '#d2b48c' : '#444'; ctx.fillRect(m.x, m.y, m.w, m.h);
-          ctx.fillStyle = this.stageTheme === 'grass' ? '#6b3513' : this.stageTheme === 'desert' ? '#c19a6b' : '#222'; ctx.fillRect(m.x, m.y, m.w, 5);
+          // 地面もブロックで描画
+          let num = Math.ceil(m.w / 20); for(let k=0; k<num; k++) drawSprite(m.x + k*20, m.y, '#8b4513', sprs.block, 2.5);
         } else if (m.type === 'goal') { 
           ctx.fillStyle = '#ffd700'; ctx.fillRect(m.x, m.y, m.w, m.h); ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('★', m.x + 7, m.y + 30); 
         }
@@ -174,12 +181,18 @@ const Action = {
       if (plat.disappeared) continue;
       if (plat.x - this.camX > -50 && plat.x - this.camX < 250) {
         if (plat.disappear && plat.timer > 0 && plat.timer < 15) ctx.globalAlpha = plat.timer / 15;
-        ctx.fillStyle = plat.fake ? '#964' : '#654321'; ctx.fillRect(plat.x, plat.y, plat.w, plat.h); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(plat.x, plat.y, plat.w, 2); ctx.globalAlpha = 1;
+        // ★ 修正：矩形の代わりにブロックの絵を描画
+        let color = plat.fake ? '#964' : '#654321';
+        let num = Math.ceil(plat.w / 20);
+        for(let k=0; k<num; k++) drawSprite(plat.x + k*20, plat.y, color, sprs.block, 2.5);
+        ctx.globalAlpha = 1;
       }
     }
     for (let ib of this.invisibleBlocks) {
       if (ib.x - this.camX > -50 && ib.x - this.camX < 250) {
-        if (ib.visible) { ctx.fillStyle = '#888'; ctx.fillRect(ib.x, ib.y, ib.w, ib.h); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(ib.x, ib.y, ib.w, 2); } 
+        if (ib.visible) { 
+           let num = Math.ceil(ib.w / 20); for(let k=0; k<num; k++) drawSprite(ib.x + k*20, ib.y, '#888', sprs.block, 2.5);
+        } 
         else { ctx.strokeStyle = 'rgba(136,136,136,0.2)'; ctx.strokeRect(ib.x, ib.y, ib.w, ib.h); }
       }
     }
