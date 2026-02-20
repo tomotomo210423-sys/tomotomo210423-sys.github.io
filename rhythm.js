@@ -1,23 +1,17 @@
-// === BEAT BROS - LONG NOTES ADDED ===
+// === BEAT BROS - LONG NOTES & CRASH FIX ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
   touchBound: false, laneTouch: [false,false,false,false],
   
-  arrows: ['←', '↓', '↑', '→'],
-  colors: ['#f0f', '#0ff', '#0f0', '#f00'],
-  lineY: 340, 
+  arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
   
   init() {
     this.st = 'menu'; this.mode = 'normal'; this.laneTouch = [false,false,false,false];
     this.audioBuffer = null; if (this.source) { this.source.stop(); this.source.disconnect(); this.source = null; }
-    
     document.getElementById('gameboy').classList.remove('mode-tall');
-    const cvs = document.getElementById('gameCanvas');
-    cvs.width = 200; cvs.height = 300; 
-    
-    BGM.play('menu');
-    this.showFileUI();
+    const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 300; 
+    BGM.play('menu'); this.showFileUI();
     
     if (!this.touchBound) {
       this.touchBound = true;
@@ -25,15 +19,12 @@ const Rhythm = {
         if (activeApp !== this) return;
         if (this.st !== 'play' && this.st !== 'result') return;
         e.preventDefault(); 
-        
         const r = cvs.getBoundingClientRect();
         let ts = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
         let nT = [false,false,false,false]; let jt = [];
-        
         for(let i=0; i<ts.length; i++) {
           let x = (ts[i].clientX - r.left) / r.width * cvs.width;
           let y = (ts[i].clientY - r.top) / r.height * cvs.height;
-          
           if (e.type === 'touchstart' || e.type === 'mousedown') {
             if (y < 40 && x < 60) { this.exitGame(); return; }
             if (this.st === 'result') { this.exitGame(); return; }
@@ -52,23 +43,16 @@ const Rhythm = {
   showFileUI() {
     let ui = document.getElementById('rhythm-file-ui');
     if (!ui) {
-      ui = document.createElement('div');
-      ui.id = 'rhythm-file-ui';
-      ui.style.position = 'absolute';
-      ui.style.bottom = '80px'; 
-      ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
+      ui = document.createElement('div'); ui.id = 'rhythm-file-ui';
+      ui.style.position = 'absolute'; ui.style.bottom = '80px'; ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
       let label = document.createElement('label');
       label.style.display = 'inline-block'; label.style.background = '#ff0'; label.style.color = '#000'; label.style.padding = '10px 15px'; label.style.fontFamily = 'monospace'; label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; label.style.cursor = 'pointer'; label.style.border = '2px solid #fff'; label.style.boxShadow = '0 0 15px #ff0';
       label.innerHTML = '📁 曲ファイルを選ぶ';
       label.onclick = () => { initAudio(); }; label.ontouchstart = () => { initAudio(); };
-      
-      let input = document.createElement('input');
-      input.type = 'file'; input.accept = 'audio/*'; input.style.display = 'none';
+      let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*'; input.style.display = 'none';
       input.onchange = (e) => {
         if (e.target.files[0]) { 
-          initAudio(); this.hideFileUI(); 
-          this.pendingFile = e.target.files[0];
-          e.target.value = ''; 
+          initAudio(); this.hideFileUI(); this.pendingFile = e.target.files[0]; e.target.value = ''; 
           this.st = 'transform_in'; this.transformTimer = 120; 
           document.getElementById('gameboy').classList.add('mode-tall'); 
           const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 400; 
@@ -90,8 +74,7 @@ const Rhythm = {
   },
   
   loadFile(file) {
-    this.st = 'loading'; BGM.stop();
-    const reader = new FileReader();
+    this.st = 'loading'; BGM.stop(); const reader = new FileReader();
     reader.onload = e => {
       audioCtx.decodeAudioData(e.target.result, buffer => {
         this.audioBuffer = buffer; this.generateNotes(buffer);
@@ -101,35 +84,40 @@ const Rhythm = {
   },
   
   generateNotes(buffer) {
-    const raw = buffer.getChannelData(0);
-    this.notes = [];
+    const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0;
     for (let i = 0; i < raw.length; i += 1000) { sum += Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
-    
     let threshold = avgVol * (this.mode === 'hard' ? 1.2 : this.mode === 'normal' ? 2.0 : 3.0);
     if (threshold < 0.01) threshold = 0.01;
     let minGap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.25 : 0.5;
     
-    let lastTime = 0;
+    // ★ 修正：同じレーンにノーツが被らないように管理
+    let laneEnd = [0,0,0,0]; 
+    
     for (let i = 0; i < raw.length; i += 256) {
-      let vol = Math.abs(raw[i]);
-      if (vol > threshold) {
+      if (Math.abs(raw[i]) > threshold) {
         let t = i / buffer.sampleRate; 
-        if (t - lastTime > minGap) {
-          let lane = Math.floor(Math.random() * 4);
+        let avail = []; for(let l=0; l<4; l++) if(t > laneEnd[l] + minGap) avail.push(l);
+        if (avail.length > 0) {
+          let lane = avail[Math.floor(Math.random() * avail.length)];
           let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
           this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
-          lastTime = t;
+          laneEnd[lane] = t + dur; // 長押しの長さを記録して被りを防ぐ
         }
       }
     }
     
     if (this.notes.length < 10) {
-       this.notes = []; 
+       this.notes = []; laneEnd = [0,0,0,0];
        for (let t = 2; t < buffer.duration; t += minGap * 1.5) {
-           let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
-           this.notes.push({ time: t, lane: Math.floor(Math.random() * 4), hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
+           let avail = []; for(let l=0; l<4; l++) if(t > laneEnd[l] + minGap) avail.push(l);
+           if(avail.length > 0) {
+               let lane = avail[Math.floor(Math.random() * avail.length)];
+               let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
+               this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
+               laneEnd[lane] = t + dur;
+           }
        }
     }
     this.startPlay();
@@ -141,10 +129,8 @@ const Rhythm = {
     this.source = audioCtx.createBufferSource();
     this.source.buffer = this.audioBuffer;
     this.source.connect(audioCtx.destination);
-    
     this.source.onended = () => { 
-      this.st = 'result'; 
-      let finalScore = Math.floor(this.score);
+      this.st = 'result'; let finalScore = Math.floor(this.score);
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0};
       if (finalScore > rData[this.mode]) { rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
     }; 
@@ -154,8 +140,6 @@ const Rhythm = {
       if (this.st !== 'play') return;
       let now = audioCtx.currentTime - this.startTime;
       let hitNote = null, minDiff = 999;
-      let cx = 25 + lane * 50; 
-      
       for (let n of this.notes) {
         if (!n.hit && !n.missed && n.lane === lane) {
           let diff = Math.abs(n.time - now);
@@ -163,7 +147,7 @@ const Rhythm = {
         }
       }
       if (hitNote) {
-        hitNote.hit = true; 
+        hitNote.hit = true; let cx = 25 + lane * 50;
         if(hitNote.type === 'long') {
            hitNote.hold = true;
            addParticle(cx, this.lineY, this.colors[lane], 'star'); playSnd('hit');
@@ -175,8 +159,7 @@ const Rhythm = {
            else { msg = 'GOOD'; pts = 10; }
            this.combo++; if (this.combo > this.maxCombo) this.maxCombo = this.combo;
            this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
-           this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane });
-           playSnd('hit');
+           this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); playSnd('hit');
         }
       }
   },
@@ -232,14 +215,14 @@ const Rhythm = {
               if (isP[n.lane]) {
                  this.score += 2; // 押している間スコア加算！
                  if (Math.random() < 0.2) addParticle(25 + n.lane * 50, this.lineY, this.colors[n.lane], 'star');
-                 if (endY > this.lineY) {
+                 if (endY >= this.lineY) {
                     n.hold = false; n.missed = true;
                     this.combo++; if(this.combo > this.maxCombo) this.maxCombo = this.combo;
                     this.judgements.push({ msg: 'PERFECT', life: 30, color: '#ff0', lane: n.lane });
                     playSnd('combo');
                  }
               } else {
-                 n.hold = false; n.missed = true; // 途中で離してもペナルティなしで消える
+                 n.hold = false; n.missed = true; // ★修正：途中で離してもペナルティなしで消える
               }
            } else if (!n.hit && !n.missed && n.y > 420) {
               n.missed = true; this.combo = 0; 
@@ -253,6 +236,9 @@ const Rhythm = {
         }
       }
       for (let i = this.judgements.length - 1; i >= 0; i--) { this.judgements[i].life--; if (this.judgements[i].life <= 0) this.judgements.splice(i, 1); }
+      
+      // ★ クラッシュ(メモリリーク)修正：増え続けるパーティクルを削除
+      if (typeof updateParticles === 'function') updateParticles();
     }
   },
   
@@ -302,7 +288,8 @@ const Rhythm = {
              let endY = this.lineY - (n.time + n.dur - now) * speed;
              let startY = n.hold ? this.lineY : n.y;
              
-             if (startY > -30 && endY < 420) {
+             // ★ クラッシュ(描画エラー)修正：高さがマイナスになるバグを防御
+             if (startY > -30 && endY < 420 && startY > endY) {
                  ctx.fillStyle = this.colors[n.lane]; ctx.globalAlpha = 0.5;
                  ctx.fillRect(cx - 12, endY, 24, startY - endY); ctx.globalAlpha = 1.0;
              }
