@@ -4,12 +4,12 @@ const Slot = {
   coins: 100,
   bet: 1,
   winAmount: 0,
-  winLines: [], // 当たったラインを記録
+  winLines: [], 
   msg: 'BET & PRESS A',
   timer: 0,
   reachTimer: 0,
   
-  symHeight: 32, // 1シンボルの高さ
+  symHeight: 32, 
   
   reels: [
     { pos: 0, speed: 0, stopped: true, bounce: 0 },
@@ -46,7 +46,6 @@ const Slot = {
     BGM.stop();
   },
 
-  // ★ 追加：リールの現在の「上・中・下」の絵柄を正確に取得する
   getSymbols(reelIdx) {
     let r = this.reels[reelIdx];
     let baseIdx = Math.round(r.pos / this.symHeight) % 10;
@@ -57,22 +56,17 @@ const Slot = {
     };
   },
 
-  // ★ 追加：BET数に応じた有効ラインを取得する
+  // ★ 修正：BET数に関係なく、常に全5ライン（横3＋斜め2）を当たり判定にする！
   getActiveLines(sym0, sym1, sym2) {
     let lines = [];
-    if (this.bet >= 1) lines.push({name: 'mid', s0: sym0.mid, s1: sym1.mid, s2: sym2 ? sym2.mid : null});
-    if (this.bet >= 2) {
-        lines.push({name: 'top', s0: sym0.top, s1: sym1.top, s2: sym2 ? sym2.top : null});
-        lines.push({name: 'bot', s0: sym0.bot, s1: sym1.bot, s2: sym2 ? sym2.bot : null});
-    }
-    if (this.bet === 3) {
-        lines.push({name: 'cross1', s0: sym0.top, s1: sym1.mid, s2: sym2 ? sym2.bot : null});
-        lines.push({name: 'cross2', s0: sym0.bot, s1: sym1.mid, s2: sym2 ? sym2.top : null});
-    }
+    lines.push({name: 'mid', s0: sym0.mid, s1: sym1.mid, s2: sym2 ? sym2.mid : null});
+    lines.push({name: 'top', s0: sym0.top, s1: sym1.top, s2: sym2 ? sym2.top : null});
+    lines.push({name: 'bot', s0: sym0.bot, s1: sym1.bot, s2: sym2 ? sym2.bot : null});
+    lines.push({name: 'cross1', s0: sym0.top, s1: sym1.mid, s2: sym2 ? sym2.bot : null});
+    lines.push({name: 'cross2', s0: sym0.bot, s1: sym1.mid, s2: sym2 ? sym2.top : null});
     return lines;
   },
 
-  // ★ 追加：リーチ判定（第2リール停止時にチェック）
   checkTenpai() {
     let sym0 = this.getSymbols(0); let sym1 = this.getSymbols(1);
     let lines = this.getActiveLines(sym0, sym1, null);
@@ -89,6 +83,7 @@ const Slot = {
       
       for(let l of lines) {
           if (l.s0 === l.s1 && l.s1 === l.s2) {
+              // BET数が多いほど配当が倍増する
               this.winAmount += this.bet * this.payouts[l.s0];
               this.winLines.push(l.name);
           }
@@ -153,7 +148,7 @@ const Slot = {
     }
     else if (this.st === 'reach_action') {
         this.reachTimer++;
-        if (this.reachTimer % 15 === 0) playSnd('sel'); // 心音のような緊張感
+        if (this.reachTimer % 15 === 0) playSnd('sel'); // 心音
         
         if (this.reachTimer > 60) this.reels[2].speed = 2; // さらに遅くなる
         
@@ -203,7 +198,7 @@ const Slot = {
   draw() {
     ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 200, 300);
 
-    // ★ リーチ中は筐体が赤く点滅する演出
+    // リーチ中は筐体が赤く点滅する演出
     if (this.st === 'reach_action' && this.reachTimer % 10 < 5) {
         ctx.fillStyle = '#f55';
     } else {
@@ -222,7 +217,6 @@ const Slot = {
     ctx.save();
     ctx.beginPath(); ctx.rect(30, 70, 140, 100); ctx.clip();
 
-    // 描画と当たり判定の完全一致化
     for(let i=0; i<3; i++) {
         let r = this.reels[i];
         let rx = 30 + i * 50;
@@ -241,19 +235,14 @@ const Slot = {
     }
     ctx.restore();
 
-    // ★ BET数に応じた有効ラインの描画（薄い線）
-    ctx.lineWidth = 2;
-    if (this.bet >= 1) { ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; ctx.beginPath(); ctx.moveTo(25, 118); ctx.lineTo(175, 118); ctx.stroke(); }
-    if (this.bet >= 2) { 
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)'; 
-        ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 86); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 150); ctx.stroke();
-    }
-    if (this.bet === 3) {
-        ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
-        ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 150); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 86); ctx.stroke();
-    }
+    // ★ 修正：全ラインが常に有効であることを示すため、薄い線を5本描画
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath(); ctx.moveTo(25, 118); ctx.lineTo(175, 118); ctx.stroke(); // 中
+    ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 86); ctx.stroke();   // 上
+    ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 150); ctx.stroke(); // 下
+    ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 150); ctx.stroke();  // 斜め1
+    ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 86); ctx.stroke();  // 斜め2
 
     // ★ 当たったラインを太く光らせる演出
     if (this.st === 'payout' && this.winAmount > 0 && this.timer % 10 < 5) {
