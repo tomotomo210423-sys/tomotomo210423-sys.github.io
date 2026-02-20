@@ -1,4 +1,4 @@
-// === BEAT BROS - LONG NOTES & CRASH FIX ===
+// === BEAT BROS - HUMAN PLAYABLE & CRASH FIX ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
@@ -86,35 +86,49 @@ const Rhythm = {
   generateNotes(buffer) {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0;
-    for (let i = 0; i < raw.length; i += 1000) { sum += Math.abs(raw[i]); count++; }
+    // 荒くサンプリングして平均音量を出す
+    for (let i = 0; i < raw.length; i += 2048) { sum += Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
-    let threshold = avgVol * (this.mode === 'hard' ? 1.2 : this.mode === 'normal' ? 2.0 : 3.0);
-    if (threshold < 0.01) threshold = 0.01;
-    let minGap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.25 : 0.5;
+    let threshold = avgVol * (this.mode === 'hard' ? 1.5 : this.mode === 'normal' ? 2.5 : 3.5);
+    if (threshold < 0.02) threshold = 0.02;
     
-    // ★ 修正：同じレーンにノーツが被らないように管理
+    // ★ 修正：人間が叩ける限界のスキマを強制的に設定（壁譜面の防止）
+    let minGap = this.mode === 'hard' ? 0.2 : this.mode === 'normal' ? 0.35 : 0.5;
     let laneEnd = [0,0,0,0]; 
+    let lastGlobalTime = 0; // 全レーン共通での最終生成時間
     
-    for (let i = 0; i < raw.length; i += 256) {
+    // 判定間隔を広くして微細な音を拾わないようにする
+    for (let i = 0; i < raw.length; i += 2048) {
       if (Math.abs(raw[i]) > threshold) {
         let t = i / buffer.sampleRate; 
-        let avail = []; for(let l=0; l<4; l++) if(t > laneEnd[l] + minGap) avail.push(l);
-        if (avail.length > 0) {
-          let lane = avail[Math.floor(Math.random() * avail.length)];
-          let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
-          this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
-          laneEnd[lane] = t + dur; // 長押しの長さを記録して被りを防ぐ
+        
+        // 前のノーツから確実に間隔が空いているかチェック
+        if (t - lastGlobalTime > minGap) {
+            let avail = []; 
+            for(let l=0; l<4; l++) if(t > laneEnd[l] + 0.1) avail.push(l);
+            
+            if (avail.length > 0) {
+              let lane = avail[Math.floor(Math.random() * avail.length)];
+              // 長押し確率は15%くらいに抑え、長さも常識的な範囲に
+              let isL = Math.random() < 0.15; 
+              let dur = isL ? (0.4 + Math.random() * 0.4) : 0;
+              
+              this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
+              laneEnd[lane] = t + dur;
+              lastGlobalTime = t; 
+            }
         }
       }
     }
     
+    // 曲が静かすぎる場合の救済措置
     if (this.notes.length < 10) {
        this.notes = []; laneEnd = [0,0,0,0];
        for (let t = 2; t < buffer.duration; t += minGap * 1.5) {
-           let avail = []; for(let l=0; l<4; l++) if(t > laneEnd[l] + minGap) avail.push(l);
+           let avail = []; for(let l=0; l<4; l++) if(t > laneEnd[l] + 0.1) avail.push(l);
            if(avail.length > 0) {
                let lane = avail[Math.floor(Math.random() * avail.length)];
-               let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
+               let isL = Math.random() < 0.15; let dur = isL ? 0.4 + Math.random() * 0.4 : 0;
                this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
                laneEnd[lane] = t + dur;
            }
@@ -213,7 +227,7 @@ const Rhythm = {
            let endY = this.lineY - (n.time + n.dur - now) * speed;
            if (n.hold) {
               if (isP[n.lane]) {
-                 this.score += 2; // 押している間スコア加算！
+                 this.score += 2; 
                  if (Math.random() < 0.2) addParticle(25 + n.lane * 50, this.lineY, this.colors[n.lane], 'star');
                  if (endY >= this.lineY) {
                     n.hold = false; n.missed = true;
@@ -222,7 +236,7 @@ const Rhythm = {
                     playSnd('combo');
                  }
               } else {
-                 n.hold = false; n.missed = true; // ★修正：途中で離してもペナルティなしで消える
+                 n.hold = false; n.missed = true; // 離してもペナルティなし
               }
            } else if (!n.hit && !n.missed && n.y > 420) {
               n.missed = true; this.combo = 0; 
@@ -237,7 +251,6 @@ const Rhythm = {
       }
       for (let i = this.judgements.length - 1; i >= 0; i--) { this.judgements[i].life--; if (this.judgements[i].life <= 0) this.judgements.splice(i, 1); }
       
-      // ★ クラッシュ(メモリリーク)修正：増え続けるパーティクルを削除
       if (typeof updateParticles === 'function') updateParticles();
     }
   },
@@ -288,7 +301,6 @@ const Rhythm = {
              let endY = this.lineY - (n.time + n.dur - now) * speed;
              let startY = n.hold ? this.lineY : n.y;
              
-             // ★ クラッシュ(描画エラー)修正：高さがマイナスになるバグを防御
              if (startY > -30 && endY < 420 && startY > endY) {
                  ctx.fillStyle = this.colors[n.lane]; ctx.globalAlpha = 0.5;
                  ctx.fillRect(cx - 12, endY, 24, startY - endY); ctx.globalAlpha = 1.0;
