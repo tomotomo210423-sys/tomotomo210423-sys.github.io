@@ -11,8 +11,6 @@
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100vh; }
@@ -40,49 +38,20 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #btn-left { top: 50px; left: 0; width: 50px; height: 50px; border-radius: 5px 0 0 5px; }
 #btn-right { top: 50px; right: 0; width: 50px; height: 50px; border-radius: 0 5px 5px 0; }
 .d-center { top: 50px; left: 50px; width: 50px; height: 50px; background: #333; position: absolute; }
+
 #action-buttons { position: absolute; right: 25px; top: 55px; width: 160px; height: 120px; transform: rotate(-15deg); }
 .a-btn { position: absolute; width: 70px; height: 70px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; }
 .a-btn:active { background: #800; transform: translateY(2px); }
 #btn-b { left: 0; bottom: 0; } #btn-a { right: 0; top: 0; }
 .btn-label { position: absolute; font-size: 16px; color: #555; font-weight: bold; pointer-events: none; }
 #label-b { left: 25px; bottom: -28px; } #label-a { right: 25px; top: -28px; }
+
 #sys-buttons { position: absolute; bottom: 35px; width: 100%; display: flex; justify-content: center; }
 .s-btn-wrap { text-align: center; }
 .s-btn { width: 70px; height: 20px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
 .s-btn:active { background: #333; }
 .s-label { font-size: 12px; color: #555; font-weight: bold; margin-top: 8px; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
-
-/* 3Dマイクラ用 横画面フルスクリーンUI */
-#mine-container { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1000; background: #000; overflow: hidden; }
-#mine-container.active { display: block; }
-#mine-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-
-#rotate-warning { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #fff; z-index: 2000; justify-content: center; align-items: center; flex-direction: column; text-align: center; font-size: 20px; font-weight: bold; font-family: sans-serif; pointer-events: auto; }
-.icon-rotate { font-size: 50px; margin-bottom: 20px; display: block; transform: rotate(-90deg); }
-
-/* コントローラー */
-#joystick-zone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; background: rgba(255,255,255,0.15); border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); pointer-events: auto; touch-action: none; }
-#joystick-knob { position: absolute; top: 35px; left: 35px; width: 70px; height: 70px; background: rgba(255,255,255,0.7); border-radius: 50%; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-#touch-zone { position: absolute; top: 0; right: 0; width: 50%; height: 100%; pointer-events: auto; touch-action: none; }
-
-.mine-btn { position: absolute; background: rgba(0,0,0,0.4); border: 2px solid rgba(255,255,255,0.5); color: #fff; font-weight: bold; pointer-events: auto; user-select: none; font-family: sans-serif; display: flex; justify-content: center; align-items: center; cursor: pointer; }
-#btn-jump { bottom: 120px; right: 40px; width: 70px; height: 70px; font-size: 28px; border-radius: 50%; }
-#btn-crouch { bottom: 30px; right: 40px; width: 70px; height: 70px; font-size: 28px; border-radius: 50%; }
-#btn-mine-exit { top: 20px; right: 20px; width: 50px; height: 50px; font-size: 20px; border-radius: 8px; }
-
-#crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.8); font-size: 28px; pointer-events: none; text-shadow: 1px 1px 2px #000; font-family: sans-serif; }
-
-/* ★ 新規追加：ホットバー（インベントリ） */
-#hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: rgba(0,0,0,0.6); padding: 5px; border-radius: 6px; pointer-events: auto; }
-.slot { width: 45px; height: 45px; border: 2px solid #555; background-image: url('atlas.png'); background-size: 180px 180px; image-rendering: pixelated; cursor: pointer; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
-.slot.active { border: 3px solid #fff; box-shadow: 0 0 10px #fff; transform: scale(1.05); }
-/* atlas.png から各ブロックの側面を切り抜いて表示 */
-.slot[data-type="dirt"] { background-position: -90px 0px; }
-.slot[data-type="cobblestone"] { background-position: 0px -45px; }
-.slot[data-type="wood"] { background-position: -45px -45px; }
-.slot[data-type="plank"] { background-position: 0px -90px; }
-.slot[data-type="glass"] { background-position: -90px -90px; }
 </style>
 </head>
 <body>
@@ -119,30 +88,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   </div>
 </div>
 
-<div id="mine-container">
-  <div id="rotate-warning">
-    <span class="icon-rotate">📱</span>
-    スマホを横向きに<br>持ち替えてください<br><br>
-    <span style="font-size:12px; font-weight:normal;">※画面の回転ロックを解除してください</span>
-  </div>
-  <div id="mine-ui">
-    <div id="joystick-zone"><div id="joystick-knob"></div></div>
-    <div id="touch-zone"></div>
-    <div class="mine-btn" id="btn-jump">▲</div>
-    <div class="mine-btn" id="btn-crouch">▼</div>
-    <div class="mine-btn" id="btn-mine-exit">II</div>
-    <div id="crosshair">+</div>
-    
-    <div id="hotbar">
-      <div class="slot active" data-type="dirt"></div>
-      <div class="slot" data-type="cobblestone"></div>
-      <div class="slot" data-type="wood"></div>
-      <div class="slot" data-type="plank"></div>
-      <div class="slot" data-type="glass"></div>
-    </div>
-  </div>
-</div>
-
 <script>
 let bootProgress = 0;
 const bootInterval = setInterval(() => {
@@ -165,7 +110,6 @@ const bootInterval = setInterval(() => {
 <script src="arena.js"></script>
 <script src="online.js"></script>
 <script src="rhythm.js"></script>
-<script src="mine.js"></script>
 
 <script>
 window.onload = () => {
