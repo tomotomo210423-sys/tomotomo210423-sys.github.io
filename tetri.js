@@ -1,4 +1,4 @@
-// === TETRIVADER - SPEED ADJUST & POSITION FIX ===
+// === TETRIVADER - SPEED ADJUST FIXED ===
 const Tetri = {
   mode: 'normal', difficultySelect: false, brd: [], blts: [], m: null, px: 4.5, cool: 0, sc: 0, st: 'play', dropCounter: 0, combo: 0,
   starFall: false, starY: 0, starX: 5, danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0, playerSkin: 0,
@@ -32,10 +32,11 @@ const Tetri = {
     if (this.st === 'over') { if (keysDown.a || keysDown.b) { this.difficultySelect = false; switchApp(Menu); } return; }
     if (this.danmakuMode) {
       this.danmakuTimer--;
-      if (keys.left) this.px = Math.max(0, this.px - 0.2); if (keys.right) this.px = Math.min(9, this.px + 0.2);
-      if (Math.random() < 0.15) { const pt = [{x: Math.random() * 10, y: 0, vx: 0, vy: 0.15, type: 'normal'}, {x: Math.random() * 10, y: 0, vx: (Math.random() - 0.5) * 0.3, vy: 0.15, type: 'curve'}, {x: Math.random() * 10, y: 0, vx: 0, vy: 0.1, type: 'accel'}]; this.danmakuBullets.push(pt[Math.floor(Math.random() * pt.length)]); }
+      // 自機の移動速度も少し緩和
+      if (keys.left) this.px = Math.max(0, this.px - 0.15); if (keys.right) this.px = Math.min(9, this.px + 0.15);
+      if (Math.random() < 0.1) { const pt = [{x: Math.random() * 10, y: 0, vx: 0, vy: 0.1, type: 'normal'}, {x: Math.random() * 10, y: 0, vx: (Math.random() - 0.5) * 0.2, vy: 0.1, type: 'curve'}, {x: Math.random() * 10, y: 0, vx: 0, vy: 0.08, type: 'accel'}]; this.danmakuBullets.push(pt[Math.floor(Math.random() * pt.length)]); }
       for (let i = this.danmakuBullets.length - 1; i >= 0; i--) {
-        let b = this.danmakuBullets[i]; if (b.type === 'accel') b.vy += 0.005; b.x += b.vx; b.y += b.vy;
+        let b = this.danmakuBullets[i]; if (b.type === 'accel') b.vy += 0.003; b.x += b.vx; b.y += b.vy;
         if (Math.abs(b.x - this.px - 0.5) < 0.4 && Math.abs(b.y - 14) < 0.4) {
           this.playerHit = true; playSnd('hit'); addParticle(this.px * 20 + 10, 14 * 20 + 10, '#f00', 'explosion'); screenShake(10);
           this.danmakuMode = false; this.danmakuBullets = []; this.playerHit = false; return;
@@ -49,19 +50,18 @@ const Tetri = {
       }
       return;
     }
-    if (keys.left) this.px = Math.max(0, this.px - 0.15); if (keys.right) this.px = Math.min(9, this.px + 0.15);
+    if (keys.left) this.px = Math.max(0, this.px - 0.12); if (keys.right) this.px = Math.min(9, this.px + 0.12);
     
-    // ★ 弾の発射位置：常に自機の中心(this.px + 0.5)から出る
-    if (keysDown.a && this.cool <= 0) { this.blts.push({x: this.px + 0.5, y: 14}); this.cool = 10; playSnd('jmp'); addParticle(this.px * 20 + 10, 14 * 20, '#ff0', 'star'); }
+    if (keysDown.a && this.cool <= 0) { this.blts.push({x: this.px + 0.5, y: 14}); this.cool = 15; playSnd('jmp'); addParticle(this.px * 20 + 10, 14 * 20, '#ff0', 'star'); }
     if (this.cool > 0) this.cool--;
     
     if (this.starFall) {
-      this.starY += 0.1;
+      this.starY += 0.06;
       if (this.starY >= 14) { this.scoreBeforeDanmaku = this.sc; this.danmakuMode = true; this.danmakuTimer = 600; this.starFall = false; playSnd('combo'); screenShake(5); }
       for (let i = this.blts.length - 1; i >= 0; i--) { let b = this.blts[i]; if (Math.abs(Math.floor(b.x) - this.starX) < 1 && Math.abs(Math.floor(b.y) - this.starY) < 1) { this.starFall = false; this.blts.splice(i, 1); break; } }
     }
     for (let i = this.blts.length - 1; i >= 0; i--) {
-      let b = this.blts[i]; b.y -= 0.6; let h = false; let bx = Math.floor(b.x), by = Math.floor(b.y);
+      let b = this.blts[i]; b.y -= 0.5; let h = false; let bx = Math.floor(b.x), by = Math.floor(b.y);
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
           let tx = bx + dx, ty = by + dy; if (ty >= 0 && ty < 15 && tx >= 0 && tx < 10 && this.brd[ty][tx]) { this.brd[ty][tx] = 0; h = true; this.sc += 3; this.combo++; addParticle(tx * 20 + 10, ty * 20 + 10, '#ff0', 'star'); }
@@ -79,8 +79,9 @@ const Tetri = {
       if (h || b.y < 0) this.blts.splice(i, 1);
     }
     
-    // ★ ハードモードの落下スピードを少し遅く調整 (15 -> 20)
-    let baseSpeed = this.mode === 'hard' ? 20 : 25; this.dropCounter += keys.b ? 3 : 1;
+    // ★ 落下スピードをマイルドに調整！(数値を大きくして遅くした)
+    let baseSpeed = this.mode === 'hard' ? 35 : 45; 
+    this.dropCounter += keys.b ? 4 : 1;
     if (this.dropCounter >= baseSpeed) {
       this.dropCounter = 0;
       if (this.m) {
@@ -112,8 +113,6 @@ const Tetri = {
     if (this.danmakuMode) {
       ctx.fillStyle = '#200'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText('DANMAKU MODE!', 40, 30); ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace'; ctx.fillText('SUCCESS = x2 SCORE!', 30, 50); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`TIME: ${Math.ceil(this.danmakuTimer / 60)}`, 70, 65);
       this.danmakuBullets.forEach(b => { ctx.shadowBlur = 15; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(b.x * 20 + 10, b.y * 20 + 10, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 10; ctx.shadowColor = '#ff0'; ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(b.x * 20 + 10, b.y * 20 + 10, 3, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x * 20 + 10, b.y * 20 + 10, 1, 0, Math.PI * 2); ctx.fill(); });
-      
-      // ★ 弾幕モード中の自機の中心座標渡し
       ctx.shadowBlur = 0; this.drawPlayer(this.px * 20 + 10, 14 * 20 + 10);
       drawParticles(); if (this.playerHit) { ctx.fillStyle = 'rgba(255,0,0,0.5)'; ctx.fillRect(0, 0, 200, 300); }
       resetShake(); return;
@@ -124,8 +123,6 @@ const Tetri = {
     if (this.m) { for (let r = 0; r < this.m.s.length; r++) { for (let c = 0; c < this.m.s[0].length; c++) { if (this.m.s[r][c]) db(this.m.x + c, this.m.y + r, this.m.c); } } }
     if (this.starFall) drawSprite(this.starX * 20 + 5, this.starY * 20 + 5, '#ff0', sprs.star, 2);
     ctx.fillStyle = '#ff0'; this.blts.forEach(b => ctx.fillRect(b.x * 20 - 2, b.y * 20 - 8, 4, 12));
-    
-    // ★ 通常モード中の自機の中心座標渡し
     this.drawPlayer(this.px * 20 + 10, 14 * 20 + 10);
     
     drawParticles(); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; let hi = this.mode === 'normal' ? SaveSys.data.scores.n : SaveSys.data.scores.h; ctx.fillText(`SC:${this.sc} HI:${hi}`, 5, 12);
@@ -133,8 +130,6 @@ const Tetri = {
     if (this.st === 'over') { ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 100, 200, 60); ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText('GAMEOVER', 55, 125); ctx.font = '10px monospace'; ctx.fillText('(A) Menu', 65, 145); }
     resetShake();
   },
-  
-  // ★ 渡された中心座標(cx, cy)から、自機がピッタリ真ん中に来るように逆算して描画
   drawPlayer(cx, cy) {
     const skinList = [sprs.fighter, sprs.banana, sprs.peperoncino, sprs.cannon];
     drawSprite(cx - 10, cy - 10, '#fff', skinList[this.playerSkin], 2.5);
