@@ -1,13 +1,13 @@
-// === BEAT BROS - UI FLOW & 8BIT FIX ===
+// === BEAT BROS - HITBOX EXPANDED & NEW FILTERS ===
 const Rhythm = {
-  st: 'menu', mode: 'normal', use8bit: true, settingsCur: 0,
+  st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
   touchBound: false, laneTouch: [false,false,false,false],
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
 
   init() {
-    this.st = 'menu'; this.mode = 'normal'; this.use8bit = true; this.settingsCur = 0;
+    this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0;
     this.laneTouch = [false,false,false,false];
     this.audioBuffer = null; if(this.source){ this.source.stop(); this.source.disconnect(); this.source=null; }
     document.getElementById('gameboy').classList.remove('mode-tall');
@@ -54,7 +54,6 @@ const Rhythm = {
       input.onchange = (e) => {
         if(e.target.files[0]) { 
           initAudio(); this.hideFileUI(); this.pendingFile = e.target.files[0]; e.target.value = ''; 
-          // ★修正：変形させずに、そのまま設定画面へ行く
           this.st = 'settings'; this.settingsCur = 0; 
         }
       };
@@ -124,14 +123,22 @@ const Rhythm = {
     this.source = audioCtx.createBufferSource();
     this.source.buffer = this.audioBuffer;
     
-    if(this.use8bit) {
-        let shaper = audioCtx.createWaveShaper();
-        let curve = new Float32Array(44100);
-        let levels = 8;
-        for(let i=0; i<44100; i++){ let x = (i * 2) / 44100 - 1; curve[i] = Math.round(x * levels) / levels; }
-        shaper.curve = curve;
-        this.source.connect(shaper); shaper.connect(audioCtx.destination);
-    } else {
+    // ★ 新・音声フィルター処理
+    if(this.filterType === 1) { // RADIO (AMラジオ風)
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 1.5;
+        this.source.connect(filter); filter.connect(audioCtx.destination);
+    } else if(this.filterType === 2) { // WATER (水中・壁越し風)
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass'; filter.frequency.value = 400;
+        this.source.connect(filter); filter.connect(audioCtx.destination);
+    } else if(this.filterType === 3) { // ECHO (やまびこ)
+        let delay = audioCtx.createDelay(); delay.delayTime.value = 0.35;
+        let feedback = audioCtx.createGain(); feedback.gain.value = 0.3;
+        delay.connect(feedback); feedback.connect(delay);
+        this.source.connect(delay); delay.connect(audioCtx.destination);
+        this.source.connect(audioCtx.destination);
+    } else { // OFF (通常)
         this.source.connect(audioCtx.destination);
     }
     
@@ -146,18 +153,22 @@ const Rhythm = {
       if(this.st !== 'play') return;
       let now = audioCtx.currentTime - this.startTime;
       let hitNote = null, minDiff = 999;
+      
       for(let n of this.notes) {
         if(!n.hit && !n.missed && n.lane === lane) {
           let diff = Math.abs(n.time - now);
-          if(diff < 0.2 && diff < minDiff){ minDiff = diff; hitNote = n; }
+          // ★ 当たり判定を極限まで広くする！(0.2秒 → 0.3秒に拡大)
+          if(diff < 0.3 && diff < minDiff){ minDiff = diff; hitNote = n; }
         }
       }
       if(hitNote) {
         hitNote.hit = true; let cx = 25 + lane * 50;
         let msg = '', pts = 0;
-        if(minDiff < 0.05){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); screenShake(4); }
-        else if(minDiff < 0.1){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); }
+        // ★ PERFECT、GREATの許容範囲も大幅に広くして爽快感アップ
+        if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); screenShake(4); }
+        else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); }
         else { msg = 'GOOD'; pts = 10; }
+        
         this.combo++; if(this.combo > this.maxCombo) this.maxCombo = this.combo;
         this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
         this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); playSnd('hit');
@@ -178,10 +189,10 @@ const Rhythm = {
       
       if(this.settingsCur === 0) {
         if(kD.left || kD.right || kD.a){ let m = ['easy','normal','hard']; this.mode = m[(m.indexOf(this.mode)+1)%3]; playSnd('sel'); }
-      } else if(this.settingsCur === 1) {
-        if(kD.left || kD.right || kD.a){ this.use8bit = !this.use8bit; playSnd('sel'); }
+      } else if(this.settingsCur === 1) { // フィルター選択
+        if(kD.left) { this.filterType = (this.filterType + 3) % 4; playSnd('sel'); }
+        if(kD.right || kD.a) { this.filterType = (this.filterType + 1) % 4; playSnd('sel'); }
       } else if(this.settingsCur === 2) {
-        // ★修正：STARTを押した瞬間にゲーム機を変形させる！
         if(kD.a){ 
           playSnd('jmp'); 
           this.st = 'transform_in'; this.transformTimer = 120; 
@@ -239,15 +250,16 @@ const Rhythm = {
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if(this.st === 'settings') {
-      // ★修正：変形前の画面（高さ300）に収まるようにY座標を調整
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('SYSTEM READY', 45, 50);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
       
       ctx.fillStyle = this.settingsCur === 0 ? '#ff0' : '#fff';
       ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 30, 110);
       
+      // ★ フィルター表示の切り替え
+      const filters = ['OFF', 'RADIO', 'WATER', 'ECHO'];
       ctx.fillStyle = this.settingsCur === 1 ? '#ff0' : '#fff';
-      ctx.fillText((this.settingsCur===1?'> ':'  ') + `8BIT SOUND: ${this.use8bit ? 'ON' : 'OFF'}`, 30, 140);
+      ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 30, 140);
       
       ctx.fillStyle = this.settingsCur === 2 ? '#0f0' : '#fff';
       ctx.fillText((this.settingsCur===2?'> ':'  ') + `GAME START!`, 30, 190);
