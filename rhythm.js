@@ -1,16 +1,14 @@
-// === BEAT BROS - SMOOTH TRANSFORM & SAFE NOTES ===
+// === BEAT BROS - SINGLE NOTES & DENSITY UP ===
 const Rhythm = {
   st: 'menu', mode: 'normal', audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
   touchBound: false, laneTouch: [false,false,false,false],
-  
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
   
   init() {
     this.st = 'menu'; this.mode = 'normal'; this.laneTouch = [false,false,false,false];
     this.audioBuffer = null; if (this.source) { this.source.stop(); this.source.disconnect(); this.source = null; }
     
-    // ★ 化け物変形を直すため、スロットの跳ね返りアニメーションをここで無効化してリセット！
     const gb = document.getElementById('gameboy'), ct = document.getElementById('controls'), cv = document.getElementById('gameCanvas');
     gb.style.transition = ''; ct.style.transition = ''; cv.style.transition = '';
     gb.classList.remove('mode-tall'); cv.width = 200; cv.height = 300; 
@@ -20,22 +18,17 @@ const Rhythm = {
     if (!this.touchBound) {
       this.touchBound = true;
       const tH = (e) => {
-        if (activeApp !== this) return;
-        if (this.st !== 'play' && this.st !== 'result') return;
-        e.preventDefault(); 
-        const r = cv.getBoundingClientRect();
+        if (activeApp !== this) return; if (this.st !== 'play' && this.st !== 'result') return;
+        e.preventDefault(); const r = cv.getBoundingClientRect();
         let ts = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
         let nT = [false,false,false,false]; let jt = [];
         for(let i=0; i<ts.length; i++) {
-          let x = (ts[i].clientX - r.left) / r.width * cv.width;
-          let y = (ts[i].clientY - r.top) / r.height * cv.height;
+          let x = (ts[i].clientX - r.left) / r.width * cv.width; let y = (ts[i].clientY - r.top) / r.height * cv.height;
           if (e.type === 'touchstart' || e.type === 'mousedown') {
-            if (y < 40 && x < 60) { this.exitGame(); return; }
-            if (this.st === 'result') { this.exitGame(); return; }
+            if (y < 40 && x < 60) { this.exitGame(); return; } if (this.st === 'result') { this.exitGame(); return; }
           }
           if (this.st === 'play' && y > 150) {
-             let l = Math.floor(x / (cv.width / 4)); 
-             if (l >= 0 && l <= 3) { nT[l] = true; if (!this.laneTouch[l]) jt.push(l); }
+             let l = Math.floor(x / (cv.width / 4)); if (l >= 0 && l <= 3) { nT[l] = true; if (!this.laneTouch[l]) jt.push(l); }
           }
         }
         this.laneTouch = nT; jt.forEach(l => this.hitKey(l));
@@ -51,35 +44,29 @@ const Rhythm = {
       ui.style.position = 'absolute'; ui.style.bottom = '80px'; ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
       let lbl = document.createElement('label');
       lbl.style.display = 'inline-block'; lbl.style.background = '#ff0'; lbl.style.color = '#000'; lbl.style.padding = '10px 15px'; lbl.style.fontFamily = 'monospace'; lbl.style.fontWeight = 'bold'; lbl.style.fontSize = '12px'; lbl.style.borderRadius = '5px'; lbl.style.cursor = 'pointer'; lbl.style.border = '2px solid #fff'; lbl.style.boxShadow = '0 0 15px #ff0';
-      lbl.innerHTML = '📁 曲ファイルを選ぶ';
-      lbl.onclick = () => { initAudio(); }; lbl.ontouchstart = () => { initAudio(); };
+      lbl.innerHTML = '📁 曲ファイルを選ぶ'; lbl.onclick = () => { initAudio(); }; lbl.ontouchstart = () => { initAudio(); };
       let inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'audio/*'; inp.style.display = 'none';
       inp.onchange = (e) => {
         if (e.target.files[0]) { 
           initAudio(); this.hideFileUI(); this.pendingFile = e.target.files[0]; e.target.value = ''; 
           this.st = 'transform_in'; this.transformTimer = 90; 
-          
-          // ★ リズムゲーム専用の、ゆっくりで滑らかなアニメーションを強制適用
           let gb = document.getElementById('gameboy'), ct = document.getElementById('controls'), cv = document.getElementById('gameCanvas');
           gb.style.transition = 'all 1.5s ease'; ct.style.transition = 'all 1.5s ease'; cv.style.transition = 'all 1.5s ease';
           gb.classList.add('mode-tall'); cv.width = 200; cv.height = 400; 
         }
       };
       lbl.appendChild(inp); ui.appendChild(lbl);
-      const ctr = document.getElementById('screen-container');
-      if (ctr) ctr.appendChild(ui); else document.body.appendChild(ui);
+      const ctr = document.getElementById('screen-container'); if (ctr) ctr.appendChild(ui); else document.body.appendChild(ui);
     }
     ui.style.display = 'block';
   },
   
   hideFileUI() { let ui = document.getElementById('rhythm-file-ui'); if (ui) ui.style.display = 'none'; },
-  
   exitGame() {
     this.st = 'transform_out'; this.transformTimer = 90; 
     let gb = document.getElementById('gameboy'), ct = document.getElementById('controls'), cv = document.getElementById('gameCanvas');
     gb.style.transition = 'all 1.5s ease'; ct.style.transition = 'all 1.5s ease'; cv.style.transition = 'all 1.5s ease';
-    gb.classList.remove('mode-tall');
-    if (this.source) { this.source.stop(); this.source = null; }
+    gb.classList.remove('mode-tall'); if (this.source) { this.source.stop(); this.source = null; }
   },
   
   loadFile(f) {
@@ -91,30 +78,34 @@ const Rhythm = {
   generateNotes(b) {
     const raw = b.getChannelData(0); this.notes = [];
     let sum = 0, cnt = 0; for (let i = 0; i < raw.length; i += 1000) { sum += Math.abs(raw[i]); cnt++; }
-    let avg = sum / cnt; let th = avg * (this.mode === 'hard' ? 1.2 : this.mode === 'normal' ? 2.0 : 3.0);
-    if (th < 0.01) th = 0.01; let gap = this.mode === 'hard' ? 0.18 : this.mode === 'normal' ? 0.25 : 0.5;
+    let avg = sum / cnt; 
+    // ★ 物量アップ：感度を上げて音を拾いやすくし、ノーツ間隔の限界を狭くする
+    let th = avg * (this.mode === 'hard' ? 1.0 : this.mode === 'normal' ? 1.6 : 2.5);
+    if (th < 0.01) th = 0.01; let gap = this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.22 : 0.4;
     
-    // ★ 修正：長押し中や前のノーツから一定時間は絶対に次のノーツを出さない
-    let lastT = 0; 
+    let lastT = 0; let lastLane = -1; // ★ 縦連打防止用
     
     for (let i = 0; i < raw.length; i += 256) {
       if (Math.abs(raw[i]) > th) {
         let t = i / b.sampleRate; 
         if (t - lastT > gap) {
-          let lane = Math.floor(Math.random() * 4); let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
-          this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
-          // 長押しの秒数ぶん、次のノーツが降ってくる時間を遅らせる
-          lastT = t + dur; 
+          let lane = Math.floor(Math.random() * 4);
+          // ★ 縦連打防止：前回と同じレーンが選ばれたら、隣にズラす
+          if (lane === lastLane) lane = (lane + 1) % 4;
+          
+          this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
+          lastT = t; lastLane = lane;
         }
       }
     }
     if (this.notes.length < 10) {
-       this.notes = []; lastT = 0;
+       this.notes = []; lastT = 0; lastLane = -1;
        for (let t = 2; t < b.duration; t += gap * 1.5) {
            if (t - lastT > gap) {
-               let lane = Math.floor(Math.random() * 4); let isL = Math.random() < 0.2; let dur = isL ? 0.4 + Math.random() * 0.6 : 0;
-               this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false, type: isL?'long':'short', dur: dur, hold: false });
-               lastT = t + dur;
+               let lane = Math.floor(Math.random() * 4);
+               if (lane === lastLane) lane = (lane + 1) % 4;
+               this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
+               lastT = t; lastLane = lane;
            }
        }
     }
@@ -137,33 +128,23 @@ const Rhythm = {
         if (!n.hit && !n.missed && n.lane === lane) { let d = Math.abs(n.time - now); if (d < 0.2 && d < mD) { mD = d; hN = n; } }
       }
       if (hN) {
-        hN.hit = true; let cx = 25 + lane * 50;
-        if(hN.type === 'long') {
-           hN.hold = true; addParticle(cx, this.lineY, this.colors[lane], 'star'); playSnd('hit');
-           this.judgements.push({ msg: 'HOLD!', life: 30, color: '#0ff', lane: lane });
-        } else {
-           let msg = '', pts = 0;
-           if (mD < 0.05) { msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); screenShake(4); }
-           else if (mD < 0.1) { msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); }
-           else { msg = 'GOOD'; pts = 10; }
-           this.combo++; if (this.combo > this.maxCombo) this.maxCombo = this.combo;
-           this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
-           this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); playSnd('hit');
-        }
+        hN.hit = true; let cx = 25 + lane * 50; let msg = '', pts = 0;
+        if (mD < 0.05) { msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); screenShake(4); }
+        else if (mD < 0.1) { msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); }
+        else { msg = 'GOOD'; pts = 10; }
+        this.combo++; if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+        this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
+        this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); playSnd('hit');
       }
   },
   
   update() {
     let kD = typeof keysDown !== 'undefined' ? keysDown : {}; let k = typeof keys !== 'undefined' ? keys : {};
-    
     if (this.st === 'menu') {
       if (kD.select) { this.hideFileUI(); switchApp(Menu); return; }
       if (kD.up || kD.down) { if (this.mode === 'easy') this.mode = 'normal'; else if (this.mode === 'normal') this.mode = 'hard'; else this.mode = 'easy'; playSnd('sel'); }
     }
-    else if (this.st === 'transform_in') {
-      this.transformTimer--; if (this.transformTimer % 15 === 0) playSnd('hit');
-      if (this.transformTimer <= 0) this.loadFile(this.pendingFile);
-    }
+    else if (this.st === 'transform_in') { this.transformTimer--; if (this.transformTimer % 15 === 0) playSnd('hit'); if (this.transformTimer <= 0) this.loadFile(this.pendingFile); }
     else if (this.st === 'transform_out') {
       this.transformTimer--; if (this.transformTimer % 15 === 0) playSnd('hit');
       if (this.transformTimer <= 0) { 
@@ -171,29 +152,15 @@ const Rhythm = {
           gb.style.transition = ''; ct.style.transition = ''; cv.style.transition = ''; cv.width = 200; cv.height = 300; switchApp(Menu); 
       }
     }
-    else if (this.st === 'intro') {
-      this.transformTimer++; if (this.transformTimer === 60) { this.st = 'play'; this.startTime = audioCtx.currentTime + 1.5; this.source.start(this.startTime); }
-    }
+    else if (this.st === 'intro') { this.transformTimer++; if (this.transformTimer === 60) { this.st = 'play'; this.startTime = audioCtx.currentTime + 1.5; this.source.start(this.startTime); } }
     else if (this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
       let speed = this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150;
-      
-      let isP = [ k.left || k.l0 || this.laneTouch[0], k.down || k.l1 || this.laneTouch[1], k.up || k.l2 || this.laneTouch[2], k.right|| k.l3 || this.laneTouch[3] ];
       if (kD.left || kD.l0) this.hitKey(0); if (kD.down || kD.l1) this.hitKey(1); if (kD.up || kD.l2) this.hitKey(2); if (kD.right|| kD.l3) this.hitKey(3);
       
       for (let n of this.notes) {
         n.y = this.lineY - (n.time - now) * speed;
-        if (n.type === 'long') {
-           let endY = this.lineY - (n.time + n.dur - now) * speed;
-           if (n.hold) {
-              if (isP[n.lane]) {
-                 this.score += 2; if (Math.random() < 0.2) addParticle(25 + n.lane * 50, this.lineY, this.colors[n.lane], 'star');
-                 if (endY >= this.lineY) { n.hold = false; n.missed = true; this.combo++; if(this.combo > this.maxCombo) this.maxCombo = this.combo; this.judgements.push({ msg: 'PERFECT', life: 30, color: '#ff0', lane: n.lane }); playSnd('combo'); }
-              } else { n.hold = false; n.missed = true; }
-           } else if (!n.hit && !n.missed && n.y > 420) { n.missed = true; this.combo = 0; this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); screenShake(2); }
-        } else {
-           if (!n.hit && !n.missed && n.y > 420) { n.missed = true; this.combo = 0; this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); screenShake(2); }
-        }
+        if (!n.hit && !n.missed && n.y > 420) { n.missed = true; this.combo = 0; this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); screenShake(2); }
       }
       for (let i = this.judgements.length - 1; i >= 0; i--) { this.judgements[i].life--; if (this.judgements[i].life <= 0) this.judgements.splice(i, 1); }
       if (typeof updateParticles === 'function') updateParticles();
@@ -215,23 +182,22 @@ const Rhythm = {
     }
     else if (this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
       ctx.strokeStyle = '#121'; ctx.lineWidth = 1; for (let i = 0; i < 30; i++) { ctx.beginPath(); ctx.moveTo(0, i * 15 + (Date.now() % 15)); ctx.lineTo(200, i * 15 + (Date.now() % 15)); ctx.stroke(); }
+      
       let k = typeof keys !== 'undefined' ? keys : {};
       for (let i = 0; i < 4; i++) {
          let cx = 25 + i * 50; let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
-         ctx.fillStyle = isP ? `rgba(255,255,255,0.15)` : `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 25, 0, 50, 400); ctx.strokeStyle = this.colors[i]; ctx.lineWidth = isP ? 4 : 2; ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6); ctx.fillStyle = isP ? '#fff' : '#666'; ctx.font = '10px monospace'; ctx.fillText(['[D]', '[F]', '[J]', '[K]'][i], cx - 9, this.lineY + 30);
+         ctx.fillStyle = isP ? `rgba(255,255,255,0.15)` : `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 25, 0, 50, 400); 
+         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = isP ? 4 : 2; ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke(); 
+         ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6); 
+         ctx.fillStyle = isP ? '#fff' : '#666'; ctx.font = '10px monospace'; ctx.fillText(['[D]', '[F]', '[J]', '[K]'][i], cx - 9, this.lineY + 30);
       }
       
       this.notes.forEach(n => {
-        if (!n.missed) {
-          let cx = 25 + n.lane * 50;
-          if (n.type === 'long') {
-             let now = audioCtx.currentTime - this.startTime; let spd = this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150;
-             let endY = this.lineY - (n.time + n.dur - now) * spd; let startY = n.hold ? this.lineY : n.y;
-             if (startY > -30 && endY < 420 && startY > endY) { ctx.fillStyle = this.colors[n.lane]; ctx.globalAlpha = 0.5; ctx.fillRect(cx - 12, endY, 24, startY - endY); ctx.globalAlpha = 1.0; }
-             if (!n.hit && n.y > -30 && n.y < 420) { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5); }
-          } else {
-             if (!n.hit && n.y > -30 && n.y < 420) { ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5); }
-          }
+        if (!n.missed && !n.hit && n.y > -30 && n.y < 420) {
+           let cx = 25 + n.lane * 50;
+           ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill(); 
+           ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke(); 
+           ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5);
         }
       });
       drawParticles();
