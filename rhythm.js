@@ -1,4 +1,4 @@
-// === BEAT BROS - 8BIT FILTER & UI FIX ===
+// === BEAT BROS - UI FLOW & 8BIT FIX ===
 const Rhythm = {
   st: 'menu', mode: 'normal', use8bit: true, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
@@ -54,9 +54,8 @@ const Rhythm = {
       input.onchange = (e) => {
         if(e.target.files[0]) { 
           initAudio(); this.hideFileUI(); this.pendingFile = e.target.files[0]; e.target.value = ''; 
-          this.st = 'transform_in'; this.transformTimer = 120; // ゆっくり変形
-          document.getElementById('gameboy').classList.add('mode-tall'); 
-          const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 400; 
+          // ★修正：変形させずに、そのまま設定画面へ行く
+          this.st = 'settings'; this.settingsCur = 0; 
         }
       };
       label.appendChild(input); ui.appendChild(label);
@@ -90,11 +89,8 @@ const Rhythm = {
     for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // しきい値を下げて物量を増やす
     let threshold = avgVol * (this.mode === 'hard' ? 1.0 : this.mode === 'normal' ? 1.5 : 2.0);
     if(threshold < 0.01) threshold = 0.01;
-    
-    // ノーツ間隔を少し詰める
     let minGap = this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.22 : 0.35;
     
     let lastTime = 0; let lastLane = -1;
@@ -103,7 +99,6 @@ const Rhythm = {
         let t = i / buffer.sampleRate; 
         if(t - lastTime > minGap) {
           let lane = Math.floor(Math.random() * 4);
-          // 連続で同じレーンになるのを防ぐ（60%の確率で別のレーンに散らす）
           if(lane === lastLane && Math.random() < 0.6) lane = (lane + 1 + Math.floor(Math.random()*2)) % 4;
           this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
           lastTime = t; lastLane = lane;
@@ -129,18 +124,13 @@ const Rhythm = {
     this.source = audioCtx.createBufferSource();
     this.source.buffer = this.audioBuffer;
     
-    // ★ 8bitサウンドフィルター (WaveShaperで音を荒くする)
     if(this.use8bit) {
         let shaper = audioCtx.createWaveShaper();
         let curve = new Float32Array(44100);
-        let levels = 8; // 3bit相当の荒さでレトロ感を出す
-        for(let i=0; i<44100; i++){
-            let x = (i * 2) / 44100 - 1;
-            curve[i] = Math.round(x * levels) / levels;
-        }
+        let levels = 8;
+        for(let i=0; i<44100; i++){ let x = (i * 2) / 44100 - 1; curve[i] = Math.round(x * levels) / levels; }
         shaper.curve = curve;
-        this.source.connect(shaper);
-        shaper.connect(audioCtx.destination);
+        this.source.connect(shaper); shaper.connect(audioCtx.destination);
     } else {
         this.source.connect(audioCtx.destination);
     }
@@ -181,24 +171,30 @@ const Rhythm = {
     if(this.st === 'menu') {
       if(kD.select){ this.hideFileUI(); switchApp(Menu); return; }
     }
+    else if(this.st === 'settings') {
+      if(kD.select){ this.st = 'menu'; this.showFileUI(); return; }
+      if(kD.up){ this.settingsCur = (this.settingsCur + 2) % 3; playSnd('sel'); }
+      if(kD.down){ this.settingsCur = (this.settingsCur + 1) % 3; playSnd('sel'); }
+      
+      if(this.settingsCur === 0) {
+        if(kD.left || kD.right || kD.a){ let m = ['easy','normal','hard']; this.mode = m[(m.indexOf(this.mode)+1)%3]; playSnd('sel'); }
+      } else if(this.settingsCur === 1) {
+        if(kD.left || kD.right || kD.a){ this.use8bit = !this.use8bit; playSnd('sel'); }
+      } else if(this.settingsCur === 2) {
+        // ★修正：STARTを押した瞬間にゲーム機を変形させる！
+        if(kD.a){ 
+          playSnd('jmp'); 
+          this.st = 'transform_in'; this.transformTimer = 120; 
+          document.getElementById('gameboy').classList.add('mode-tall'); 
+          const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 400; 
+        }
+      }
+    }
     else if(this.st === 'transform_in') {
       this.transformTimer--;
       if(this.transformTimer % 20 === 0) playSnd('hit'); 
       if(this.transformTimer % 40 === 0) screenShake(5); 
-      if(this.transformTimer <= 0) { this.st = 'settings'; this.settingsCur = 0; BGM.play('menu'); } // 設定画面へ
-    }
-    else if(this.st === 'settings') {
-      if(kD.select){ this.exitGame(); return; }
-      if(kD.up){ this.settingsCur = (this.settingsCur + 2) % 3; playSnd('sel'); }
-      if(kD.down){ this.settingsCur = (this.settingsCur + 1) % 3; playSnd('sel'); }
-      
-      if(this.settingsCur === 0) { // 難易度
-        if(kD.left || kD.right || kD.a){ let m = ['easy','normal','hard']; this.mode = m[(m.indexOf(this.mode)+1)%3]; playSnd('sel'); }
-      } else if(this.settingsCur === 1) { // 8BIT
-        if(kD.left || kD.right || kD.a){ this.use8bit = !this.use8bit; playSnd('sel'); }
-      } else if(this.settingsCur === 2) { // START
-        if(kD.a){ playSnd('jmp'); this.loadFile(this.pendingFile); }
-      }
+      if(this.transformTimer <= 0) { this.loadFile(this.pendingFile); } 
     }
     else if(this.st === 'transform_out') {
       this.transformTimer--;
@@ -243,19 +239,20 @@ const Rhythm = {
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if(this.st === 'settings') {
+      // ★修正：変形前の画面（高さ300）に収まるようにY座標を調整
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('SYSTEM READY', 45, 50);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
       
       ctx.fillStyle = this.settingsCur === 0 ? '#ff0' : '#fff';
-      ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 30, 150);
+      ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 30, 110);
       
       ctx.fillStyle = this.settingsCur === 1 ? '#ff0' : '#fff';
-      ctx.fillText((this.settingsCur===1?'> ':'  ') + `8BIT SOUND: ${this.use8bit ? 'ON' : 'OFF'}`, 30, 180);
+      ctx.fillText((this.settingsCur===1?'> ':'  ') + `8BIT SOUND: ${this.use8bit ? 'ON' : 'OFF'}`, 30, 140);
       
       ctx.fillStyle = this.settingsCur === 2 ? '#0f0' : '#fff';
-      ctx.fillText((this.settingsCur===2?'> ':'  ') + `GAME START!`, 30, 230);
+      ctx.fillText((this.settingsCur===2?'> ':'  ') + `GAME START!`, 30, 190);
       
-      ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A/←→:変更  SEL:戻る', 25, 380);
+      ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A/←→:変更  SEL:戻る', 25, 280);
     }
     else if(this.st === 'transform_in' || this.st === 'transform_out') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
@@ -270,7 +267,6 @@ const Rhythm = {
          let cx = 25 + i * 50;
          let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
          
-         // 押した時にレーン全体が光る演出を残す
          ctx.fillStyle = isP ? `rgba(255,255,255,0.15)` : `rgba(255,255,255,0.03)`; ctx.fillRect(cx - 25, 0, 50, 400);
          ctx.strokeStyle = this.colors[i]; ctx.lineWidth = isP ? 4 : 2; ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke();
          ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
