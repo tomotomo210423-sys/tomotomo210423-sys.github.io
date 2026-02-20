@@ -1,23 +1,23 @@
 // === RETRO SLOT MACHINE ===
 const Slot = {
-  st: 'bet', // 状態: bet, spin, stop, payout, bankrupt
+  st: 'bet', // bet, spin, reach_wait, reach_action, payout, bankrupt
   coins: 100,
   bet: 1,
   winAmount: 0,
+  winLines: [], // 当たったラインを記録
   msg: 'BET & PRESS A',
   timer: 0,
+  reachTimer: 0,
   
-  // 1リールあたりのシンボル表示間隔（ピクセル）
-  symHeight: 32,
+  symHeight: 32, // 1シンボルの高さ
   
   reels: [
-    { pos: 0, speed: 0, stopped: true, finalIdx: 0, bounce: 0 },
-    { pos: 0, speed: 0, stopped: true, finalIdx: 0, bounce: 0 },
-    { pos: 0, speed: 0, stopped: true, finalIdx: 0, bounce: 0 }
+    { pos: 0, speed: 0, stopped: true, bounce: 0 },
+    { pos: 0, speed: 0, stopped: true, bounce: 0 },
+    { pos: 0, speed: 0, stopped: true, bounce: 0 }
   ],
-  stopIndex: 0, // 今何個目のリールを止めるか
+  stopIndex: 0,
   
-  // スロットの絵柄（8x8ドット）
   symSprs: {
     'seven': "0000000005555550000005500000550000055000005500000550000000000000",
     'bar':   "00000000033333303ffffff33f3333f33ffffff3033333300000000000000000",
@@ -26,10 +26,8 @@ const Slot = {
     'cherry':"0000600000066000006006000600006055000055550005550000000000000000"
   },
   
-  // 配当（倍率）
   payouts: { 'seven': 50, 'bar': 20, 'bell': 10, 'suika': 5, 'cherry': 2 },
   
-  // リールの配列（各リール10個）
   layout: [
     ['seven', 'cherry', 'bell', 'bar', 'suika', 'bell', 'cherry', 'bar', 'suika', 'cherry'],
     ['bar', 'seven', 'cherry', 'suika', 'bell', 'cherry', 'bar', 'bell', 'suika', 'cherry'],
@@ -39,21 +37,63 @@ const Slot = {
   init() {
     if (SaveSys.data.slotCoins === undefined) SaveSys.data.slotCoins = 100;
     this.coins = SaveSys.data.slotCoins;
-    if (this.coins <= 0) {
-        this.coins = 10; // 救済措置
-        SaveSys.data.slotCoins = this.coins; SaveSys.save();
-    }
-    this.bet = 1;
-    this.st = 'bet';
-    this.msg = 'BET: U/D or B  START: A';
-    this.timer = 0;
+    if (this.coins <= 0) { this.coins = 10; SaveSys.data.slotCoins = this.coins; SaveSys.save(); }
+    this.bet = 1; this.st = 'bet'; this.msg = 'BET: U/D or B  START: A'; this.timer = 0;
     for(let i=0; i<3; i++) {
         this.reels[i].pos = Math.floor(Math.random() * 10) * this.symHeight;
-        this.reels[i].speed = 0;
-        this.reels[i].stopped = true;
-        this.reels[i].bounce = 0;
+        this.reels[i].speed = 0; this.reels[i].stopped = true; this.reels[i].bounce = 0;
     }
     BGM.stop();
+  },
+
+  // ★ 追加：リールの現在の「上・中・下」の絵柄を正確に取得する
+  getSymbols(reelIdx) {
+    let r = this.reels[reelIdx];
+    let baseIdx = Math.round(r.pos / this.symHeight) % 10;
+    return {
+        top: this.layout[reelIdx][baseIdx % 10],
+        mid: this.layout[reelIdx][(baseIdx + 1) % 10],
+        bot: this.layout[reelIdx][(baseIdx + 2) % 10]
+    };
+  },
+
+  // ★ 追加：BET数に応じた有効ラインを取得する
+  getActiveLines(sym0, sym1, sym2) {
+    let lines = [];
+    if (this.bet >= 1) lines.push({name: 'mid', s0: sym0.mid, s1: sym1.mid, s2: sym2 ? sym2.mid : null});
+    if (this.bet >= 2) {
+        lines.push({name: 'top', s0: sym0.top, s1: sym1.top, s2: sym2 ? sym2.top : null});
+        lines.push({name: 'bot', s0: sym0.bot, s1: sym1.bot, s2: sym2 ? sym2.bot : null});
+    }
+    if (this.bet === 3) {
+        lines.push({name: 'cross1', s0: sym0.top, s1: sym1.mid, s2: sym2 ? sym2.bot : null});
+        lines.push({name: 'cross2', s0: sym0.bot, s1: sym1.mid, s2: sym2 ? sym2.top : null});
+    }
+    return lines;
+  },
+
+  // ★ 追加：リーチ判定（第2リール停止時にチェック）
+  checkTenpai() {
+    let sym0 = this.getSymbols(0); let sym1 = this.getSymbols(1);
+    let lines = this.getActiveLines(sym0, sym1, null);
+    for (let l of lines) { if (l.s0 === l.s1) return true; }
+    return false;
+  },
+
+  checkWin() {
+      let sym0 = this.getSymbols(0); let sym1 = this.getSymbols(1); let sym2 = this.getSymbols(2);
+      let lines = this.getActiveLines(sym0, sym1, sym2);
+      
+      this.winAmount = 0;
+      this.winLines = [];
+      
+      for(let l of lines) {
+          if (l.s0 === l.s1 && l.s1 === l.s2) {
+              this.winAmount += this.bet * this.payouts[l.s0];
+              this.winLines.push(l.name);
+          }
+      }
+      if (this.winAmount === 0) this.msg = 'YOU LOSE...';
   },
 
   update() {
@@ -70,34 +110,67 @@ const Slot = {
         SaveSys.data.slotCoins = this.coins; SaveSys.save();
         this.st = 'spin';
         this.stopIndex = 0;
+        this.winLines = [];
         this.msg = 'PRESS A TO STOP!';
         for(let i=0; i<3; i++) {
             this.reels[i].stopped = false;
-            this.reels[i].speed = 12 + i * 2; // 右のリールほど少し速く回る
+            this.reels[i].speed = 12 + i * 2; 
         }
         playSnd('jmp');
       }
     } 
     else if (this.st === 'spin') {
       if (keysDown.a) {
-        // 現在のリールを止める
         let r = this.reels[this.stopIndex];
-        r.stopped = true;
-        r.speed = 0;
-        // 一番近いシンボルにピッタリ合わせる
+        r.stopped = true; r.speed = 0;
         let idx = Math.round(r.pos / this.symHeight) % 10;
         r.pos = idx * this.symHeight;
-        r.finalIdx = idx;
-        r.bounce = 5; // 止まった時の「カクッ」という演出用
+        r.bounce = 5; 
         playSnd('hit');
         
         this.stopIndex++;
-        if (this.stopIndex >= 3) {
+        
+        // 第2リール停止時、リーチチェック！
+        if (this.stopIndex === 2) {
+            if (this.checkTenpai()) {
+                this.st = 'reach_wait';
+                this.msg = 'REACH!! PRESS A!';
+            }
+        } else if (this.stopIndex >= 3) {
+            this.st = 'payout'; this.timer = 0; this.checkWin();
+        }
+      }
+    }
+    else if (this.st === 'reach_wait') {
+        if (keysDown.a) {
+            // リーチ演出開始！
+            this.st = 'reach_action';
+            this.reachTimer = 0;
+            this.reels[2].speed = 4; // スロー回転になる
+            this.msg = 'DOKI DOKI...';
+            playSnd('jmp'); 
+        }
+    }
+    else if (this.st === 'reach_action') {
+        this.reachTimer++;
+        if (this.reachTimer % 15 === 0) playSnd('sel'); // 心音のような緊張感
+        
+        if (this.reachTimer > 60) this.reels[2].speed = 2; // さらに遅くなる
+        
+        // 約1.5秒焦らして自動停止
+        if (this.reachTimer > 100) { 
+            let r = this.reels[2];
+            r.stopped = true; r.speed = 0;
+            let idx = Math.round(r.pos / this.symHeight) % 10;
+            r.pos = idx * this.symHeight;
+            r.bounce = 10; // ドンッ！と強めに止まる
+            playSnd('hit');
+            
+            this.stopIndex++;
             this.st = 'payout';
             this.timer = 0;
             this.checkWin();
         }
-      }
     }
     else if (this.st === 'payout') {
       if (this.timer === 30 && this.winAmount > 0) {
@@ -106,29 +179,18 @@ const Slot = {
           SaveSys.data.slotCoins = this.coins; SaveSys.save();
           this.msg = `WIN ${this.winAmount} COINS!`;
       }
-      if (this.timer > 90) {
-          if (this.coins <= 0) {
-              this.st = 'bankrupt';
-              this.msg = 'GAME OVER... PRESS A';
-          } else {
-              this.st = 'bet';
-              this.bet = Math.min(this.bet, this.coins);
-              this.msg = 'BET & PRESS A';
-          }
+      if (this.timer > 100) {
+          if (this.coins <= 0) { this.st = 'bankrupt'; this.msg = 'GAME OVER... PRESS A'; } 
+          else { this.st = 'bet'; this.bet = Math.min(this.bet, this.coins); this.msg = 'BET & PRESS A'; }
       }
     }
     else if (this.st === 'bankrupt') {
         if (keysDown.a) {
-            this.coins = 50; // 破産からの復活ボーナス
-            SaveSys.data.slotCoins = this.coins; SaveSys.save();
-            this.st = 'bet';
-            this.bet = 1;
-            this.msg = 'BONUS 50 COINS!';
-            playSnd('combo');
+            this.coins = 50; SaveSys.data.slotCoins = this.coins; SaveSys.save();
+            this.st = 'bet'; this.bet = 1; this.msg = 'BONUS 50 COINS!'; playSnd('combo');
         }
     }
 
-    // リールの位置更新
     for(let i=0; i<3; i++) {
         if (!this.reels[i].stopped) {
             this.reels[i].pos += this.reels[i].speed;
@@ -138,84 +200,79 @@ const Slot = {
     }
   },
 
-  checkWin() {
-      // センターラインの絵柄を取得（配列は下から上へ流れるため、インデックスを逆算）
-      const centerLine = [];
-      for(let i=0; i<3; i++) {
-          let idx = 10 - (this.reels[i].finalIdx % 10);
-          if (idx === 10) idx = 0;
-          centerLine.push(this.layout[i][idx]);
-      }
-      
-      this.winAmount = 0;
-      const s0 = centerLine[0]; const s1 = centerLine[1]; const s2 = centerLine[2];
-      
-      if (s0 === s1 && s1 === s2) {
-          this.winAmount = this.bet * this.payouts[s0];
-      }
-      
-      if (this.winAmount === 0) {
-          this.msg = 'YOU LOSE...';
-      }
-  },
-
   draw() {
     ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 200, 300);
 
-    // 筐体デザイン
-    ctx.fillStyle = '#a00'; ctx.fillRect(10, 10, 180, 280);
+    // ★ リーチ中は筐体が赤く点滅する演出
+    if (this.st === 'reach_action' && this.reachTimer % 10 < 5) {
+        ctx.fillStyle = '#f55';
+    } else {
+        ctx.fillStyle = '#a00'; 
+    }
+    ctx.fillRect(10, 10, 180, 280);
     ctx.fillStyle = '#f00'; ctx.fillRect(15, 15, 170, 270);
     ctx.fillStyle = '#000'; ctx.fillRect(20, 60, 160, 120);
 
-    // タイトル
     ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace';
     ctx.fillText('★ RETRO SLOT ★', 25, 40);
 
-    // リール背景
     ctx.fillStyle = '#fff';
-    ctx.fillRect(30, 70, 40, 100);
-    ctx.fillRect(80, 70, 40, 100);
-    ctx.fillRect(130, 70, 40, 100);
+    ctx.fillRect(30, 70, 40, 100); ctx.fillRect(80, 70, 40, 100); ctx.fillRect(130, 70, 40, 100);
 
-    // クリップしてリールを描画
     ctx.save();
     ctx.beginPath(); ctx.rect(30, 70, 140, 100); ctx.clip();
 
+    // 描画と当たり判定の完全一致化
     for(let i=0; i<3; i++) {
         let r = this.reels[i];
         let rx = 30 + i * 50;
-        let bounceOffset = r.bounce % 2 === 0 ? r.bounce : -r.bounce; // ガタガタ演出
+        let bounceOffset = r.bounce % 2 === 0 ? r.bounce : -r.bounce; 
         
-        // 描画用に現在位置から上下のシンボルを計算して表示
         let baseIdx = Math.floor(r.pos / this.symHeight);
         let offset = r.pos % this.symHeight;
         
-        for(let j = -1; j <= 4; j++) {
-            let symIdx = (10 - ((baseIdx + j) % 10)) % 10;
-            if (symIdx < 0) symIdx += 10;
+        for(let j = -1; j <= 3; j++) {
+            let symIdx = (baseIdx + j) % 10;
+            if (symIdx < 0) symIdx += 10; 
             let symName = this.layout[i][symIdx];
             let ry = 70 - offset + j * this.symHeight + bounceOffset;
-            
-            // 少し中央に寄せるためのマージン
             drawSprite(rx + 4, ry, '#fff', this.symSprs[symName], 4.0);
         }
     }
     ctx.restore();
 
-    // センターライン
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-    ctx.fillRect(25, 118, 150, 4);
+    // ★ BET数に応じた有効ラインの描画（薄い線）
+    ctx.lineWidth = 2;
+    if (this.bet >= 1) { ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)'; ctx.beginPath(); ctx.moveTo(25, 118); ctx.lineTo(175, 118); ctx.stroke(); }
+    if (this.bet >= 2) { 
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)'; 
+        ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 86); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 150); ctx.stroke();
+    }
+    if (this.bet === 3) {
+        ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
+        ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 150); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 86); ctx.stroke();
+    }
 
-    // 情報ディスプレイ
+    // ★ 当たったラインを太く光らせる演出
+    if (this.st === 'payout' && this.winAmount > 0 && this.timer % 10 < 5) {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#ff0';
+        if (this.winLines.includes('mid')) { ctx.beginPath(); ctx.moveTo(25, 118); ctx.lineTo(175, 118); ctx.stroke(); }
+        if (this.winLines.includes('top')) { ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 86); ctx.stroke(); }
+        if (this.winLines.includes('bot')) { ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 150); ctx.stroke(); }
+        if (this.winLines.includes('cross1')) { ctx.beginPath(); ctx.moveTo(25, 86); ctx.lineTo(175, 150); ctx.stroke(); }
+        if (this.winLines.includes('cross2')) { ctx.beginPath(); ctx.moveTo(25, 150); ctx.lineTo(175, 86); ctx.stroke(); }
+    }
+
     ctx.fillStyle = '#000'; ctx.fillRect(20, 190, 160, 60);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(20, 190, 160, 60);
     
     ctx.fillStyle = '#0f0'; ctx.font = '12px monospace';
     ctx.fillText(`COIN: ${this.coins}`, 30, 210);
-    ctx.fillStyle = '#ff0';
-    ctx.fillText(`BET : ${this.bet}`, 120, 210);
+    ctx.fillStyle = '#ff0'; ctx.fillText(`BET : ${this.bet}`, 120, 210);
     
-    // メッセージ点滅
     if (this.st === 'bet' && this.timer % 60 < 30) {
         ctx.fillStyle = '#fff'; ctx.fillText(this.msg, 30, 235);
     } else if (this.st !== 'bet') {
@@ -223,11 +280,9 @@ const Slot = {
         ctx.fillText(this.msg, 30, 235);
     }
 
-    // 配当表（小さく）
     ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
     ctx.fillText('777:x50  BAR:x20  BELL:x10', 20, 270);
     ctx.fillText('SUIKA:x5 CHERRY:x2', 20, 280);
-    
     ctx.fillStyle = '#666'; ctx.font = '8px monospace';
     ctx.fillText('SELECT: EXIT', 130, 280);
   }
