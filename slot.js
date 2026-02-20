@@ -1,19 +1,17 @@
-// === RETRO SLOT MACHINE (UI IMPROVED & MINIFIED) ===
+// === RETRO SLOT MACHINE (FIXED BET CYCLE) ===
 const Slot={
   st:'bet', coins:100, bet:1, win:0, lines:[], msg:'BET & PRESS A', tmr:0, rTmr:0,
   jp:1000, free:0, symH:32, stopIdx:0,
   reels:[{p:0,s:0,st:true,b:0},{p:0,s:0,st:true,b:0},{p:0,s:0,st:true,b:0}],
-  
-  // ★ 絵柄を分かりやすく修正（W:ピンクのW、F:水色のF、JP:黄色の王冠）
   sprs:{
     '7':  "0000000005555550000005500000550000055000005500000550000000000000",
     'BAR':"00000000033333303ffffff33f3333f33ffffff3033333300000000000000000",
     'BEL':"0000000000088000008888000088880008888880088888800000000000088000",
     'SUI':"00000000006a6a0006a6a6a06a6a6a6a6a6a6a6a06a6a6a0006a6a0000000000",
     'CHE':"0000600000066000006006000600006055000055550005550000000000000000",
-    'WLD':"0cc00cc00cc00cc00cc00cc00cccccc00cccccc000cccc00000cc00000000000", // W
-    'FRE':"0bbbbbb00bb000000bb000000bbbbb000bb000000bb000000bb0000000000000", // F
-    'JP': "0800008008800880088888800888888008588580088888800888888000000000"  // 王冠
+    'WLD':"0cc00cc00cc00cc00cc00cc00cccccc00cccccc000cccc00000cc00000000000", 
+    'FRE':"0bbbbbb00bb000000bb000000bbbbb000bb000000bb000000bb0000000000000", 
+    'JP': "0800008008800880088888800888888008588580088888800888888000000000"  
   },
   pays:{'7':50,'BAR':20,'BEL':10,'SUI':5,'CHE':2},
   lay:[
@@ -26,7 +24,7 @@ const Slot={
     document.getElementById('gameboy').classList.add('mode-slot');
     let d=SaveSys.data; this.coins=d.slotCoins||100; this.jp=d.jackpotPool||1000;
     if(this.coins<=0)this.coins=10;
-    this.bet=1; this.st='bet'; this.tmr=0; this.free=0; this.msg='BET: U/D or B  START:A';
+    this.bet=1; this.st='bet'; this.tmr=0; this.free=0; this.msg='SET BET & PRESS SPIN';
     for(let i=0;i<3;i++){this.reels[i].p=Math.floor(Math.random()*20)*this.symH;this.reels[i].s=0;this.reels[i].st=true;this.reels[i].b=0;}
     BGM.stop();
   },
@@ -48,7 +46,6 @@ const Slot={
     let lines=this.getLines(this.getSyms(0),this.getSyms(1),null);
     for(let l of lines){
       if(l.s0===l.s1) return true;
-      // WILDはFREとJPの代用にはならない
       if(l.s0==='WLD'||l.s1==='WLD'){ if(l.s0!=='FRE'&&l.s0!=='JP'&&l.s1!=='FRE'&&l.s1!=='JP') return true; }
     } return false;
   },
@@ -62,7 +59,6 @@ const Slot={
       else if(n.every(s=>s===n[0])){
         let sym=n[0];
         if(sym==='FRE'||sym==='JP'){
-          // FREとJPはWILD代用不可（自力で3つ揃える必要がある）
           if(n.length===3){ if(sym==='FRE')tF+=10; if(sym==='JP')tJ=true; this.lines.push(l.n); }
         } else {
           this.win+=this.bet*this.pays[sym]; this.lines.push(l.n);
@@ -75,7 +71,7 @@ const Slot={
   },
 
   spin(){
-    this.st='spin'; this.stopIdx=0; this.lines=[]; this.msg='PRESS A TO STOP!';
+    this.st='spin'; this.stopIdx=0; this.lines=[]; this.msg='PRESS SPIN TO STOP!';
     for(let i=0;i<3;i++){this.reels[i].st=false;this.reels[i].s=12+i*2;} playSnd('jmp');
   },
 
@@ -84,11 +80,12 @@ const Slot={
     this.tmr++;
     if(this.st==='bet'){
       if(this.free>0){
-        this.msg=`FREE SPIN: ${this.free}  PRESS A`; if(keysDown.a){this.free--;this.spin();}
+        this.msg=`FREE SPIN: ${this.free}  PRESS SPIN`; if(keysDown.a){this.free--;this.spin();}
       }else{
-        this.msg='BET: U/D or B  START: A';
-        if(keysDown.up){this.bet=Math.min(3,Math.min(this.coins,this.bet+1));playSnd('sel');}
-        if(keysDown.down){this.bet=Math.max(1,this.bet-1);playSnd('sel');}
+        this.msg='SET BET & PRESS SPIN';
+        // ★ ここを修正！BETボタンを押すたびに 1→2→3→1 とループする
+        if(keysDown.up){this.bet++; if(this.bet>3||this.bet>this.coins)this.bet=1; playSnd('sel');}
+        if(keysDown.down){this.bet=Math.max(1,this.bet-1);playSnd('sel');} // PCキーボード用
         if(keysDown.b){this.bet=Math.min(3,this.coins);playSnd('combo');}
         if(keysDown.a&&this.coins>=this.bet){
           this.coins-=this.bet; this.jp+=this.bet; SaveSys.data.slotCoins=this.coins; SaveSys.data.jackpotPool=this.jp; SaveSys.save(); this.spin();
@@ -99,7 +96,7 @@ const Slot={
       if(keysDown.a){
         let r=this.reels[this.stopIdx]; r.st=true; r.s=0; r.p=(Math.round(r.p/this.symH)%20)*this.symH; r.b=5; playSnd('hit');
         this.stopIdx++;
-        if(this.stopIdx===2){ if(this.chkTen()){this.st='reach_W';this.msg='REACH!! PRESS A!';} }
+        if(this.stopIdx===2){ if(this.chkTen()){this.st='reach_W';this.msg='REACH!! PRESS SPIN!';} }
         else if(this.stopIdx>=3){ this.st='pay';this.tmr=0;this.chkWin(); }
       }
     }
@@ -114,7 +111,7 @@ const Slot={
         if(!this.msg.includes('JACKPOT')&&!this.msg.includes('FREE'))this.msg=`WIN ${this.win} COINS!`;
       }
       if(this.tmr>100){
-        if(this.coins<=0&&this.free<=0){this.st='bank';this.msg='GAME OVER... PRESS A';}
+        if(this.coins<=0&&this.free<=0){this.st='bank';this.msg='GAME OVER... PRESS SPIN';}
         else{this.st='bet';this.bet=Math.min(this.bet,this.coins>0?this.coins:this.bet);}
       }
     }
@@ -158,7 +155,6 @@ const Slot={
     ctx.fillStyle='#0f0'; ctx.font='12px monospace'; ctx.fillText(`COIN: ${this.coins}`,25,208); ctx.fillStyle='#ff0'; ctx.fillText(`BET: ${this.bet}`,115,208);
     if((this.st==='bet'&&this.tmr%60<30)||this.free>0){ctx.fillStyle=this.free>0?'#0ff':'#fff';ctx.fillText(this.msg,25,230);}else if(this.st!=='bet'){ctx.fillStyle=this.win>0?'#ff0':'#fff';ctx.fillText(this.msg,25,230);}
 
-    // ★ 説明書を分かりやすく改訂
     ctx.fillStyle='#fff'; ctx.font='9px monospace';
     ctx.fillText('7:x50 BAR:x20 BEL:x10 SUI:x5 CHE:x2', 17, 255);
     ctx.fillStyle='#f8f'; ctx.fillText('[W]:WILD(代用)', 17, 270);
