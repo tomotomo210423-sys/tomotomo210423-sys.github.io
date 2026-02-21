@@ -1,10 +1,11 @@
-// === CORE SYSTEM (Input Fixed Edition) ===
+// === CORE SYSTEM (Input & HitStop Fixed Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false, l0: false, l1: false, l2: false, l3: false };
 const keysDown = { ...keys };
 let prevKeys = { ...keys };
+const keyPressQueue = { ...keys }; // ★ 高速タップの「フレーム抜け」を防ぐ記憶システム
 let activeApp = null;
 
 // ===== オーディオシステム =====
@@ -56,8 +57,15 @@ function playSnd(t) {
   if (!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
   if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.05); } 
   else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05, n); o.start(n); o.stop(n + 0.1); } 
-  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); screenShake(4); hitStop(3); } 
-  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); screenShake(2); hitStop(2); }
+  // ★ 修正：リズムゲーム中は「時間停止（ヒットストップ）」を発動させない！
+  else if (t === 'hit') { 
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); 
+    screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); 
+  } 
+  else if (t === 'combo') { 
+    o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); 
+    screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); 
+  }
 }
 
 // ===== セーブシステム =====
@@ -175,12 +183,25 @@ const DataBackup = {
   }
 };
 
+// ===== メインループ =====
 function loop() {
   try {
-    if (hitStopTimer <= 0) { for (let k in keys) { keysDown[k] = keys[k] && !prevKeys[k]; prevKeys[k] = keys[k]; } }
-    if (transTimer > 0) { transTimer--; if (transTimer === 0 && nextApp) { activeApp = nextApp; activeApp.init(); nextApp = null; } } 
+    if (hitStopTimer <= 0) { 
+      for (let k in keys) { 
+        // ★修正：フレームをすり抜けたタップ記憶(Queue)を確実にここで回収する！
+        keysDown[k] = (keys[k] && !prevKeys[k]) || keyPressQueue[k]; 
+        keyPressQueue[k] = false; 
+        prevKeys[k] = keys[k]; 
+      } 
+    }
+    
+    if (transTimer > 0) { 
+        transTimer--; 
+        if (transTimer === 0 && nextApp) { activeApp = nextApp; activeApp.init(); nextApp = null; } 
+    } 
     else if (hitStopTimer > 0) { hitStopTimer--; } 
     else { if (activeApp && activeApp.update) activeApp.update(); }
+    
     if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
   } catch (err) {
     console.error(err); ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = "#fff"; ctx.fillText("ERROR CRASHED", 10, 50);
@@ -189,17 +210,17 @@ function loop() {
 }
 requestAnimationFrame(loop);
 
-// ★ 修正部分：マルチタッチ・スワイプに対応するための堅牢なイベントリスナー
+// ===== ボタン入力管理 =====
 const setBtn = (id, k) => {
   const e = document.getElementById(id); if (!e) return;
-  const p = (ev) => { ev.preventDefault(); keys[k] = true; initAudio(); };
+  // ★修正：押された瞬間に必ず記憶（Queue）を残す
+  const p = (ev) => { ev.preventDefault(); keys[k] = true; keyPressQueue[k] = true; initAudio(); };
   const r = (ev) => { ev.preventDefault(); keys[k] = false; };
-  // スワイプによるキャンセルを防ぐため、touchstart と touchend で確実に判定する
+  
   e.addEventListener('touchstart', p, {passive: false});
   e.addEventListener('touchend', r, {passive: false});
   e.addEventListener('touchcancel', r, {passive: false});
   
-  // PCやマウス用の判定
   e.addEventListener('mousedown', p);
   e.addEventListener('mouseup', r);
   e.addEventListener('mouseleave', r);
@@ -210,10 +231,13 @@ const setBtn = (id, k) => {
 
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { keys.up = true; initAudio(); } if (e.key === 'ArrowDown') { keys.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { keys.left = true; initAudio(); } if (e.key === 'ArrowRight') { keys.right = true; initAudio(); }
-  if (k === 'z' || e.key === ' ') { keys.a = true; initAudio(); } if (k === 'x') { keys.b = true; initAudio(); }
-  if (e.key === 'Shift') { keys.select = true; initAudio(); }
+  if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { keys.down = true; keyPressQueue.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { keys.left = true; keyPressQueue.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { keys.right = true; keyPressQueue.right = true; initAudio(); }
+  if (k === 'z' || e.key === ' ') { keys.a = true; keyPressQueue.a = true; initAudio(); } 
+  if (k === 'x') { keys.b = true; keyPressQueue.b = true; initAudio(); }
+  if (e.key === 'Shift') { keys.select = true; keyPressQueue.select = true; initAudio(); }
 });
 
 window.addEventListener('keyup', e => {
