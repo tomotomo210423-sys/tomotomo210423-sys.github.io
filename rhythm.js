@@ -1,24 +1,10 @@
-// === BEAT BROS - SLIDE INPUT RESTORED ===
+// === BEAT BROS - TOUCH FIX & NO SHAKE/SOUND ===
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
   touchBound: false, laneTouch: [false,false,false,false],
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
-
-  playTap(isPerfect) {
-    if(!audioCtx) return;
-    const now = audioCtx.currentTime;
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = isPerfect ? 'sine' : 'square';
-    o.frequency.setValueAtTime(isPerfect ? 880 : 440, now);
-    o.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-    g.gain.setValueAtTime(isPerfect ? 0.15 : 0.05, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(now); o.stop(now + 0.1);
-  },
 
   init() {
     this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0;
@@ -48,24 +34,29 @@ const Rhythm = {
             }
         }
         
-        // ★ スライディング復活：指が移動して新しいレーンに入った瞬間に反応させる！
-        let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
-        let nT = [false,false,false,false];
-        let jt = []; // 新しく触れられたレーン
-        
-        for(let i=0; i<activeTs.length; i++) {
-            let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
-            let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-            if(this.st === 'play' && y > 150) {
-                let l = Math.floor(x / (cvs.width / 4));
-                if(l >= 0 && l <= 3) {
-                   nT[l] = true;
-                   if(!this.laneTouch[l]) jt.push(l); // 前のフレームで触れていなければヒット！
+        // ★ プレイ中のタッチ判定：判定エリアを上に広げ、二重判定を防いで確実に拾う
+        if (this.st === 'play') {
+            let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
+            let nT = [false,false,false,false];
+            
+            for(let i=0; i<activeTs.length; i++) {
+                let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
+                let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
+                // ★ 判定エリアを y > 150 から y > 100 に拡大（上の方を叩いても反応する）
+                if(y > 100) { 
+                    let l = Math.floor(x / (cvs.width / 4));
+                    if(l >= 0 && l <= 3) nT[l] = true;
                 }
             }
+            
+            // 新しく指が触れたレーン、または指が滑って入ってきたレーンだけを「叩いた」と判定する
+            for(let l=0; l<4; l++) {
+                if(nT[l] && !this.laneTouch[l]) {
+                    this.hitKey(l);
+                }
+            }
+            this.laneTouch = nT;
         }
-        this.laneTouch = nT;
-        jt.forEach(l => this.hitKey(l));
       };
       ['touchstart','touchmove','touchend','touchcancel','mousedown','mousemove','mouseup','mouseleave'].forEach(E => cvs.addEventListener(E, tH, {passive: false}));
     }
@@ -196,7 +187,9 @@ const Rhythm = {
       if(hitNote) {
         hitNote.hit = true; let cx = 25 + lane * 50;
         let msg = '', pts = 0;
-        if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); screenShake(4); }
+        
+        // ★ 画面の揺れ (screenShake) を完全に削除
+        if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); }
         else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); }
         else { msg = 'GOOD'; pts = 10; }
         
@@ -204,7 +197,7 @@ const Rhythm = {
         this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
         this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); 
         
-        this.playTap(minDiff < 0.10);
+        // ★ 打撃音(ピコピコ音)も削除しました
       }
   },
 
@@ -238,6 +231,7 @@ const Rhythm = {
     }
     else if(this.st === 'transform_in') {
       this.transformTimer--;
+      // 変形中の音と揺れは演出として残しています
       if(this.transformTimer % 20 === 0) playSnd('hit'); 
       if(this.transformTimer % 40 === 0) screenShake(5); 
       if(this.transformTimer <= 0) { this.loadFile(this.pendingFile); } 
@@ -258,7 +252,6 @@ const Rhythm = {
       
       if(this.mode === 'nightmare' && this.source) {
           this.source.playbackRate.value = 1.0 + Math.sin(Date.now()/200)*0.3;
-          screenShake(3);
       }
 
       if(kD.left || kD.l0) this.hitKey(0);
@@ -270,7 +263,8 @@ const Rhythm = {
         n.y = this.lineY - (n.time - now) * speed;
         if(!n.hit && !n.missed && n.y > 420) { 
            n.missed = true; this.combo = 0; 
-           this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); screenShake(2); 
+           this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); 
+           // ★ MISS時の画面揺れも削除しました
         }
       }
       for(let i = this.judgements.length - 1; i >= 0; i--){ this.judgements[i].life--; if(this.judgements[i].life <= 0) this.judgements.splice(i, 1); }
@@ -283,6 +277,7 @@ const Rhythm = {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
     ctx.save();
     
+    // NIGHTMAREモード特有のうねる画面揺れ
     if(this.mode === 'nightmare' && this.st === 'play') {
        ctx.translate(100, 200);
        ctx.rotate(Math.sin(Date.now()/300) * 0.1);
