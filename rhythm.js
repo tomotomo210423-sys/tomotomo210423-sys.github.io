@@ -1,4 +1,4 @@
-// === BEAT BROS - NIGHTMARE UPDATE ===
+// === BEAT BROS - UI MENU CLEANUP ===
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
@@ -88,7 +88,6 @@ const Rhythm = {
     for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // ★NIGHTMARE用にしきい値と間隔を極限まで下げる
     let threshold = avgVol * (this.mode === 'nightmare' ? 0.5 : this.mode === 'hard' ? 1.0 : this.mode === 'normal' ? 1.5 : 2.0);
     if(threshold < 0.01) threshold = 0.01;
     let minGap = this.mode === 'nightmare' ? 0.08 : this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.22 : 0.35;
@@ -99,7 +98,6 @@ const Rhythm = {
         let t = i / buffer.sampleRate; 
         if(t - lastTime > minGap) {
           if (this.mode === 'nightmare') {
-            // ★NIGHTMARE：容赦ない同時押し＆乱打生成
             let nCnt = Math.random() < 0.3 ? 3 : Math.random() < 0.6 ? 2 : 1;
             let lanes = [0,1,2,3].sort(()=>Math.random()-0.5).slice(0,nCnt);
             lanes.forEach(l => this.notes.push({ time: t + (Math.random()*0.05), lane: l, hit: false, y: -50, missed: false }));
@@ -191,7 +189,6 @@ const Rhythm = {
       if(kD.down){ this.settingsCur = (this.settingsCur + 1) % 3; playSnd('sel'); }
       
       if(this.settingsCur === 0) {
-        // ★ NIGHTMARE を追加
         let m = ['easy','normal','hard','nightmare'];
         if(kD.left) { this.mode = m[(m.indexOf(this.mode)+3)%4]; playSnd('sel'); }
         if(kD.right || kD.a) { this.mode = m[(m.indexOf(this.mode)+1)%4]; playSnd('sel'); }
@@ -225,13 +222,11 @@ const Rhythm = {
     }
     else if(this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      // ★ NIGHTMAREの超高速落下 (速度666)
       let speed = this.mode === 'nightmare' ? 666 : this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150;
       
-      // ★ NIGHTMAREの聴覚妨害：曲のピッチと速度がグニャグニャに狂う
       if(this.mode === 'nightmare' && this.source) {
           this.source.playbackRate.value = 1.0 + Math.sin(Date.now()/200)*0.3;
-          screenShake(3); // 常に画面が揺れ続ける
+          screenShake(3);
       }
 
       if(kD.left || kD.l0) this.hitKey(0);
@@ -256,7 +251,6 @@ const Rhythm = {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
     ctx.save();
     
-    // ★ NIGHTMAREの視覚妨害：画面全体が酔うように揺れ動く
     if(this.mode === 'nightmare' && this.st === 'play') {
        ctx.translate(100, 200);
        ctx.rotate(Math.sin(Date.now()/300) * 0.1);
@@ -265,35 +259,33 @@ const Rhythm = {
     
     if(typeof shakeTimer !== 'undefined' && shakeTimer > 0){ ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; }
     
+    // ★ 不法侵入していた難易度リストを完全に削除し、スッキリさせました！
     if(this.st === 'menu') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('BEAT BROS', 60, 50);
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('↑下のボタンで曲を選ぶ↑', 40, 80);
-      
-      // ★ メニューにもNIGHTMAREのスコアを表示
-      const modes = ['easy', 'normal', 'hard', 'nightmare'];
-      let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
-      
-      for(let i=0; i<4; i++) {
-        ctx.fillStyle = this.mode === modes[i] ? (i===3 ? '#f00' : '#0f0') : '#666';
-        ctx.fillText((this.mode === modes[i] ? '> ' : '  ') + modes[i].toUpperCase(), 45, 120 + i * 28);
-        ctx.fillStyle = this.mode === modes[i] ? '#ff0' : '#888'; ctx.font = '8px monospace';
-        ctx.fillText(`HI-SCORE: ${rData[modes[i]] || 0}`, 45, 130 + i * 28); ctx.font = '10px monospace';
-      }
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if(this.st === 'settings') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('SYSTEM READY', 45, 50);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
       
+      // ★ ハイスコアは設定画面で、選んだ難易度に合わせて表示するようにしました！
+      let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
+      let hi = rData[this.mode] || 0;
+      
       ctx.fillStyle = this.settingsCur === 0 ? (this.mode === 'nightmare' ? '#f00' : '#ff0') : '#fff';
       ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 30, 110);
       
+      ctx.fillStyle = '#aaa'; ctx.font = '10px monospace';
+      ctx.fillText(`  HI-SCORE: ${hi}`, 30, 125);
+      
+      ctx.font = '12px monospace';
       const filters = ['OFF', 'RADIO', 'WATER', 'ECHO'];
       ctx.fillStyle = this.settingsCur === 1 ? '#ff0' : '#fff';
-      ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 30, 140);
+      ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 30, 160);
       
       ctx.fillStyle = this.settingsCur === 2 ? '#0f0' : '#fff';
-      ctx.fillText((this.settingsCur===2?'> ':'  ') + `GAME START!`, 30, 190);
+      ctx.fillText((this.settingsCur===2?'> ':'  ') + `GAME START!`, 30, 210);
       
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A/←→:変更  SEL:戻る', 25, 280);
     }
@@ -326,7 +318,6 @@ const Rhythm = {
       });
       drawParticles();
       
-      // ★ NIGHTMAREの視覚妨害：突発的なフラッシュやエラー文字
       if(this.mode === 'nightmare' && this.st === 'play' && Math.random() < 0.08) {
          ctx.fillStyle = ['rgba(255,0,0,0.5)', 'rgba(255,0,255,0.4)', 'rgba(255,255,0,0.3)'][Math.floor(Math.random()*3)];
          ctx.font = 'bold ' + (20 + Math.random()*40) + 'px monospace';
