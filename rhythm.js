@@ -1,4 +1,4 @@
-// === BEAT BROS - HIT-STOP FREEZE & TOUCH FIX ===
+// === BEAT BROS - SLIDE INPUT RESTORED ===
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
@@ -6,7 +6,6 @@ const Rhythm = {
   touchBound: false, laneTouch: [false,false,false,false],
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
 
-  // ★ 追加：ヒットストップ（ゲーム停止）を発生させない音ゲー専用のタップ音
   playTap(isPerfect) {
     if(!audioCtx) return;
     const now = audioCtx.currentTime;
@@ -38,7 +37,7 @@ const Rhythm = {
         
         const r = cvs.getBoundingClientRect();
         
-        // ★修正：指が触れた瞬間(叩いた瞬間)だけを確実に判定し、滑りによる無反応を防ぐ
+        // 戻るボタン等のUI判定（タップ時のみ）
         if (e.type === 'touchstart' || e.type === 'mousedown') {
             let ts = e.type === 'mousedown' ? [e] : e.changedTouches;
             for(let i=0; i<ts.length; i++) {
@@ -46,26 +45,27 @@ const Rhythm = {
                 let y = (ts[i].clientY - r.top) / r.height * cvs.height;
                 if(y < 40 && x < 60){ this.exitGame(); return; }
                 if(this.st === 'result'){ this.exitGame(); return; }
-                
-                if(this.st === 'play' && y > 150) {
-                    let l = Math.floor(x / (cvs.width / 4)); 
-                    if(l >= 0 && l <= 3) this.hitKey(l);
-                }
             }
         }
         
-        // 押しっぱなし状態（レーンの発光演出用）の更新
+        // ★ スライディング復活：指が移動して新しいレーンに入った瞬間に反応させる！
         let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
         let nT = [false,false,false,false];
+        let jt = []; // 新しく触れられたレーン
+        
         for(let i=0; i<activeTs.length; i++) {
             let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
             let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-            if(y > 150) {
+            if(this.st === 'play' && y > 150) {
                 let l = Math.floor(x / (cvs.width / 4));
-                if(l >= 0 && l <= 3) nT[l] = true;
+                if(l >= 0 && l <= 3) {
+                   nT[l] = true;
+                   if(!this.laneTouch[l]) jt.push(l); // 前のフレームで触れていなければヒット！
+                }
             }
         }
         this.laneTouch = nT;
+        jt.forEach(l => this.hitKey(l));
       };
       ['touchstart','touchmove','touchend','touchcancel','mousedown','mousemove','mouseup','mouseleave'].forEach(E => cvs.addEventListener(E, tH, {passive: false}));
     }
@@ -204,7 +204,6 @@ const Rhythm = {
         this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
         this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); 
         
-        // ★修正：ヒットストップ(ゲームのフリーズ)を引き起こさない専用音を使用！
         this.playTap(minDiff < 0.10);
       }
   },
