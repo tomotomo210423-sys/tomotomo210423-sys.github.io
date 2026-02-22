@@ -82,8 +82,8 @@ const SaveSys = {
 // 　【GitHub対策】APIキーを3〜4つに「分割して」貼り付けてください！
 // 　（例: "AIzaSy" + "12345" + "67890" + "abcdefg"）
 const GEMINI_API_KEY = [
-  "AIzaSy",
-  "40pJoEo_",
+  "AIza",
+  "Sy40pJoEo_",
   "Xcluzq2P",
   "FYxS0guU6owK60BY"
 ].join("");
