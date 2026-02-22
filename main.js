@@ -85,7 +85,7 @@ const GEMINI_API_KEY = [
   "SyDa7Ku8RWSO",
   "OGDXKCQTdw",
   "AObBHi6A8GcKA"
-].join(""
+].join("");
 // ★============================================★
 
 const AISys = {
