@@ -1,4 +1,4 @@
-// === RETRO SLOT MACHINE (FIXED BET CYCLE) ===
+// === RETRO SLOT MACHINE - LOGGING UPDATE ===
 const Slot={
   st:'bet', coins:100, bet:1, win:0, lines:[], msg:'BET & PRESS A', tmr:0, rTmr:0,
   jp:1000, free:0, symH:32, stopIdx:0,
@@ -65,7 +65,10 @@ const Slot={
         }
       }
     }
-    if(tJ){ this.win+=this.jp; this.jp=1000; this.msg='JACKPOT!!!'; }
+    if(tJ){ 
+      this.win+=this.jp; this.jp=1000; this.msg='JACKPOT!!!'; 
+      SaveSys.addLog('スロット', 'ジャックポットを当てて大儲けした！'); // ★ ログ
+    }
     else if(tF>0){ this.free+=tF; this.msg=`GET ${tF} FREE SPINS!`; }
     else if(this.win===0) this.msg='YOU LOSE...';
   },
@@ -83,9 +86,8 @@ const Slot={
         this.msg=`FREE SPIN: ${this.free}  PRESS SPIN`; if(keysDown.a){this.free--;this.spin();}
       }else{
         this.msg='SET BET & PRESS SPIN';
-        // ★ ここを修正！BETボタンを押すたびに 1→2→3→1 とループする
         if(keysDown.up){this.bet++; if(this.bet>3||this.bet>this.coins)this.bet=1; playSnd('sel');}
-        if(keysDown.down){this.bet=Math.max(1,this.bet-1);playSnd('sel');} // PCキーボード用
+        if(keysDown.down){this.bet=Math.max(1,this.bet-1);playSnd('sel');}
         if(keysDown.b){this.bet=Math.min(3,this.coins);playSnd('combo');}
         if(keysDown.a&&this.coins>=this.bet){
           this.coins-=this.bet; this.jp+=this.bet; SaveSys.data.slotCoins=this.coins; SaveSys.data.jackpotPool=this.jp; SaveSys.save(); this.spin();
@@ -111,7 +113,10 @@ const Slot={
         if(!this.msg.includes('JACKPOT')&&!this.msg.includes('FREE'))this.msg=`WIN ${this.win} COINS!`;
       }
       if(this.tmr>100){
-        if(this.coins<=0&&this.free<=0){this.st='bank';this.msg='GAME OVER... PRESS SPIN';}
+        if(this.coins<=0&&this.free<=0){
+          this.st='bank';this.msg='GAME OVER... PRESS SPIN';
+          SaveSys.addLog('スロット', '全財産をすって破産した…'); // ★ ログ
+        }
         else{this.st='bet';this.bet=Math.min(this.bet,this.coins>0?this.coins:this.bet);}
       }
     }
