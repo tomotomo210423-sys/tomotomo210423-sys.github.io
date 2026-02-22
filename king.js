@@ -1,19 +1,22 @@
-// === KING'S ROOM (Phase 3.5: RPG Dialogue Style) ===
+// === KING'S ROOM (Phase 4: AI Qwen Descends) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
-  logs: [
-    { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
-    // ★ セリフの表示をRPG風に変更
-    { speaker: 'king', text: "王：「おお ゆうしゃよ！\nよくぞ まいった！\nわしが このせかいの おうじゃ！」" },
-    { speaker: 'sys', text: "【フェーズ3 テストモード】\n Aボタン: 表情チェンジ\n Bボタン: 最新のプレイ記録を覗き見" }
-  ],
+  logs: [], chatHistory: [],
+  cmdCur: 0, cmds: ["ほうこくする", "ほめてほしい", "なぐさめて", "退出する"],
+  typeText: "", typeIdx: 0, typeTimer: 0,
   
   init() {
-    this.st = 'chat';
+    this.st = 'init';
     this.scroll = 0;
+    this.logs = [
+      { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
+      { speaker: 'king', text: "王：「よくぞ まいった！\nわしが このせかいの おうじゃ！」" }
+    ];
+    this.chatHistory = [];
     BGM.play('spell'); 
     
+    // 画像ロード
     const emos = ['normal', 'thinking', 'angry', 'laughing', 'disappointed'];
     emos.forEach(emo => {
       if (!this.images[emo]) {
@@ -23,31 +26,137 @@ const KingRoom = {
         this.images[emo] = img;
       }
     });
+
+    // AIのステータスチェック (0.5秒遅延して安定させる)
+    setTimeout(() => {
+      if (AISys.status === 'init') {
+        this.st = 'ask_dl';
+      } else if (AISys.status === 'loading') {
+        this.st = 'downloading';
+      } else {
+        this.st = 'chat';
+      }
+    }, 500);
   },
   
-  update() {
-    if (keysDown.select) { switchApp(Menu); return; }
-    if (keys.up) { this.scroll = Math.max(0, this.scroll - 3); }
-    if (keys.down) { this.scroll += 3; }
+  // ★ ここがAIと会話する魔法の関数
+  async sendPrompt() {
+    this.st = 'thinking';
+    this.emotion = 'thinking';
+    playSnd('sel');
     
-    // Aボタンで表情切り替え
-    if (keysDown.a) {
-      const emos = ['normal', 'thinking', 'angry', 'laughing', 'disappointed'];
-      this.emotion = emos[(emos.indexOf(this.emotion) + 1) % emos.length];
-      playSnd('sel');
-    }
+    // ① 監視データを取得
+    let recentLog = SaveSys.data.logs[0] || "特になし";
+    
+    // ② プレイヤーが選んだコマンドに合わせてプロンプト（指示書）を構築
+    let p = "";
+    if(this.cmdCur === 0) p = `勇者の最近の記録:『${recentLog}』。これについて一言コメントして。`;
+    if(this.cmdCur === 1) p = `勇者の最近の記録:『${recentLog}』。これを理由に、大げさに褒め称えて。`;
+    if(this.cmdCur === 2) p = `勇者の最近の記録:『${recentLog}』。これについて、呆れつつも優しく慰めて。`;
+    
+    // プレイヤーのコマンドを画面に表示
+    this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
+    this.scrollToBottom();
 
-    // Bボタンで最新のプレイ記録（監視データ）を喋る
-    if (keysDown.b) {
-      let recentLog = "とくに なにも しておらんようじゃな。";
-      if (SaveSys.data.logs && SaveSys.data.logs.length > 0) {
-        recentLog = SaveSys.data.logs[0]; 
+    // 絶対に守らせる鉄の掟
+    const sysPrompt = "あなたはレトロRPG風の王様です。一人称は「わし」、語尾は「じゃ」「じゃな」。腹黒くツンデレな性格。絶対に50文字以内で短く答え、AIであることは隠してください。「王：」などの記号は付けず、セリフの中身だけを出力すること。";
+    
+    // ③ AIに送信！
+    const reply = await AISys.chat(sysPrompt, p, this.chatHistory);
+    
+    // ④ 返ってきた内容を記憶(履歴)に保存 (直近3往復だけ残す)
+    this.chatHistory.push({ role: 'user', content: p });
+    this.chatHistory.push({ role: 'assistant', content: reply });
+    if (this.chatHistory.length > 6) this.chatHistory.splice(0, 2); 
+
+    // ⑤ 王様の表情を自動判定
+    if (reply.includes("！")) this.emotion = 'laughing';
+    else if (reply.includes("…") || reply.includes("なさけない")) this.emotion = 'disappointed';
+    else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
+    else this.emotion = 'normal';
+
+    // ⑥ タイピング表示の準備
+    this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, ''); // AIが間違えてつけたカギカッコを除去
+    this.typeIdx = 0;
+    this.typeTimer = 0;
+    this.logs.push({ speaker: 'king', text: "王：「" });
+    this.st = 'typing';
+  },
+
+  scrollToBottom() {
+     let lines = 0;
+     this.logs.forEach(l => lines += l.text.split('\n').length + 1);
+     this.scroll = Math.max(0, lines * 15 - 100);
+  },
+
+  update() {
+    if (this.st === 'init') return;
+    
+    // 初回のダウンロード確認画面
+    if (this.st === 'ask_dl') {
+      if (keysDown.left || keysDown.right) { this.cmdCur = this.cmdCur === 0 ? 1 : 0; playSnd('sel'); }
+      if (keysDown.a) {
+        if (this.cmdCur === 0) {
+          AISys.initModel();
+          this.st = 'downloading';
+          playSnd('jmp');
+        } else {
+          this.st = 'chat'; // ダウンロードしない場合は通常の無口モードへ
+          playSnd('sel');
+        }
       }
-      // ★ ここも王様のカギカッコ対応（中身は『』にする）
-      this.logs.push({ speaker: 'king', text: "王：「ふむ、ほうこく に よると...\n『" + recentLog + "』\n...ということじゃな！\nわしは すべて おみとおしじゃぞ！」" });
-      this.emotion = 'thinking';
-      this.scroll = Math.max(0, this.logs.length * 40); 
-      playSnd('jmp');
+    }
+    // ダウンロード中
+    else if (this.st === 'downloading') {
+      if (AISys.status === 'ready') { this.st = 'chat'; playSnd('combo'); }
+      if (AISys.status === 'error') { this.st = 'chat'; }
+    }
+    // 通常ログ閲覧モード
+    else if (this.st === 'chat') {
+      if (keysDown.select) { switchApp(Menu); return; }
+      if (keys.up) { this.scroll = Math.max(0, this.scroll - 3); }
+      if (keys.down) { this.scroll += 3; }
+      // Aボタンでコマンド選択ポップアップを開く！
+      if (keysDown.a) { this.st = 'cmd'; this.cmdCur = 0; playSnd('sel'); }
+    }
+    // コマンド選択モード
+    else if (this.st === 'cmd') {
+      if (keysDown.b) { this.st = 'chat'; playSnd('sel'); return; } // キャンセル
+      if (keysDown.up) { this.cmdCur = (this.cmdCur - 1 + this.cmds.length) % this.cmds.length; playSnd('sel'); }
+      if (keysDown.down) { this.cmdCur = (this.cmdCur + 1) % this.cmds.length; playSnd('sel'); }
+      if (keysDown.a) {
+        if (this.cmdCur === 3) { switchApp(Menu); return; } // 退出する
+        
+        // AIが準備OKならチャット開始、ダメなら影武者
+        if (AISys.status === 'ready') {
+          this.sendPrompt();
+        } else {
+          this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
+          this.logs.push({ speaker: 'king', text: "王：「わしは 今 ねむいんじゃ。\nまた あとで こい！」" });
+          this.emotion = 'disappointed';
+          this.scrollToBottom();
+          this.st = 'chat';
+          playSnd('hit');
+        }
+      }
+    }
+    // タイピング表示エフェクト
+    else if (this.st === 'typing') {
+      this.typeTimer++;
+      if (this.typeTimer >= 2) { // 2フレームに1文字表示
+        this.typeTimer = 0;
+        let currentLog = this.logs[this.logs.length - 1];
+        currentLog.text += this.typeText[this.typeIdx];
+        this.typeIdx++;
+        
+        if (this.typeIdx % 3 === 0) playSnd('sel'); // ポポポ音
+        this.scrollToBottom();
+        
+        if (this.typeIdx >= this.typeText.length) {
+          currentLog.text += "」";
+          this.st = 'chat';
+        }
+      }
     }
   },
   
@@ -69,11 +178,39 @@ const KingRoom = {
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('Loading King...', 60, 80);
     }
     
-    if (this.emotion === 'thinking') {
+    // 考え中アニメーション
+    if (this.st === 'thinking') {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace';
       ctx.fillText('...', 130 + Math.sin(Date.now() / 150) * 3, 50);
     }
 
+    // 初回ダウンロード確認UI
+    if (this.st === 'ask_dl') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(10, 50, 180, 100);
+      ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(10, 50, 180, 100);
+      ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+      ctx.fillText("【AIモデルのダウンロード】", 20, 70);
+      ctx.fillText("約1.2GBの通信が発生します。", 20, 90);
+      ctx.fillText("王様に魂を宿しますか？", 20, 105);
+      ctx.fillStyle = this.cmdCur === 0 ? '#0f0' : '#aaa'; ctx.fillText((this.cmdCur===0?'> ':'  ')+"はい(Wi-Fi推奨)", 30, 125);
+      ctx.fillStyle = this.cmdCur === 1 ? '#0f0' : '#aaa'; ctx.fillText((this.cmdCur===1?'> ':'  ')+"いいえ(後で)", 30, 140);
+    }
+    // ダウンロード進捗UI
+    else if (this.st === 'downloading') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(10, 50, 180, 100);
+      ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(10, 50, 180, 100);
+      ctx.fillStyle = '#0f0'; ctx.font = '11px monospace';
+      ctx.fillText("魂を 召喚中...", 60, 70);
+      
+      ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 90, 160, 10);
+      ctx.fillStyle = '#0f0'; ctx.fillRect(20, 90, 160 * AISys.progress, 10);
+      
+      ctx.fillStyle = '#aaa'; ctx.font = '9px monospace';
+      ctx.fillText(AISys.progressText.slice(0, 25) + '...', 20, 115);
+      ctx.fillText(`${Math.floor(AISys.progress * 100)}%`, 85, 130);
+    }
+
+    // ログウィンドウ
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(5, 145, 190, 150);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(5, 145, 190, 150);
     ctx.save(); ctx.beginPath(); ctx.rect(10, 150, 180, 140); ctx.clip();
@@ -81,7 +218,7 @@ const KingRoom = {
     ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
     let drawY = 165 - this.scroll;
     
-    // 文字の長さを測って自動で折り返す
+    // はみ出し防止の自動折り返し処理
     const wrapText = (text, maxWidth) => {
       let result = [];
       let rawLines = text.split('\n');
@@ -103,8 +240,8 @@ const KingRoom = {
     };
 
     for (let log of this.logs) {
-      ctx.fillStyle = log.speaker === 'king' ? '#0f0' : '#aaa';
-      let wrappedLines = wrapText(log.text, 160); 
+      ctx.fillStyle = log.speaker === 'king' ? '#0f0' : (log.speaker === 'sys' ? '#aaa' : '#fff');
+      let wrappedLines = wrapText(log.text, 170); 
       for (let line of wrappedLines) { 
         ctx.fillText(line, 15, drawY); 
         drawY += 15; 
@@ -112,7 +249,21 @@ const KingRoom = {
       drawY += 5; 
     }
     ctx.restore();
-    ctx.fillStyle = '#888'; ctx.font = '9px monospace';
-    ctx.fillText('A:表情  B:ログ覗き見  SEL:戻る', 10, 290);
+
+    // ★ ポップアップするコマンドウィンドウ
+    if (this.st === 'cmd') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.95)'; ctx.fillRect(90, 160, 100, 85);
+      ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(90, 160, 100, 85);
+      ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+      for (let i = 0; i < this.cmds.length; i++) {
+        ctx.fillStyle = this.cmdCur === i ? '#ff0' : '#aaa';
+        ctx.fillText((this.cmdCur === i ? '> ' : '  ') + this.cmds[i], 95, 180 + i * 18);
+      }
+    }
+
+    if (this.st === 'chat') {
+      ctx.fillStyle = '#888'; ctx.font = '9px monospace';
+      ctx.fillText('A:はなしかける ↑↓:スクロール SEL:戻る', 10, 290);
+    }
   }
 };
