@@ -1,8 +1,8 @@
-// === KING'S ROOM (Phase 4.4: Anti-Hallucination & Free Chat) ===
+// === KING'S ROOM (Phase 4.5: Memory Wipe & Strict Prompt) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
-  logs: [], chatHistory: [],
+  logs: [], 
   cmdCur: 0, cmds: ["ほうこくする", "ほめてほしい", "なぐさめて", "じゆうにはなす", "退出する"],
   typeText: "", typeIdx: 0, typeTimer: 0,
   
@@ -13,7 +13,6 @@ const KingRoom = {
       { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
       { speaker: 'king', text: "王：「よくぞ まいった！\nわしが このせかいの おうじゃ！」" }
     ];
-    this.chatHistory = [];
     BGM.play('spell'); 
     
     const emos = ['normal', 'thinking', 'angry', 'laughing', 'disappointed'];
@@ -44,43 +43,35 @@ const KingRoom = {
       playSnd('sel');
       
       let p = "";
-      // ★ 0.5Bモデルが勘違いしないよう「状況説明」と「要求」を明確に分割
       if (customText) {
-        p = `【状況】勇者があなたに話しかけました。\n勇者「${customText}」\n\nこれに対する王様としての返答（セリフのみ）：`;
+        p = `勇者の言葉：「${customText}」\nこれに対する王様の返答セリフ：`;
         this.logs.push({ speaker: 'sys', text: `> あなた: ${customText}` });
       } else {
         let recentLog = SaveSys.data.logs && SaveSys.data.logs.length > 0 ? SaveSys.data.logs[0] : "とくに なにも しておらん";
-        if(this.cmdCur === 0) p = `【状況】勇者が最近の行動を報告しました。\n報告内容『${recentLog}』\n\nこれに対する王様の反応（セリフのみ）：`;
-        if(this.cmdCur === 1) p = `【状況】勇者が最近の行動を報告しました。\n報告内容『${recentLog}』\n\nこれを大げさに褒める王様のセリフ（セリフのみ）：`;
-        if(this.cmdCur === 2) p = `【状況】勇者が最近の行動を報告しました。\n報告内容『${recentLog}』\n\nこれを優しく慰める王様のセリフ（セリフのみ）：`;
+        if(this.cmdCur === 0) p = `勇者の報告：「${recentLog}」\nこれに対する王様の短い返答セリフ：`;
+        if(this.cmdCur === 1) p = `勇者の報告：「${recentLog}」\nこれを大げさに褒める王様の短いセリフ：`;
+        if(this.cmdCur === 2) p = `勇者の報告：「${recentLog}」\nこれを呆れつつも優しく慰める王様の短いセリフ：`;
         this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
       }
       
       this.scrollToBottom();
 
-      // ★ 0.5B向けの超強力な拘束指示書（解説を絶対に行わせない）
-      const sysPrompt = `あなたはレトロRPGの偉大な王様です。絶対に解説や説明をしてはいけません。以下のルールを厳守して「王様のセリフ」だけを生成してください。
+      // ★ 超シンプルかつ強力な拘束ルール
+      const sysPrompt = `あなたはレトロRPGの偉大な王様です。プレイヤー（勇者）の言葉に対して、王様としてのセリフを1つだけ返してください。
 
-【ルール】
+【厳格なルール】
 ・一人称は「わし」、二人称は「そなた」か「ゆうしゃ」。
-・語尾は「～じゃ」「～じゃな」「～でおじゃる」のいずれか。
-・絶対に50文字以内。
-・解説、要約、ゲームの仕様説明は「絶対に」禁止。
-・「王：」や「」などの記号は書かない。
+・語尾は「～じゃ」「～じゃな」「～でおじゃる」。
+・絶対に50文字以内の短い1文のみ出力すること。
+・解説、説明、箇条書きは絶対に禁止。
+・「王：」などの記号は書かない。`;
 
-【良い例】
-おお ゆうしゃよ！ ギャンブルに おぼれるとは なさけない！ わしの へそくりを わけてやろう！
-ふはは！ その程度の スコアで まんぞく してはおらんじゃろうな！ もっと せいじん せよ！`;
-
-      let reply = await AISys.chat(sysPrompt, p, this.chatHistory);
+      // ★ 履歴(chatHistory)を渡さない！その場限りの会話にすることで混乱・ループを完全に防ぐ
+      let reply = await AISys.chat(sysPrompt, p);
       
       if (!reply || typeof reply !== 'string') {
           reply = "むむっ... わしの アタマが フリーズしたようじゃ！（エラー）";
       }
-      
-      this.chatHistory.push({ role: 'user', content: p });
-      this.chatHistory.push({ role: 'assistant', content: reply });
-      if (this.chatHistory.length > 6) this.chatHistory.splice(0, 2); 
 
       // 感情判定
       if (reply.includes("！")) this.emotion = 'laughing';
@@ -88,7 +79,7 @@ const KingRoom = {
       else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
       else this.emotion = 'normal';
 
-      // 万が一「王：」などの余計な文字を出力した場合は削除
+      // 万が一余計な文字を出力した場合は削除
       this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, '').replace(/^出力：?/, ''); 
       this.typeIdx = 0;
       this.typeTimer = 0;
@@ -142,11 +133,10 @@ const KingRoom = {
       if (keysDown.down) { this.cmdCur = (this.cmdCur + 1) % this.cmds.length; playSnd('sel'); }
       
       if (keysDown.a) {
-        if (this.cmdCur === 4) { switchApp(Menu); return; } // 退出
+        if (this.cmdCur === 4) { switchApp(Menu); return; } 
         
         if (AISys.status === 'ready') {
           let customText = null;
-          // 「じゆうにはなす」の処理
           if (this.cmdCur === 3) {
             keys.a = false; keysDown.a = false; 
             customText = prompt("王様に伝える言葉を入力してください：", "");
