@@ -1,4 +1,4 @@
-// === KING'S ROOM (Phase 4: AI Qwen Descends) ===
+// === KING'S ROOM (Phase 4.1: Error Handling Boost) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
@@ -16,7 +16,6 @@ const KingRoom = {
     this.chatHistory = [];
     BGM.play('spell'); 
     
-    // 画像ロード
     const emos = ['normal', 'thinking', 'angry', 'laughing', 'disappointed'];
     emos.forEach(emo => {
       if (!this.images[emo]) {
@@ -27,7 +26,6 @@ const KingRoom = {
       }
     });
 
-    // AIのステータスチェック (0.5秒遅延して安定させる)
     setTimeout(() => {
       if (AISys.status === 'init') {
         this.st = 'ask_dl';
@@ -39,48 +37,56 @@ const KingRoom = {
     }, 500);
   },
   
-  // ★ ここがAIと会話する魔法の関数
+  // ★ AIへの送信処理（絶対にエラーで落ちないように防弾処理を追加）
   async sendPrompt() {
-    this.st = 'thinking';
-    this.emotion = 'thinking';
-    playSnd('sel');
-    
-    // ① 監視データを取得
-    let recentLog = SaveSys.data.logs[0] || "特になし";
-    
-    // ② プレイヤーが選んだコマンドに合わせてプロンプト（指示書）を構築
-    let p = "";
-    if(this.cmdCur === 0) p = `勇者の最近の記録:『${recentLog}』。これについて一言コメントして。`;
-    if(this.cmdCur === 1) p = `勇者の最近の記録:『${recentLog}』。これを理由に、大げさに褒め称えて。`;
-    if(this.cmdCur === 2) p = `勇者の最近の記録:『${recentLog}』。これについて、呆れつつも優しく慰めて。`;
-    
-    // プレイヤーのコマンドを画面に表示
-    this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
-    this.scrollToBottom();
+    try {
+      this.st = 'thinking';
+      this.emotion = 'thinking';
+      playSnd('sel');
+      
+      let recentLog = "特になし";
+      if (SaveSys.data && SaveSys.data.logs && SaveSys.data.logs.length > 0) {
+          recentLog = SaveSys.data.logs[0];
+      }
+      
+      let p = "";
+      if(this.cmdCur === 0) p = `勇者の最近の記録:『${recentLog}』。これについて一言コメントして。`;
+      if(this.cmdCur === 1) p = `勇者の最近の記録:『${recentLog}』。これを理由に、大げさに褒め称えて。`;
+      if(this.cmdCur === 2) p = `勇者の最近の記録:『${recentLog}』。これについて、呆れつつも優しく慰めて。`;
+      
+      this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
+      this.scrollToBottom();
 
-    // 絶対に守らせる鉄の掟
-    const sysPrompt = "あなたはレトロRPG風の王様です。一人称は「わし」、語尾は「じゃ」「じゃな」。腹黒くツンデレな性格。絶対に50文字以内で短く答え、AIであることは隠してください。「王：」などの記号は付けず、セリフの中身だけを出力すること。";
-    
-    // ③ AIに送信！
-    const reply = await AISys.chat(sysPrompt, p, this.chatHistory);
-    
-    // ④ 返ってきた内容を記憶(履歴)に保存 (直近3往復だけ残す)
-    this.chatHistory.push({ role: 'user', content: p });
-    this.chatHistory.push({ role: 'assistant', content: reply });
-    if (this.chatHistory.length > 6) this.chatHistory.splice(0, 2); 
+      const sysPrompt = "あなたはレトロRPG風の王様です。一人称は「わし」、語尾は「じゃ」「じゃな」。腹黒くツンデレな性格。絶対に50文字以内で短く答え、AIであることは隠してください。「王：」などの記号は付けず、セリフの中身だけを出力すること。";
+      
+      let reply = await AISys.chat(sysPrompt, p, this.chatHistory);
+      
+      if (!reply || typeof reply !== 'string') {
+          reply = "むむっ... わしの アタマが フリーズしたようじゃ！（エラー）";
+      }
+      
+      this.chatHistory.push({ role: 'user', content: p });
+      this.chatHistory.push({ role: 'assistant', content: reply });
+      if (this.chatHistory.length > 6) this.chatHistory.splice(0, 2); 
 
-    // ⑤ 王様の表情を自動判定
-    if (reply.includes("！")) this.emotion = 'laughing';
-    else if (reply.includes("…") || reply.includes("なさけない")) this.emotion = 'disappointed';
-    else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
-    else this.emotion = 'normal';
+      if (reply.includes("！")) this.emotion = 'laughing';
+      else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("エラー")) this.emotion = 'disappointed';
+      else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
+      else this.emotion = 'normal';
 
-    // ⑥ タイピング表示の準備
-    this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, ''); // AIが間違えてつけたカギカッコを除去
-    this.typeIdx = 0;
-    this.typeTimer = 0;
-    this.logs.push({ speaker: 'king', text: "王：「" });
-    this.st = 'typing';
+      this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, ''); 
+      this.typeIdx = 0;
+      this.typeTimer = 0;
+      this.logs.push({ speaker: 'king', text: "王：「" });
+      this.st = 'typing';
+
+    } catch (err) {
+      console.error("AI Talk Error:", err);
+      this.logs.push({ speaker: 'king', text: "王：「すまぬ！ なにかが おかしいようじゃ！」" });
+      this.emotion = 'disappointed';
+      this.scrollToBottom();
+      this.st = 'chat';
+    }
   },
 
   scrollToBottom() {
@@ -92,7 +98,6 @@ const KingRoom = {
   update() {
     if (this.st === 'init') return;
     
-    // 初回のダウンロード確認画面
     if (this.st === 'ask_dl') {
       if (keysDown.left || keysDown.right) { this.cmdCur = this.cmdCur === 0 ? 1 : 0; playSnd('sel'); }
       if (keysDown.a) {
@@ -101,35 +106,31 @@ const KingRoom = {
           this.st = 'downloading';
           playSnd('jmp');
         } else {
-          this.st = 'chat'; // ダウンロードしない場合は通常の無口モードへ
+          this.st = 'chat'; 
           playSnd('sel');
         }
       }
     }
-    // ダウンロード中
     else if (this.st === 'downloading') {
       if (AISys.status === 'ready') { this.st = 'chat'; playSnd('combo'); }
       if (AISys.status === 'error') { this.st = 'chat'; }
     }
-    // 通常ログ閲覧モード
     else if (this.st === 'chat') {
       if (keysDown.select) { switchApp(Menu); return; }
       if (keys.up) { this.scroll = Math.max(0, this.scroll - 3); }
       if (keys.down) { this.scroll += 3; }
-      // Aボタンでコマンド選択ポップアップを開く！
       if (keysDown.a) { this.st = 'cmd'; this.cmdCur = 0; playSnd('sel'); }
     }
-    // コマンド選択モード
     else if (this.st === 'cmd') {
-      if (keysDown.b) { this.st = 'chat'; playSnd('sel'); return; } // キャンセル
+      if (keysDown.b) { this.st = 'chat'; playSnd('sel'); return; } 
       if (keysDown.up) { this.cmdCur = (this.cmdCur - 1 + this.cmds.length) % this.cmds.length; playSnd('sel'); }
       if (keysDown.down) { this.cmdCur = (this.cmdCur + 1) % this.cmds.length; playSnd('sel'); }
       if (keysDown.a) {
-        if (this.cmdCur === 3) { switchApp(Menu); return; } // 退出する
+        if (this.cmdCur === 3) { switchApp(Menu); return; } 
         
-        // AIが準備OKならチャット開始、ダメなら影武者
         if (AISys.status === 'ready') {
-          this.sendPrompt();
+          // ★ 非同期エラーを完全にキャッチしてクラッシュを防ぐ
+          this.sendPrompt().catch(e => console.error(e));
         } else {
           this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
           this.logs.push({ speaker: 'king', text: "王：「わしは 今 ねむいんじゃ。\nまた あとで こい！」" });
@@ -140,16 +141,15 @@ const KingRoom = {
         }
       }
     }
-    // タイピング表示エフェクト
     else if (this.st === 'typing') {
       this.typeTimer++;
-      if (this.typeTimer >= 2) { // 2フレームに1文字表示
+      if (this.typeTimer >= 2) { 
         this.typeTimer = 0;
         let currentLog = this.logs[this.logs.length - 1];
         currentLog.text += this.typeText[this.typeIdx];
         this.typeIdx++;
         
-        if (this.typeIdx % 3 === 0) playSnd('sel'); // ポポポ音
+        if (this.typeIdx % 3 === 0) playSnd('sel'); 
         this.scrollToBottom();
         
         if (this.typeIdx >= this.typeText.length) {
@@ -178,24 +178,21 @@ const KingRoom = {
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('Loading King...', 60, 80);
     }
     
-    // 考え中アニメーション
     if (this.st === 'thinking') {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace';
       ctx.fillText('...', 130 + Math.sin(Date.now() / 150) * 3, 50);
     }
 
-    // 初回ダウンロード確認UI
     if (this.st === 'ask_dl') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(10, 50, 180, 100);
       ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(10, 50, 180, 100);
       ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
       ctx.fillText("【AIモデルのダウンロード】", 20, 70);
-      ctx.fillText("約1.2GBの通信が発生します。", 20, 90);
+      ctx.fillText("約400MBの通信が発生します。", 20, 90);
       ctx.fillText("王様に魂を宿しますか？", 20, 105);
       ctx.fillStyle = this.cmdCur === 0 ? '#0f0' : '#aaa'; ctx.fillText((this.cmdCur===0?'> ':'  ')+"はい(Wi-Fi推奨)", 30, 125);
       ctx.fillStyle = this.cmdCur === 1 ? '#0f0' : '#aaa'; ctx.fillText((this.cmdCur===1?'> ':'  ')+"いいえ(後で)", 30, 140);
     }
-    // ダウンロード進捗UI
     else if (this.st === 'downloading') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(10, 50, 180, 100);
       ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(10, 50, 180, 100);
@@ -210,7 +207,6 @@ const KingRoom = {
       ctx.fillText(`${Math.floor(AISys.progress * 100)}%`, 85, 130);
     }
 
-    // ログウィンドウ
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(5, 145, 190, 150);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(5, 145, 190, 150);
     ctx.save(); ctx.beginPath(); ctx.rect(10, 150, 180, 140); ctx.clip();
@@ -218,21 +214,15 @@ const KingRoom = {
     ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
     let drawY = 165 - this.scroll;
     
-    // はみ出し防止の自動折り返し処理
     const wrapText = (text, maxWidth) => {
-      let result = [];
-      let rawLines = text.split('\n');
+      let result = []; let rawLines = text.split('\n');
       for (let i = 0; i < rawLines.length; i++) {
         let line = '';
         for (let n = 0; n < rawLines[i].length; n++) {
           let testLine = line + rawLines[i][n];
           let metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && n > 0) {
-            result.push(line);
-            line = rawLines[i][n];
-          } else {
-            line = testLine;
-          }
+          if (metrics.width > maxWidth && n > 0) { result.push(line); line = rawLines[i][n]; } 
+          else { line = testLine; }
         }
         result.push(line);
       }
@@ -242,15 +232,11 @@ const KingRoom = {
     for (let log of this.logs) {
       ctx.fillStyle = log.speaker === 'king' ? '#0f0' : (log.speaker === 'sys' ? '#aaa' : '#fff');
       let wrappedLines = wrapText(log.text, 170); 
-      for (let line of wrappedLines) { 
-        ctx.fillText(line, 15, drawY); 
-        drawY += 15; 
-      }
+      for (let line of wrappedLines) { ctx.fillText(line, 15, drawY); drawY += 15; }
       drawY += 5; 
     }
     ctx.restore();
 
-    // ★ ポップアップするコマンドウィンドウ
     if (this.st === 'cmd') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.95)'; ctx.fillRect(90, 160, 100, 85);
       ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(90, 160, 100, 85);
