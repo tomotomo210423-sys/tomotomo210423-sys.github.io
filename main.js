@@ -1,11 +1,11 @@
-// === CORE SYSTEM (Input & HitStop Fixed Edition) ===
+// === CORE SYSTEM (Monitoring System Update) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false, l0: false, l1: false, l2: false, l3: false };
 const keysDown = { ...keys };
 let prevKeys = { ...keys };
-const keyPressQueue = { ...keys }; // ★ 高速タップの「フレーム抜け」を防ぐ記憶システム
+const keyPressQueue = { ...keys };
 let activeApp = null;
 
 // ===== オーディオシステム =====
@@ -57,32 +57,30 @@ function playSnd(t) {
   if (!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
   if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.05); } 
   else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05, n); o.start(n); o.stop(n + 0.1); } 
-  // ★ 修正：リズムゲーム中は「時間停止（ヒットストップ）」を発動させない！
-  else if (t === 'hit') { 
-    o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); 
-    screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); 
-  } 
-  else if (t === 'combo') { 
-    o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); 
-    screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); 
-  }
+  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); } 
+  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
 }
 
-// ===== セーブシステム =====
+// ===== セーブシステム ＆ ログ機能 =====
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
-    return { playerName: d.playerName || 'PLAYER', scores: d.scores || { n: 0, h: 0 }, rankings: d.rankings || { n: [], h: [] }, bgTheme: d.bgTheme || 0, slotCoins: d.slotCoins || 100, jackpotPool: d.jackpotPool || 1000, actStage: d.actStage||1, actLives: d.actLives||5, actSeed: d.actSeed||1, rhythm: d.rhythm||{easy:0,normal:0,hard:0} }; 
+    return { playerName: d.playerName || 'PLAYER', scores: d.scores || { n: 0, h: 0 }, rankings: d.rankings || { n: [], h: [] }, bgTheme: d.bgTheme || 0, slotCoins: d.slotCoins || 100, jackpotPool: d.jackpotPool || 1000, actStage: d.actStage||1, actLives: d.actLives||5, actSeed: d.actSeed||1, rhythm: d.rhythm||{easy:0,normal:0,hard:0}, logs: d.logs||[] }; 
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
   addScore(mode, score) { 
     const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
     rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
     rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); 
+  },
+  // ★ AIに読ませるための監視ログ追加機能
+  addLog(game, msg) {
+    this.data.logs.unshift(`【${game}】${msg}`);
+    if(this.data.logs.length > 10) this.data.logs.pop(); // 最新10件のみ保持
+    this.save();
   }
 };
 
-// ===== パーティクル処理 =====
 const particles = [];
 function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 12 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, life: 30 + Math.random()*10, color: color, size: type === 'explosion' ? 3 : 1 }); } }
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
@@ -107,7 +105,6 @@ const drawSprite = (x, y, c, d, s = 2.5) => {
 let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
-// ★ メニュー配列とリンク先を「王様の間 (KingRoom)」に変更
 const Menu = {
   cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'ローカルランキング', '設定', '王様の間'], holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
@@ -163,12 +160,10 @@ const Ranking = {
   }
 };
 
-// ===== メインループ =====
 function loop() {
   try {
     if (hitStopTimer <= 0) { 
       for (let k in keys) { 
-        // ★修正：フレームをすり抜けたタップ記憶(Queue)を確実にここで回収する！
         keysDown[k] = (keys[k] && !prevKeys[k]) || keyPressQueue[k]; 
         keyPressQueue[k] = false; 
         prevKeys[k] = keys[k]; 
@@ -190,22 +185,13 @@ function loop() {
 }
 requestAnimationFrame(loop);
 
-// ===== ボタン入力管理 =====
 const setBtn = (id, k) => {
   const e = document.getElementById(id); if (!e) return;
-  // ★修正：押された瞬間に必ず記憶（Queue）を残す
   const p = (ev) => { ev.preventDefault(); keys[k] = true; keyPressQueue[k] = true; initAudio(); };
   const r = (ev) => { ev.preventDefault(); keys[k] = false; };
-  
-  e.addEventListener('touchstart', p, {passive: false});
-  e.addEventListener('touchend', r, {passive: false});
-  e.addEventListener('touchcancel', r, {passive: false});
-  
-  e.addEventListener('mousedown', p);
-  e.addEventListener('mouseup', r);
-  e.addEventListener('mouseleave', r);
+  e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('touchcancel', r, {passive: false});
+  e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
 };
-
 ['btn-up','btn-down','btn-left','btn-right','btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['up','down','left','right','a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
 
