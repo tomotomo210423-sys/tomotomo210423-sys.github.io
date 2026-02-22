@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 4.5: Llama 3.2 1B Integration) ===
+// === CORE SYSTEM (Phase 5: Gemini API Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -8,7 +8,6 @@ let prevKeys = { ...keys };
 const keyPressQueue = { ...keys };
 let activeApp = null;
 
-// ===== オーディオシステム =====
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx, noiseBuffer = null, bgmInterval = null;
 
@@ -79,50 +78,39 @@ const SaveSys = {
   }
 };
 
-// ★ ここが変更点！軽量かつ超優秀な「Llama-3.2-1B」を召喚します
+// ★============================================★
+// 　ここに取得したAPIキー（パスワード）を貼り付けます！
+const GEMINI_API_KEY = "ここにAPIキーを貼り付けてください";
+// ★============================================★
+
+// ★ Gemini API システム (超高速・超賢い)
 const AISys = {
-  engine: null,
-  status: 'init', 
-  progress: 0,
-  progressText: '',
-  async initModel() {
-    if (this.status !== 'init') return;
-    if (!window.webllm) { this.status = 'error'; this.progressText = 'AIモジュールが見つかりません'; return; }
-    
-    this.status = 'loading';
-    try {
-      this.engine = new window.webllm.MLCEngine();
-      this.engine.setInitProgressCallback((report) => {
-        this.progressText = report.text;
-        this.progress = report.progress;
-      });
-      // ★ 魔法の最新モデル「Llama 3.2 1B」をロード！(約800MB)
-      await this.engine.reload("Llama-3.2-1B-Instruct-q4f16_1-MLC");
-      this.status = 'ready';
-    } catch (e) {
-      console.error(e);
-      this.status = 'error';
-      this.progressText = 'モデルのロードに失敗しました';
+  status: 'ready', // ダウンロード不要なので最初から準備完了
+  async chat(sysPrompt, userPrompt) {
+    if (GEMINI_API_KEY === "ここにAPIキーを貼り付けてください" || !GEMINI_API_KEY) {
+      return "【システムエラー】APIキーが設定されておらんぞ！main.jsを確認せい！";
     }
-  },
-  async chat(sysPrompt, userPrompt, history) {
-    if (this.status !== 'ready') return "わしは まだ ねむいんじゃ。";
-    const messages = [
-      { role: "system", content: sysPrompt },
-      ...history,
-      { role: "user", content: userPrompt }
-    ];
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const payload = {
+      system_instruction: { parts: { text: sysPrompt } },
+      contents: [ { role: "user", parts: [{ text: userPrompt }] } ],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
+    };
+
     try {
-      const reply = await this.engine.chat.completions.create({ 
-        messages, 
-        max_tokens: 80,
-        temperature: 0.3, // 妄想防止の薬はそのまま入れておきます
-        top_p: 0.8
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
-      return reply.choices[0].message.content || "むむ？（言葉につまった）";
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return data.candidates[0].content.parts[0].text.trim();
     } catch (e) {
-      console.error("AI Error:", e);
-      return "むむっ... あたまが...！（推論エラー）";
+      console.error("Gemini API Error:", e);
+      return "むむっ... かみさま（API）との つうしんが とぎれたようじゃ！（通信エラー）";
     }
   }
 };
