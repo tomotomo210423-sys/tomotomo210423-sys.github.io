@@ -80,7 +80,7 @@ const SaveSys = {
 
 // ★============================================★
 // 　ここに取得したAPIキー（パスワード）を貼り付けます！
-const GEMINI_API_KEY = "ここにAPIキーを貼り付けてください";
+const GEMINI_API_KEY = "AIzaSyCHpBsfgoKzBG8sMoZus7C7SSQZ1LXXa9Y";
 // ★============================================★
 
 // ★ Gemini API システム (超高速・超賢い)
