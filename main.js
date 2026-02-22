@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 4.1: AI Memory Fix & Safety) ===
+// === CORE SYSTEM (Phase 4.4: AI Anti-Hallucination) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -61,7 +61,6 @@ function playSnd(t) {
   else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
 }
 
-// ===== セーブシステム ＆ ログ機能 =====
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
@@ -80,7 +79,7 @@ const SaveSys = {
   }
 };
 
-// ★ フェーズ4.1: AIシステム (WebLLM - メモリ不足対策の軽量版)
+// ★ AIシステム (妄想防止・安定化バージョン)
 const AISys = {
   engine: null,
   status: 'init', 
@@ -97,7 +96,7 @@ const AISys = {
         this.progressText = report.text;
         this.progress = report.progress;
       });
-      // ★ スマホのメモリクラッシュを防ぐため、1.5B(1.2GB)から 0.5B(約400MB)の超軽量モデルへ変更！
+      // メモリ制限対策の0.5Bモデル
       await this.engine.reload("Qwen2.5-0.5B-Instruct-q4f16_1-MLC");
       this.status = 'ready';
     } catch (e) {
@@ -114,7 +113,13 @@ const AISys = {
       { role: "user", content: userPrompt }
     ];
     try {
-      const reply = await this.engine.chat.completions.create({ messages, max_tokens: 100 });
+      // ★ temperatureを 0.3 に下げて、AIのクリエイティビティ(妄想癖)を抑え込み、忠実に回答させる
+      const reply = await this.engine.chat.completions.create({ 
+        messages, 
+        max_tokens: 80,
+        temperature: 0.3, 
+        top_p: 0.8
+      });
       return reply.choices[0].message.content || "むむ？（言葉につまった）";
     } catch (e) {
       console.error("AI Error:", e);
