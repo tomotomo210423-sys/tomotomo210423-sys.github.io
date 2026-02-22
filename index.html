@@ -11,15 +11,20 @@
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
 
+<script type="module">
+  import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+  window.webllm = webllm;
+</script>
+
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100vh; }
 
-/* 2Dゲーム機全体のベース（変形アニメーション対応） */
+/* 2Dゲーム機全体のベース */
 #gameboy { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
 #screen-container { flex: 1; background: #444; margin: 15px 15px 5px 15px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 10px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; transition: all 0.8s; }
 
-/* ★ スロットモード時のトランスフォーム（変形）設定 */
+/* スロットモード時のトランスフォーム */
 #gameboy.mode-slot { background: linear-gradient(135deg, #aa0000 0%, #440000 100%); border-radius: 15px 15px 50px 50px; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.5), 0 0 30px rgba(255,50,50,0.8); }
 #gameboy.mode-slot #screen-container { background: #111; border-color: #ffd700; box-shadow: inset 0 0 20px rgba(255,215,0,0.4); border-radius: 5px; margin: 25px 20px 10px 20px; }
 #gameboy.mode-slot #controls { background: linear-gradient(135deg, #880000 0%, #330000 100%); border-radius: 0 0 50px 50px; }
@@ -64,7 +69,7 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-slot .s-label { color: #ccc; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
 
-/* ★ スロット専用コントローラー（初期状態は下に隠れている） */
+/* スロット専用コントローラー */
 #slot-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transform: translateY(100px); pointer-events: none; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; padding-bottom: 30px; }
 .slot-row { display: flex; gap: 30px; justify-content: center; align-items: center; width: 100%; }
 .slot-btn { border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #fff; cursor: pointer; box-shadow: 0 6px 0 #222, 0 10px 15px rgba(0,0,0,0.6); text-shadow: 1px 1px 2px #000; touch-action: none; transition: transform 0.1s, box-shadow 0.1s; }
@@ -139,12 +144,12 @@ const bootInterval = setInterval(() => {
 <script src="guide.js"></script>
 <script src="tetri.js"></script>
 <script src="action.js"></script>
-<script src="rpg.js"></script>
-<script src="arena.js"></script>
 <script src="online.js"></script>
 <script src="rhythm.js"></script>
 <script src="slot.js"></script>
-<script src="king.js"></script> <script>
+<script src="king.js"></script>
+
+<script>
 window.onload = () => {
   activeApp = Menu;
   activeApp.init();
