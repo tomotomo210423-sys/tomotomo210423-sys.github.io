@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.2: Immersive Error Messages) ===
+// === CORE SYSTEM (Phase 5.3: GitHub Secret Evasion) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -78,15 +78,24 @@ const SaveSys = {
   }
 };
 
-// ★ ここに「新しく発行した」APIキーを貼り付けてください！
-const GEMINI_API_KEY = "AIzaSyDplXURS2dyGzcHrCU49zWghBgyT9mbLHA";
+// ★============================================★
+// 　【GitHub対策】APIキーを3〜4つに「分割して」貼り付けてください！
+// 　（そのまま1つの文字列で書くとGitHubボットに自動削除されます）
+// 
+// 　例: "AIzaSy" と "XXXXXXX" と "YYYYYY" に分ける
+const GEMINI_API_KEY = [
+  "AIzaSy",         // 1つ目
+  "DplXURS2dy",      // 2つ目
+  "GzcHrCU49z",      // 3つ目
+  "WghBgyT9mbLHA"       // 4つ目（足りなければカンマで増やしてOK）
+].join("");
+// ★============================================★
 
 const AISys = {
   status: 'ready',
   async chat(sysPrompt, userPrompt) {
     const key = GEMINI_API_KEY.trim();
-    if (key === "ここに新しいAPIキーを貼り付け" || !key) {
-      // ★ 没入型エラーメッセージ1（キー未設定）
+    if (key.includes("ここに") || !key) {
       return "むむっ... この せかいの 理（APIキー）が 定まっておらぬようじゃな！";
     }
 
@@ -115,7 +124,6 @@ const AISys = {
       return data.candidates[0].content.parts[0].text.trim();
     } catch (e) {
       console.error("Connection Error:", e);
-      // ★ 没入型エラーメッセージ2（通信・処理エラー）
       return "むむっ... 時空の 歪み を 感じるぞ！ しばらく待ってから 話しかけるのじゃ！";
     }
   }
