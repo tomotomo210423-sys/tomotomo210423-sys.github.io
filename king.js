@@ -1,4 +1,4 @@
-// === KING'S ROOM (Phase 4.5: Memory Wipe & Strict Prompt) ===
+// === KING'S ROOM (Phase 5: Gemini API Edition) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
@@ -7,7 +7,7 @@ const KingRoom = {
   typeText: "", typeIdx: 0, typeTimer: 0,
   
   init() {
-    this.st = 'init';
+    this.st = 'chat'; // ダウンロード不要！即座にチャット可能
     this.scroll = 0;
     this.logs = [
       { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
@@ -24,16 +24,6 @@ const KingRoom = {
         this.images[emo] = img;
       }
     });
-
-    setTimeout(() => {
-      if (AISys.status === 'init') {
-        this.st = 'ask_dl';
-      } else if (AISys.status === 'loading') {
-        this.st = 'downloading';
-      } else {
-        this.st = 'chat';
-      }
-    }, 500);
   },
   
   async sendPrompt(customText) {
@@ -56,7 +46,7 @@ const KingRoom = {
       
       this.scrollToBottom();
 
-      // ★ 超シンプルかつ強力な拘束ルール
+      // ★ Geminiは超賢いので、シンプルな指示で完璧に演じてくれます
       const sysPrompt = `あなたはレトロRPGの偉大な王様です。プレイヤー（勇者）の言葉に対して、王様としてのセリフを1つだけ返してください。
 
 【厳格なルール】
@@ -64,22 +54,20 @@ const KingRoom = {
 ・語尾は「～じゃ」「～じゃな」「～でおじゃる」。
 ・絶対に50文字以内の短い1文のみ出力すること。
 ・解説、説明、箇条書きは絶対に禁止。
-・「王：」などの記号は書かない。`;
+・「王：」やカギカッコなどの記号は書かない。
+・ツンデレで少し腹黒い性格です。`;
 
-      // ★ 履歴(chatHistory)を渡さない！その場限りの会話にすることで混乱・ループを完全に防ぐ
       let reply = await AISys.chat(sysPrompt, p);
       
       if (!reply || typeof reply !== 'string') {
           reply = "むむっ... わしの アタマが フリーズしたようじゃ！（エラー）";
       }
 
-      // 感情判定
       if (reply.includes("！")) this.emotion = 'laughing';
       else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("エラー")) this.emotion = 'disappointed';
       else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
       else this.emotion = 'normal';
 
-      // 万が一余計な文字を出力した場合は削除
       this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, '').replace(/^出力：?/, ''); 
       this.typeIdx = 0;
       this.typeTimer = 0;
@@ -104,24 +92,7 @@ const KingRoom = {
   update() {
     if (this.st === 'init') return;
     
-    if (this.st === 'ask_dl') {
-      if (keysDown.left || keysDown.right) { this.cmdCur = this.cmdCur === 0 ? 1 : 0; playSnd('sel'); }
-      if (keysDown.a) {
-        if (this.cmdCur === 0) {
-          AISys.initModel();
-          this.st = 'downloading';
-          playSnd('jmp');
-        } else {
-          this.st = 'chat'; 
-          playSnd('sel');
-        }
-      }
-    }
-    else if (this.st === 'downloading') {
-      if (AISys.status === 'ready') { this.st = 'chat'; playSnd('combo'); }
-      if (AISys.status === 'error') { this.st = 'chat'; }
-    }
-    else if (this.st === 'chat') {
+    if (this.st === 'chat') {
       if (keysDown.select) { switchApp(Menu); return; }
       if (keys.up) { this.scroll = Math.max(0, this.scroll - 3); }
       if (keys.down) { this.scroll += 3; }
@@ -135,25 +106,16 @@ const KingRoom = {
       if (keysDown.a) {
         if (this.cmdCur === 4) { switchApp(Menu); return; } 
         
-        if (AISys.status === 'ready') {
-          let customText = null;
-          if (this.cmdCur === 3) {
-            keys.a = false; keysDown.a = false; 
-            customText = prompt("王様に伝える言葉を入力してください：", "");
-            if (!customText || customText.trim() === "") {
-              this.st = 'chat';
-              return;
-            }
+        let customText = null;
+        if (this.cmdCur === 3) {
+          keys.a = false; keysDown.a = false; 
+          customText = prompt("王様に伝える言葉を入力してください：", "");
+          if (!customText || customText.trim() === "") {
+            this.st = 'chat';
+            return;
           }
-          this.sendPrompt(customText).catch(e => console.error(e));
-        } else {
-          this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
-          this.logs.push({ speaker: 'king', text: "王：「わしは 今 ねむいんじゃ。\nまた あとで こい！」" });
-          this.emotion = 'disappointed';
-          this.scrollToBottom();
-          this.st = 'chat';
-          playSnd('hit');
         }
+        this.sendPrompt(customText).catch(e => console.error(e));
       }
     }
     else if (this.st === 'typing') {
@@ -196,30 +158,6 @@ const KingRoom = {
     if (this.st === 'thinking') {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace';
       ctx.fillText('...', 130 + Math.sin(Date.now() / 150) * 3, 50);
-    }
-
-    if (this.st === 'ask_dl') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(10, 50, 180, 100);
-      ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(10, 50, 180, 100);
-      ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
-      ctx.fillText("【AIモデルのダウンロード】", 20, 70);
-      ctx.fillText("約400MBの通信が発生します。", 20, 90);
-      ctx.fillText("王様に魂を宿しますか？", 20, 105);
-      ctx.fillStyle = this.cmdCur === 0 ? '#0f0' : '#aaa'; ctx.fillText((this.cmdCur===0?'> ':'  ')+"はい(Wi-Fi推奨)", 30, 125);
-      ctx.fillStyle = this.cmdCur === 1 ? '#0f0' : '#aaa'; ctx.fillText((this.cmdCur===1?'> ':'  ')+"いいえ(後で)", 30, 140);
-    }
-    else if (this.st === 'downloading') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(10, 50, 180, 100);
-      ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(10, 50, 180, 100);
-      ctx.fillStyle = '#0f0'; ctx.font = '11px monospace';
-      ctx.fillText("魂を 召喚中...", 60, 70);
-      
-      ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 90, 160, 10);
-      ctx.fillStyle = '#0f0'; ctx.fillRect(20, 90, 160 * AISys.progress, 10);
-      
-      ctx.fillStyle = '#aaa'; ctx.font = '9px monospace';
-      ctx.fillText(AISys.progressText.slice(0, 25) + '...', 20, 115);
-      ctx.fillText(`${Math.floor(AISys.progress * 100)}%`, 85, 130);
     }
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(5, 145, 190, 150);
