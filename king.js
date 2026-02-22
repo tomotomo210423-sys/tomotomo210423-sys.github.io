@@ -1,4 +1,4 @@
-// === KING'S ROOM (Phase 3: Log Reader) ===
+// === KING'S ROOM (Phase 3.5: Auto Word-Wrap Fix) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
@@ -36,15 +36,16 @@ const KingRoom = {
       playSnd('sel');
     }
 
-    // ★ Bボタンで最新のプレイ記録（監視データ）を喋る！
+    // Bボタンで最新のプレイ記録（監視データ）を喋る
     if (keysDown.b) {
       let recentLog = "とくに なにも しておらんようじゃな。";
       if (SaveSys.data.logs && SaveSys.data.logs.length > 0) {
-        recentLog = SaveSys.data.logs[0]; // 一番新しいログ
+        recentLog = SaveSys.data.logs[0]; 
       }
       this.logs.push({ speaker: 'king', text: "ふむ、ほうこく に よると...\n「" + recentLog + "」\n...ということじゃな！\nわしは すべて おみとおしじゃぞ！" });
       this.emotion = 'thinking';
-      this.scroll = Math.max(0, this.logs.length * 30); // ログの一番下へ
+      // ログが増えたら自動で下までスクロールさせる
+      this.scroll = Math.max(0, this.logs.length * 40); 
       playSnd('jmp');
     }
   },
@@ -75,13 +76,40 @@ const KingRoom = {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; ctx.fillRect(5, 145, 190, 150);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(5, 145, 190, 150);
     ctx.save(); ctx.beginPath(); ctx.rect(10, 150, 180, 140); ctx.clip();
+    
     ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
     let drawY = 165 - this.scroll;
+    
+    // ★ 追加：文字の長さを測って自動で折り返す魔法の関数
+    const wrapText = (text, maxWidth) => {
+      let result = [];
+      let rawLines = text.split('\n');
+      for (let i = 0; i < rawLines.length; i++) {
+        let line = '';
+        for (let n = 0; n < rawLines[i].length; n++) {
+          let testLine = line + rawLines[i][n];
+          let metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && n > 0) {
+            result.push(line);
+            line = rawLines[i][n];
+          } else {
+            line = testLine;
+          }
+        }
+        result.push(line);
+      }
+      return result;
+    };
+
+    // 描画処理（はみ出さずに描画する）
     for (let log of this.logs) {
       ctx.fillStyle = log.speaker === 'king' ? '#0f0' : '#aaa';
-      let lines = log.text.split('\n');
-      for (let line of lines) { ctx.fillText(line, 15, drawY); drawY += 15; }
-      drawY += 5; 
+      let wrappedLines = wrapText(log.text, 160); // 横幅160pxで自動改行
+      for (let line of wrappedLines) { 
+        ctx.fillText(line, 15, drawY); 
+        drawY += 15; 
+      }
+      drawY += 5; // 発言ごとの余白
     }
     ctx.restore();
     ctx.fillStyle = '#888'; ctx.font = '9px monospace';
