@@ -1,8 +1,8 @@
-// === KING'S ROOM (Phase 4.1: Error Handling Boost) ===
+// === KING'S ROOM (Phase 4.2: Anti-Crash & Stable AI) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
-  logs: [], chatHistory: [],
+  logs: [], 
   cmdCur: 0, cmds: ["ほうこくする", "ほめてほしい", "なぐさめて", "退出する"],
   typeText: "", typeIdx: 0, typeTimer: 0,
   
@@ -13,7 +13,6 @@ const KingRoom = {
       { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
       { speaker: 'king', text: "王：「よくぞ まいった！\nわしが このせかいの おうじゃ！」" }
     ];
-    this.chatHistory = [];
     BGM.play('spell'); 
     
     const emos = ['normal', 'thinking', 'angry', 'laughing', 'disappointed'];
@@ -37,38 +36,43 @@ const KingRoom = {
     }, 500);
   },
   
-  // ★ AIへの送信処理（絶対にエラーで落ちないように防弾処理を追加）
   async sendPrompt() {
     try {
+      // ★ 修正1: ログが空(特になし)の場合は、AIを使わず門前払いにする！
+      if (!SaveSys.data.logs || SaveSys.data.logs.length === 0) {
+        this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
+        this.logs.push({ speaker: 'king', text: "王：「むむ？ まだ なにも ゲームを あそんでおらんようじゃな！\nはやく なにか プレイしてくるのじゃ！」" });
+        this.emotion = 'angry';
+        this.scrollToBottom();
+        this.st = 'chat';
+        playSnd('hit');
+        return;
+      }
+
       this.st = 'thinking';
       this.emotion = 'thinking';
       playSnd('sel');
       
-      let recentLog = "特になし";
-      if (SaveSys.data && SaveSys.data.logs && SaveSys.data.logs.length > 0) {
-          recentLog = SaveSys.data.logs[0];
-      }
+      let recentLog = SaveSys.data.logs[0];
       
+      // ★ 修正2: 0.5Bモデルが迷わないようにプロンプトを具体化
       let p = "";
-      if(this.cmdCur === 0) p = `勇者の最近の記録:『${recentLog}』。これについて一言コメントして。`;
-      if(this.cmdCur === 1) p = `勇者の最近の記録:『${recentLog}』。これを理由に、大げさに褒め称えて。`;
-      if(this.cmdCur === 2) p = `勇者の最近の記録:『${recentLog}』。これについて、呆れつつも優しく慰めて。`;
+      if(this.cmdCur === 0) p = `プレイヤーの最新の記録:「${recentLog}」。王様として、この報告に対して短くコメントして。`;
+      if(this.cmdCur === 1) p = `プレイヤーの最新の記録:「${recentLog}」。王様として、この行動を大げさに褒めて。`;
+      if(this.cmdCur === 2) p = `プレイヤーの最新の記録:「${recentLog}」。王様として、失敗や状況を上から目線で優しく慰めて。`;
       
       this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
       this.scrollToBottom();
 
-      const sysPrompt = "あなたはレトロRPG風の王様です。一人称は「わし」、語尾は「じゃ」「じゃな」。腹黒くツンデレな性格。絶対に50文字以内で短く答え、AIであることは隠してください。「王：」などの記号は付けず、セリフの中身だけを出力すること。";
+      const sysPrompt = "あなたはレトロRPGの偉大な王様です。一人称は「わし」、語尾は「〜じゃ」「〜じゃな」。腹黒いが実は優しい性格。絶対に50文字以内で、短く簡潔に話してください。AIやプログラムに関するメタ発言は厳禁です。";
       
-      let reply = await AISys.chat(sysPrompt, p, this.chatHistory);
+      // ★ 修正3: スマホのメモリ爆発(推論エラー)を防ぐため、会話履歴(history)を渡さず毎回リセットする([])！
+      let reply = await AISys.chat(sysPrompt, p, []);
       
       if (!reply || typeof reply !== 'string') {
           reply = "むむっ... わしの アタマが フリーズしたようじゃ！（エラー）";
       }
       
-      this.chatHistory.push({ role: 'user', content: p });
-      this.chatHistory.push({ role: 'assistant', content: reply });
-      if (this.chatHistory.length > 6) this.chatHistory.splice(0, 2); 
-
       if (reply.includes("！")) this.emotion = 'laughing';
       else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("エラー")) this.emotion = 'disappointed';
       else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
@@ -129,7 +133,6 @@ const KingRoom = {
         if (this.cmdCur === 3) { switchApp(Menu); return; } 
         
         if (AISys.status === 'ready') {
-          // ★ 非同期エラーを完全にキャッチしてクラッシュを防ぐ
           this.sendPrompt().catch(e => console.error(e));
         } else {
           this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
