@@ -1,4 +1,4 @@
-// === KING'S ROOM (Phase 5: Gemini API Edition) ===
+// === KING'S ROOM (Phase 6: Gemini Advanced Prompt) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
@@ -7,7 +7,7 @@ const KingRoom = {
   typeText: "", typeIdx: 0, typeTimer: 0,
   
   init() {
-    this.st = 'chat'; // ダウンロード不要！即座にチャット可能
+    this.st = 'chat';
     this.scroll = 0;
     this.logs = [
       { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
@@ -38,24 +38,26 @@ const KingRoom = {
         this.logs.push({ speaker: 'sys', text: `> あなた: ${customText}` });
       } else {
         let recentLog = SaveSys.data.logs && SaveSys.data.logs.length > 0 ? SaveSys.data.logs[0] : "とくに なにも しておらん";
-        if(this.cmdCur === 0) p = `勇者の報告：「${recentLog}」\nこれに対する王様の短い返答セリフ：`;
-        if(this.cmdCur === 1) p = `勇者の報告：「${recentLog}」\nこれを大げさに褒める王様の短いセリフ：`;
-        if(this.cmdCur === 2) p = `勇者の報告：「${recentLog}」\nこれを呆れつつも優しく慰める王様の短いセリフ：`;
+        if(this.cmdCur === 0) p = `勇者の報告：「${recentLog}」\nこれに対する王様の返答セリフ：`;
+        if(this.cmdCur === 1) p = `勇者の報告：「${recentLog}」\nこれを大げさに褒めちぎる王様のセリフ：`;
+        if(this.cmdCur === 2) p = `勇者の報告：「${recentLog}」\nこれを呆れつつも優しく慰める王様のセリフ：`;
         this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
       }
       
       this.scrollToBottom();
 
-      // ★ Geminiは超賢いので、シンプルな指示で完璧に演じてくれます
-      const sysPrompt = `あなたはレトロRPGの偉大な王様です。プレイヤー（勇者）の言葉に対して、王様としてのセリフを1つだけ返してください。
+      // ★ 超・天才AI（Gemini）向けに、縛りを解いて演技指導を強化！
+      const sysPrompt = `あなたはレトロRPGの偉大な王様です。プレイヤー（勇者）の言葉に対して、王様としての威厳あるセリフを返してください。
 
-【厳格なルール】
+【王様の設定・口調】
 ・一人称は「わし」、二人称は「そなた」か「ゆうしゃ」。
 ・語尾は「～じゃ」「～じゃな」「～でおじゃる」。
-・絶対に50文字以内の短い1文のみ出力すること。
-・解説、説明、箇条書きは絶対に禁止。
-・「王：」やカギカッコなどの記号は書かない。
-・ツンデレで少し腹黒い性格です。`;
+・性格はツンデレで少し腹黒いが、根は勇者思い。
+・人間味のある、感情豊かなリアクションをすること。
+
+【出力ルール】
+・セリフは2〜3文程度（適度な長さ）で、しっかり会話のキャッチボールをすること。（短すぎる返事はNG）
+・「王：」などの名前や、カギカッコ「」は書かず、セリフの中身だけを出力すること。`;
 
       let reply = await AISys.chat(sysPrompt, p);
       
@@ -63,11 +65,13 @@ const KingRoom = {
           reply = "むむっ... わしの アタマが フリーズしたようじゃ！（エラー）";
       }
 
-      if (reply.includes("！")) this.emotion = 'laughing';
-      else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("エラー")) this.emotion = 'disappointed';
-      else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
+      // 感情豊かなリアクションに合わせて表情を切り替え
+      if (reply.includes("！") || reply.includes("褒")) this.emotion = 'laughing';
+      else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("慰")) this.emotion = 'disappointed';
+      else if (reply.includes("ばか") || reply.includes("たわけ") || reply.includes("怒")) this.emotion = 'angry';
       else this.emotion = 'normal';
 
+      // 万が一の記号を消去
       this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, '').replace(/^出力：?/, ''); 
       this.typeIdx = 0;
       this.typeTimer = 0;
@@ -126,6 +130,7 @@ const KingRoom = {
         currentLog.text += this.typeText[this.typeIdx];
         this.typeIdx++;
         
+        // ポポポポ音を鳴らす
         if (this.typeIdx % 3 === 0) playSnd('sel'); 
         this.scrollToBottom();
         
