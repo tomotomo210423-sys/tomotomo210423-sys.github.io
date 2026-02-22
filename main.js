@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5: Gemini API Edition) ===
+// === CORE SYSTEM (Phase 5.2: Immersive Error Messages) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -78,24 +78,23 @@ const SaveSys = {
   }
 };
 
-// ★============================================★
-// 　ここに取得したAPIキー（パスワード）を貼り付けます！
-const GEMINI_API_KEY = "AIzaSyCHpBsfgoKzBG8sMoZus7C7SSQZ1LXXa9Y";
-// ★============================================★
+// ★ ここに「新しく発行した」APIキーを貼り付けてください！
+const GEMINI_API_KEY = "AIzaSyDplXURS2dyGzcHrCU49zWghBgyT9mbLHA";
 
-// ★ Gemini API システム (超高速・超賢い)
 const AISys = {
-  status: 'ready', // ダウンロード不要なので最初から準備完了
+  status: 'ready',
   async chat(sysPrompt, userPrompt) {
-    if (GEMINI_API_KEY === "ここにAPIキーを貼り付けてください" || !GEMINI_API_KEY) {
-      return "【システムエラー】APIキーが設定されておらんぞ！main.jsを確認せい！";
+    const key = GEMINI_API_KEY.trim();
+    if (key === "ここに新しいAPIキーを貼り付け" || !key) {
+      // ★ 没入型エラーメッセージ1（キー未設定）
+      return "むむっ... この せかいの 理（APIキー）が 定まっておらぬようじゃな！";
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
     
     const payload = {
-      system_instruction: { parts: { text: sysPrompt } },
-      contents: [ { role: "user", parts: [{ text: userPrompt }] } ],
+      contents: [{ parts: [{ text: userPrompt }] }],
+      systemInstruction: { parts: [{ text: sysPrompt }] },
       generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
     };
 
@@ -105,12 +104,19 @@ const AISys = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorDetail = await response.json();
+        console.error("Gemini Error Detail:", errorDetail);
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
       return data.candidates[0].content.parts[0].text.trim();
     } catch (e) {
-      console.error("Gemini API Error:", e);
-      return "むむっ... かみさま（API）との つうしんが とぎれたようじゃ！（通信エラー）";
+      console.error("Connection Error:", e);
+      // ★ 没入型エラーメッセージ2（通信・処理エラー）
+      return "むむっ... 時空の 歪み を 感じるぞ！ しばらく待ってから 話しかけるのじゃ！";
     }
   }
 };
