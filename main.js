@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.4: iPhone Debug & API Key Split) ===
+// === CORE SYSTEM (Phase 5.5: Gemini 2.5 Flash Update) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -79,14 +79,13 @@ const SaveSys = {
 };
 
 // ★============================================★
-// 　【GitHub対策】APIキーを3〜4つに「分割して」貼り付けてください！
-// 　（例: "AIzaSy" + "12345" + "67890" + "abcdefg"）
+// 【重要】先ほど認証に成功したAPIキーを、同じように分割して貼り付けてください！
 const GEMINI_API_KEY = [
   "AIza",
   "SyDa7Ku8RWSO",
   "OGDXKCQTdw",
   "AObBHi6A8GcKA"
-].join("");
+].join(""
 // ★============================================★
 
 const AISys = {
@@ -94,12 +93,12 @@ const AISys = {
   async chat(sysPrompt, userPrompt) {
     const key = GEMINI_API_KEY.trim();
     
-    // キーが初期状態、または短すぎる場合の警告
     if (key.includes("ここに") || key.length < 30) {
       return "【設定エラー】APIキーの 分割が おかしいぞ！ main.js を確認せい！";
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+    // ★ ここを最新の『gemini-2.5-flash』にアップデートしました！！
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
     
     const payload = {
       contents: [{ parts: [{ text: userPrompt }] }],
@@ -116,7 +115,6 @@ const AISys = {
 
       if (!response.ok) {
         const errorDetail = await response.json();
-        // ★ iPhoneで直接エラー原因を確認できるよう、王様に喋らせる
         const errMsg = errorDetail.error?.message || "原因不明";
         return `【通信エラー:${response.status}】\n${errMsg}`;
       }
@@ -130,7 +128,6 @@ const AISys = {
       return data.candidates[0].content.parts[0].text.trim();
       
     } catch (e) {
-      // ネットワーク自体が繋がっていない場合などのエラー
       return `【接続エラー】\n${e.message}`;
     }
   }
