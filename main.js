@@ -85,9 +85,9 @@ const SaveSys = {
 // 　例: "AIzaSy" と "XXXXXXX" と "YYYYYY" に分ける
 const GEMINI_API_KEY = [
   "AIzaSy",         // 1つ目
-  "DplXURS2dy",      // 2つ目
-  "GzcHrCU49z",      // 3つ目
-  "WghBgyT9mbLHA"       // 4つ目（足りなければカンマで増やしてOK）
+  "B40pJoEo_",      // 2つ目
+  "Xcluzq2PFYxS0g",      // 3つ目
+  "uU6owK60BY"       // 4つ目（足りなければカンマで増やしてOK）
 ].join("");
 // ★============================================★
 
