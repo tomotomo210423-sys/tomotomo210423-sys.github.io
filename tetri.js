@@ -1,4 +1,4 @@
-// === TETRIVADER - SPEED ADJUST FIXED ===
+// === TETRIVADER - LOGGING UPDATE ===
 const Tetri = {
   mode: 'normal', difficultySelect: false, brd: [], blts: [], m: null, px: 4.5, cool: 0, sc: 0, st: 'play', dropCounter: 0, combo: 0,
   starFall: false, starY: 0, starX: 5, danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0, playerSkin: 0,
@@ -21,6 +21,8 @@ const Tetri = {
   gameover() {
     this.st = 'over'; let high = this.mode === 'normal' ? SaveSys.data.scores.n : SaveSys.data.scores.h;
     if (this.sc > high) { if (this.mode === 'normal') SaveSys.data.scores.n = this.sc; else SaveSys.data.scores.h = this.sc; SaveSys.save(); } SaveSys.addScore(this.mode, this.sc);
+    // ★ 監視ログ送信
+    SaveSys.addLog('テトリベーダー', `スコア${this.sc}でブロックに潰された`);
   },
   update() {
     if (keysDown.select) { if (this.difficultySelect) { this.difficultySelect = false; switchApp(Menu); } else { this.st = 'over'; this.difficultySelect = false; switchApp(Menu); } return; }
@@ -32,7 +34,6 @@ const Tetri = {
     if (this.st === 'over') { if (keysDown.a || keysDown.b) { this.difficultySelect = false; switchApp(Menu); } return; }
     if (this.danmakuMode) {
       this.danmakuTimer--;
-      // 自機の移動速度も少し緩和
       if (keys.left) this.px = Math.max(0, this.px - 0.15); if (keys.right) this.px = Math.min(9, this.px + 0.15);
       if (Math.random() < 0.1) { const pt = [{x: Math.random() * 10, y: 0, vx: 0, vy: 0.1, type: 'normal'}, {x: Math.random() * 10, y: 0, vx: (Math.random() - 0.5) * 0.2, vy: 0.1, type: 'curve'}, {x: Math.random() * 10, y: 0, vx: 0, vy: 0.08, type: 'accel'}]; this.danmakuBullets.push(pt[Math.floor(Math.random() * pt.length)]); }
       for (let i = this.danmakuBullets.length - 1; i >= 0; i--) {
@@ -45,13 +46,16 @@ const Tetri = {
       }
       if (this.danmakuTimer <= 0) {
         this.danmakuMode = false; this.danmakuBullets = [];
-        if (!this.playerHit) { const bScore = this.scoreBeforeDanmaku; this.sc = bScore + ((this.sc - bScore) * 2); playSnd('combo'); addParticle(100, 150, '#ff0', 'explosion'); screenShake(8); }
+        if (!this.playerHit) { 
+          const bScore = this.scoreBeforeDanmaku; this.sc = bScore + ((this.sc - bScore) * 2); playSnd('combo'); addParticle(100, 150, '#ff0', 'explosion'); screenShake(8); 
+          // ★ 監視ログ送信（弾幕突破）
+          SaveSys.addLog('テトリベーダー', `見事な操作で弾幕モードを生き延びた！`);
+        }
         this.playerHit = false;
       }
       return;
     }
     if (keys.left) this.px = Math.max(0, this.px - 0.12); if (keys.right) this.px = Math.min(9, this.px + 0.12);
-    
     if (keysDown.a && this.cool <= 0) { this.blts.push({x: this.px + 0.5, y: 14}); this.cool = 15; playSnd('jmp'); addParticle(this.px * 20 + 10, 14 * 20, '#ff0', 'star'); }
     if (this.cool > 0) this.cool--;
     
@@ -79,7 +83,6 @@ const Tetri = {
       if (h || b.y < 0) this.blts.splice(i, 1);
     }
     
-    // ★ 落下スピードをマイルドに調整！(数値を大きくして遅くした)
     let baseSpeed = this.mode === 'hard' ? 35 : 45; 
     this.dropCounter += keys.b ? 4 : 1;
     if (this.dropCounter >= baseSpeed) {
