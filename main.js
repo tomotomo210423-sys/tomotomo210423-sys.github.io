@@ -83,9 +83,9 @@ const SaveSys = {
 // 　（例: "AIzaSy" + "12345" + "67890" + "abcdefg"）
 const GEMINI_API_KEY = [
   "AIza",
-  "Sy40pJoEo_",
-  "Xcluzq2P",
-  "FYxS0guU6owK60BY"
+  "SyDa7Ku8RWSO",
+  "OGDXKCQTdw",
+  "AObBHi6A8GcKA"
 ].join("");
 // ★============================================★
 
