@@ -1,9 +1,9 @@
-// === KING'S ROOM (Phase 4.2: Few-Shot Prompting) ===
+// === KING'S ROOM (Phase 4.4: Anti-Hallucination & Free Chat) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
   logs: [], chatHistory: [],
-  cmdCur: 0, cmds: ["ほうこくする", "ほめてほしい", "なぐさめて", "退出する"],
+  cmdCur: 0, cmds: ["ほうこくする", "ほめてほしい", "なぐさめて", "じゆうにはなす", "退出する"],
   typeText: "", typeIdx: 0, typeTimer: 0,
   
   init() {
@@ -37,46 +37,40 @@ const KingRoom = {
     }, 500);
   },
   
-  async sendPrompt() {
+  async sendPrompt(customText) {
     try {
       this.st = 'thinking';
       this.emotion = 'thinking';
       playSnd('sel');
       
-      let recentLog = "特になし";
-      if (SaveSys.data && SaveSys.data.logs && SaveSys.data.logs.length > 0) {
-          recentLog = SaveSys.data.logs[0];
+      let p = "";
+      // ★ 0.5Bモデルが勘違いしないよう「状況説明」と「要求」を明確に分割
+      if (customText) {
+        p = `【状況】勇者があなたに話しかけました。\n勇者「${customText}」\n\nこれに対する王様としての返答（セリフのみ）：`;
+        this.logs.push({ speaker: 'sys', text: `> あなた: ${customText}` });
+      } else {
+        let recentLog = SaveSys.data.logs && SaveSys.data.logs.length > 0 ? SaveSys.data.logs[0] : "とくに なにも しておらん";
+        if(this.cmdCur === 0) p = `【状況】勇者が最近の行動を報告しました。\n報告内容『${recentLog}』\n\nこれに対する王様の反応（セリフのみ）：`;
+        if(this.cmdCur === 1) p = `【状況】勇者が最近の行動を報告しました。\n報告内容『${recentLog}』\n\nこれを大げさに褒める王様のセリフ（セリフのみ）：`;
+        if(this.cmdCur === 2) p = `【状況】勇者が最近の行動を報告しました。\n報告内容『${recentLog}』\n\nこれを優しく慰める王様のセリフ（セリフのみ）：`;
+        this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
       }
       
-      let p = "";
-      if(this.cmdCur === 0) p = `勇者の最近の記録:『${recentLog}』。これについて一言コメントして。`;
-      if(this.cmdCur === 1) p = `勇者の最近の記録:『${recentLog}』。これを理由に、大げさに褒め称えて。`;
-      if(this.cmdCur === 2) p = `勇者の最近の記録:『${recentLog}』。これについて、呆れつつも優しく慰めて。`;
-      
-      this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
       this.scrollToBottom();
 
-      // ★ ここが超強化された「システムプロンプト（洗脳指示書）」です！
-      // ルールだけでなく、具体的な「お手本」を渡してAIにパターンを学習させます。
-      const sysPrompt = `あなたはレトロRPGの王様です。以下の【ルール】と【セリフの例】を厳格に守って返答してください。
+      // ★ 0.5B向けの超強力な拘束指示書（解説を絶対に行わせない）
+      const sysPrompt = `あなたはレトロRPGの偉大な王様です。絶対に解説や説明をしてはいけません。以下のルールを厳守して「王様のセリフ」だけを生成してください。
 
 【ルール】
-・一人称は「わし」、二人称は「そなた」「ゆうしゃよ」。
-・語尾は「～じゃ」「～じゃな」「～でおじゃる」。
-・性格は腹黒くツンデレ。プレイヤーを小馬鹿にしつつも、実は気にかけている。
-・絶対に50文字以内で短く答えること。
-・「王：」などの記号は付けず、セリフの中身だけを出力すること。
-・AIであることは絶対に隠すこと。
+・一人称は「わし」、二人称は「そなた」か「ゆうしゃ」。
+・語尾は「～じゃ」「～じゃな」「～でおじゃる」のいずれか。
+・絶対に50文字以内。
+・解説、要約、ゲームの仕様説明は「絶対に」禁止。
+・「王：」や「」などの記号は書かない。
 
-【セリフの例】
-入力：スロットで全財産すった…
-出力：おお ゆうしゃよ！ ギャンブルに おぼれるとは なさけない！ わしの へそくりを わけてやろう！
-
-入力：アクションでトゲに刺さって死んだ
-出力：ふはは！ あの程度の トラップに ひっかかるとは！ そなたの ぼうけんは ここで おわってしまった！
-
-入力：スコア1000点を取った
-出力：ふむ、まあまあ じゃな！ わしが わかかりし ころは その100倍は スコアを だしておったぞ！`;
+【良い例】
+おお ゆうしゃよ！ ギャンブルに おぼれるとは なさけない！ わしの へそくりを わけてやろう！
+ふはは！ その程度の スコアで まんぞく してはおらんじゃろうな！ もっと せいじん せよ！`;
 
       let reply = await AISys.chat(sysPrompt, p, this.chatHistory);
       
@@ -88,11 +82,13 @@ const KingRoom = {
       this.chatHistory.push({ role: 'assistant', content: reply });
       if (this.chatHistory.length > 6) this.chatHistory.splice(0, 2); 
 
+      // 感情判定
       if (reply.includes("！")) this.emotion = 'laughing';
       else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("エラー")) this.emotion = 'disappointed';
       else if (reply.includes("ばか") || reply.includes("たわけ")) this.emotion = 'angry';
       else this.emotion = 'normal';
 
+      // 万が一「王：」などの余計な文字を出力した場合は削除
       this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, '').replace(/^出力：?/, ''); 
       this.typeIdx = 0;
       this.typeTimer = 0;
@@ -144,11 +140,22 @@ const KingRoom = {
       if (keysDown.b) { this.st = 'chat'; playSnd('sel'); return; } 
       if (keysDown.up) { this.cmdCur = (this.cmdCur - 1 + this.cmds.length) % this.cmds.length; playSnd('sel'); }
       if (keysDown.down) { this.cmdCur = (this.cmdCur + 1) % this.cmds.length; playSnd('sel'); }
+      
       if (keysDown.a) {
-        if (this.cmdCur === 3) { switchApp(Menu); return; } 
+        if (this.cmdCur === 4) { switchApp(Menu); return; } // 退出
         
         if (AISys.status === 'ready') {
-          this.sendPrompt().catch(e => console.error(e));
+          let customText = null;
+          // 「じゆうにはなす」の処理
+          if (this.cmdCur === 3) {
+            keys.a = false; keysDown.a = false; 
+            customText = prompt("王様に伝える言葉を入力してください：", "");
+            if (!customText || customText.trim() === "") {
+              this.st = 'chat';
+              return;
+            }
+          }
+          this.sendPrompt(customText).catch(e => console.error(e));
         } else {
           this.logs.push({ speaker: 'sys', text: `> コマンド: ${this.cmds[this.cmdCur]}` });
           this.logs.push({ speaker: 'king', text: "王：「わしは 今 ねむいんじゃ。\nまた あとで こい！」" });
@@ -256,12 +263,12 @@ const KingRoom = {
     ctx.restore();
 
     if (this.st === 'cmd') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.95)'; ctx.fillRect(90, 160, 100, 85);
-      ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(90, 160, 100, 85);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.95)'; ctx.fillRect(80, 145, 110, 100);
+      ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2; ctx.strokeRect(80, 145, 110, 100);
       ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
       for (let i = 0; i < this.cmds.length; i++) {
         ctx.fillStyle = this.cmdCur === i ? '#ff0' : '#aaa';
-        ctx.fillText((this.cmdCur === i ? '> ' : '  ') + this.cmds[i], 95, 180 + i * 18);
+        ctx.fillText((this.cmdCur === i ? '> ' : '  ') + this.cmds[i], 85, 160 + i * 18);
       }
     }
 
