@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 4.4: AI Anti-Hallucination) ===
+// === CORE SYSTEM (Phase 4.5: Llama 3.2 1B Integration) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -79,7 +79,7 @@ const SaveSys = {
   }
 };
 
-// ★ AIシステム (妄想防止・安定化バージョン)
+// ★ ここが変更点！軽量かつ超優秀な「Llama-3.2-1B」を召喚します
 const AISys = {
   engine: null,
   status: 'init', 
@@ -96,8 +96,8 @@ const AISys = {
         this.progressText = report.text;
         this.progress = report.progress;
       });
-      // メモリ制限対策の0.5Bモデル
-      await this.engine.reload("Qwen2.5-0.5B-Instruct-q4f16_1-MLC");
+      // ★ 魔法の最新モデル「Llama 3.2 1B」をロード！(約800MB)
+      await this.engine.reload("Llama-3.2-1B-Instruct-q4f16_1-MLC");
       this.status = 'ready';
     } catch (e) {
       console.error(e);
@@ -113,11 +113,10 @@ const AISys = {
       { role: "user", content: userPrompt }
     ];
     try {
-      // ★ temperatureを 0.3 に下げて、AIのクリエイティビティ(妄想癖)を抑え込み、忠実に回答させる
       const reply = await this.engine.chat.completions.create({ 
         messages, 
         max_tokens: 80,
-        temperature: 0.3, 
+        temperature: 0.3, // 妄想防止の薬はそのまま入れておきます
         top_p: 0.8
       });
       return reply.choices[0].message.content || "むむ？（言葉につまった）";
