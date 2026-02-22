@@ -1,4 +1,4 @@
-// === UNREASONABLE BROS - TEXTURE RESTORE & DATA FIX ===
+// === UNREASONABLE BROS - LOGGING UPDATE ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1}, score: 0, camX: 0, coyoteTime: 0, stageTheme: 'grass',
@@ -6,12 +6,9 @@ const Action = {
   
   init() { 
     this.st = 'title'; BGM.play('action'); 
-    // ★ データ自動修復機能：不正な値が入っていたらリセットする
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
     if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
-    if (SaveSys.data.actLives === undefined) {
-      SaveSys.data.actLives = 5; SaveSys.save();
-    }
+    if (SaveSys.data.actLives === undefined) { SaveSys.data.actLives = 5; SaveSys.save(); }
   },
   
   load() {
@@ -19,7 +16,6 @@ const Action = {
     this.map = []; this.platforms = []; this.coins = []; this.spikes = []; this.enemies = []; this.invisibleBlocks = []; this.fakeCoins = [];
     this.score = 0; this.camX = 0; this.coyoteTime = 0; this.deathReason = '';
     
-    // データ安全チェック
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
     if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
 
@@ -50,6 +46,10 @@ const Action = {
   die(reason) {
     this.deathReason = reason;
     SaveSys.data.actLives--; SaveSys.save(); playSnd('hit'); screenShake(8); addParticle(this.p.x, this.p.y, '#00f', 'explosion');
+    
+    // ★ 監視ログ送信
+    SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}で「${reason}」により死亡`);
+
     if (SaveSys.data.actLives < 0) { 
       SaveSys.data.actStage = 1; SaveSys.data.actLives = 5; SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save(); this.st = 'gameover'; 
     } else { this.st = 'dead'; }
@@ -84,6 +84,8 @@ const Action = {
     for (let m of this.map) {
       if (m.type === 'ground' && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) { if (this.p.vy > 0) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; } }
       if (m.type === 'goal' && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) {
+        // ★ 監視ログ送信（クリア）
+        SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}をクリアした！`);
         SaveSys.data.actStage++; SaveSys.save(); playSnd('combo');
         if (SaveSys.data.actStage > 3) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
       }
@@ -170,7 +172,6 @@ const Action = {
     for (let m of this.map) {
       if (m.x - this.camX > -50 && m.x - this.camX < 250) {
         if (m.type === 'ground') {
-          // 地面もブロックで描画
           let num = Math.ceil(m.w / 20); for(let k=0; k<num; k++) drawSprite(m.x + k*20, m.y, '#8b4513', sprs.block, 2.5);
         } else if (m.type === 'goal') { 
           ctx.fillStyle = '#ffd700'; ctx.fillRect(m.x, m.y, m.w, m.h); ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('★', m.x + 7, m.y + 30); 
@@ -181,7 +182,6 @@ const Action = {
       if (plat.disappeared) continue;
       if (plat.x - this.camX > -50 && plat.x - this.camX < 250) {
         if (plat.disappear && plat.timer > 0 && plat.timer < 15) ctx.globalAlpha = plat.timer / 15;
-        // ★ 修正：矩形の代わりにブロックの絵を描画
         let color = plat.fake ? '#964' : '#654321';
         let num = Math.ceil(plat.w / 20);
         for(let k=0; k<num; k++) drawSprite(plat.x + k*20, plat.y, color, sprs.block, 2.5);
