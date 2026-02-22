@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Monitoring System Update) ===
+// === CORE SYSTEM (Phase 4: AI Engine Embedded) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -73,11 +73,52 @@ const SaveSys = {
     rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
     rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); 
   },
-  // ★ AIに読ませるための監視ログ追加機能
   addLog(game, msg) {
     this.data.logs.unshift(`【${game}】${msg}`);
-    if(this.data.logs.length > 10) this.data.logs.pop(); // 最新10件のみ保持
+    if(this.data.logs.length > 10) this.data.logs.pop();
     this.save();
+  }
+};
+
+// ★ フェーズ4: AIシステム (WebLLM)
+const AISys = {
+  engine: null,
+  status: 'init', // init, loading, ready, error
+  progress: 0,
+  progressText: '',
+  async initModel() {
+    if (this.status !== 'init') return;
+    if (!window.webllm) { this.status = 'error'; this.progressText = 'AIモジュールが見つかりません'; return; }
+    
+    this.status = 'loading';
+    try {
+      this.engine = new window.webllm.MLCEngine();
+      this.engine.setInitProgressCallback((report) => {
+        this.progressText = report.text;
+        this.progress = report.progress;
+      });
+      // ★ 大本命AI「Qwen2.5-1.5B」をブラウザにロード！
+      await this.engine.reload("Qwen2.5-1.5B-Instruct-q4f16_1-MLC");
+      this.status = 'ready';
+    } catch (e) {
+      console.error(e);
+      this.status = 'error';
+      this.progressText = 'モデルのロードに失敗しました';
+    }
+  },
+  async chat(sysPrompt, userPrompt, history) {
+    if (this.status !== 'ready') return "わしは まだ ねむいんじゃ。";
+    const messages = [
+      { role: "system", content: sysPrompt },
+      ...history,
+      { role: "user", content: userPrompt }
+    ];
+    try {
+      const reply = await this.engine.chat.completions.create({ messages, max_tokens: 100 });
+      return reply.choices[0].message.content;
+    } catch (e) {
+      return "むむっ... あたまが...！(通信エラー)";
+    }
   }
 };
 
