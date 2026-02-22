@@ -1,10 +1,11 @@
-// === KING'S ROOM (Phase 3.5: Auto Word-Wrap Fix) ===
+// === KING'S ROOM (Phase 3.5: RPG Dialogue Style) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
   logs: [
     { speaker: 'sys', text: "SYSTEM: 謁見の間に 入室しました" },
-    { speaker: 'king', text: "おお ゆうしゃよ！\nよくぞ まいった！\nわしが このせかいの おうじゃ！" },
+    // ★ セリフの表示をRPG風に変更
+    { speaker: 'king', text: "王：「おお ゆうしゃよ！\nよくぞ まいった！\nわしが このせかいの おうじゃ！」" },
     { speaker: 'sys', text: "【フェーズ3 テストモード】\n Aボタン: 表情チェンジ\n Bボタン: 最新のプレイ記録を覗き見" }
   ],
   
@@ -42,9 +43,9 @@ const KingRoom = {
       if (SaveSys.data.logs && SaveSys.data.logs.length > 0) {
         recentLog = SaveSys.data.logs[0]; 
       }
-      this.logs.push({ speaker: 'king', text: "ふむ、ほうこく に よると...\n「" + recentLog + "」\n...ということじゃな！\nわしは すべて おみとおしじゃぞ！" });
+      // ★ ここも王様のカギカッコ対応（中身は『』にする）
+      this.logs.push({ speaker: 'king', text: "王：「ふむ、ほうこく に よると...\n『" + recentLog + "』\n...ということじゃな！\nわしは すべて おみとおしじゃぞ！」" });
       this.emotion = 'thinking';
-      // ログが増えたら自動で下までスクロールさせる
       this.scroll = Math.max(0, this.logs.length * 40); 
       playSnd('jmp');
     }
@@ -80,7 +81,7 @@ const KingRoom = {
     ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
     let drawY = 165 - this.scroll;
     
-    // ★ 追加：文字の長さを測って自動で折り返す魔法の関数
+    // 文字の長さを測って自動で折り返す
     const wrapText = (text, maxWidth) => {
       let result = [];
       let rawLines = text.split('\n');
@@ -101,15 +102,14 @@ const KingRoom = {
       return result;
     };
 
-    // 描画処理（はみ出さずに描画する）
     for (let log of this.logs) {
       ctx.fillStyle = log.speaker === 'king' ? '#0f0' : '#aaa';
-      let wrappedLines = wrapText(log.text, 160); // 横幅160pxで自動改行
+      let wrappedLines = wrapText(log.text, 160); 
       for (let line of wrappedLines) { 
         ctx.fillText(line, 15, drawY); 
         drawY += 15; 
       }
-      drawY += 5; // 発言ごとの余白
+      drawY += 5; 
     }
     ctx.restore();
     ctx.fillStyle = '#888'; ctx.font = '9px monospace';
