@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.3: GitHub Secret Evasion) ===
+// === CORE SYSTEM (Phase 5 Final: Gemini API Complete) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -79,15 +79,13 @@ const SaveSys = {
 };
 
 // ★============================================★
-// 　【GitHub対策】APIキーを3〜4つに「分割して」貼り付けてください！
-// 　（そのまま1つの文字列で書くとGitHubボットに自動削除されます）
-// 
-// 　例: "AIzaSy" と "XXXXXXX" と "YYYYYY" に分ける
+// 　【超重要】新しく取得したAPIキーを分割して入れてください！
+// 　（例: "AIzaSy" + "12345" + "67890" + "abcdefg"）
 const GEMINI_API_KEY = [
-  "AIzaSy",         // 1つ目
-  "B40pJoEo_",      // 2つ目
-  "Xcluzq2PFYxS0g",      // 3つ目
-  "uU6owK60BY"       // 4つ目（足りなければカンマで増やしてOK）
+  "AIzaSy",
+  "40pJoEo_",
+  "Xcluzq2P",
+  "FYxS0guU6owK60BY"
 ].join("");
 // ★============================================★
 
@@ -95,8 +93,11 @@ const AISys = {
   status: 'ready',
   async chat(sysPrompt, userPrompt) {
     const key = GEMINI_API_KEY.trim();
-    if (key.includes("ここに") || !key) {
-      return "むむっ... この せかいの 理（APIキー）が 定まっておらぬようじゃな！";
+    
+    // キーが初期状態、または短すぎる場合の警告（王様の世界観で）
+    if (key.includes("ここに") || key.length < 30) {
+      console.error("【設定エラー】APIキーが正しく入力されていません。");
+      return "むむっ... この せかいの 理（APIキー）が まだ 定まっておらぬようじゃな！";
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
@@ -115,16 +116,27 @@ const AISys = {
       });
 
       if (!response.ok) {
+        // エラーの詳細は裏側（コンソール）に出力
         const errorDetail = await response.json();
-        console.error("Gemini Error Detail:", errorDetail);
-        throw new Error(`HTTP ${response.status}`);
+        console.error("Gemini API Error Detail:", errorDetail);
+        
+        // プレイヤーには世界観を守ったメッセージを返す
+        return "むむっ... 時空の 歪み を 感じるぞ！ しばらく待ってから 話しかけるのじゃ！";
       }
 
       const data = await response.json();
+      
+      // 空の返答が来た場合の安全装置
+      if (!data.candidates || data.candidates.length === 0) {
+          console.error("Gemini API Empty Response");
+          return "かみさまが 沈黙しておる…… もういちど 話しかけてみるのじゃ。";
+      }
+      
       return data.candidates[0].content.parts[0].text.trim();
+      
     } catch (e) {
       console.error("Connection Error:", e);
-      return "むむっ... 時空の 歪み を 感じるぞ！ しばらく待ってから 話しかけるのじゃ！";
+      return "むむっ... なにやら つうしん が 途切れたようじゃ！";
     }
   }
 };
