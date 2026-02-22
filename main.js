@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 4: AI Engine Embedded) ===
+// === CORE SYSTEM (Phase 4.1: AI Memory Fix & Safety) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -80,10 +80,10 @@ const SaveSys = {
   }
 };
 
-// ★ フェーズ4: AIシステム (WebLLM)
+// ★ フェーズ4.1: AIシステム (WebLLM - メモリ不足対策の軽量版)
 const AISys = {
   engine: null,
-  status: 'init', // init, loading, ready, error
+  status: 'init', 
   progress: 0,
   progressText: '',
   async initModel() {
@@ -97,8 +97,8 @@ const AISys = {
         this.progressText = report.text;
         this.progress = report.progress;
       });
-      // ★ 大本命AI「Qwen2.5-1.5B」をブラウザにロード！
-      await this.engine.reload("Qwen2.5-1.5B-Instruct-q4f16_1-MLC");
+      // ★ スマホのメモリクラッシュを防ぐため、1.5B(1.2GB)から 0.5B(約400MB)の超軽量モデルへ変更！
+      await this.engine.reload("Qwen2.5-0.5B-Instruct-q4f16_1-MLC");
       this.status = 'ready';
     } catch (e) {
       console.error(e);
@@ -115,9 +115,10 @@ const AISys = {
     ];
     try {
       const reply = await this.engine.chat.completions.create({ messages, max_tokens: 100 });
-      return reply.choices[0].message.content;
+      return reply.choices[0].message.content || "むむ？（言葉につまった）";
     } catch (e) {
-      return "むむっ... あたまが...！(通信エラー)";
+      console.error("AI Error:", e);
+      return "むむっ... あたまが...！（推論エラー）";
     }
   }
 };
