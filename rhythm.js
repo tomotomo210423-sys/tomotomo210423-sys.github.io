@@ -1,4 +1,4 @@
-// === BEAT BROS - TOUCH FIX & NO SHAKE/SOUND ===
+// === BEAT BROS - LOGGING UPDATE ===
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
@@ -20,10 +20,7 @@ const Rhythm = {
         if(activeApp !== this) return;
         if(this.st !== 'play' && this.st !== 'result') return;
         if(e.cancelable) e.preventDefault(); 
-        
         const r = cvs.getBoundingClientRect();
-        
-        // 戻るボタン等のUI判定（タップ時のみ）
         if (e.type === 'touchstart' || e.type === 'mousedown') {
             let ts = e.type === 'mousedown' ? [e] : e.changedTouches;
             for(let i=0; i<ts.length; i++) {
@@ -33,28 +30,18 @@ const Rhythm = {
                 if(this.st === 'result'){ this.exitGame(); return; }
             }
         }
-        
-        // ★ プレイ中のタッチ判定：判定エリアを上に広げ、二重判定を防いで確実に拾う
         if (this.st === 'play') {
             let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
             let nT = [false,false,false,false];
-            
             for(let i=0; i<activeTs.length; i++) {
                 let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
                 let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-                // ★ 判定エリアを y > 150 から y > 100 に拡大（上の方を叩いても反応する）
                 if(y > 100) { 
                     let l = Math.floor(x / (cvs.width / 4));
                     if(l >= 0 && l <= 3) nT[l] = true;
                 }
             }
-            
-            // 新しく指が触れたレーン、または指が滑って入ってきたレーンだけを「叩いた」と判定する
-            for(let l=0; l<4; l++) {
-                if(nT[l] && !this.laneTouch[l]) {
-                    this.hitKey(l);
-                }
-            }
+            for(let l=0; l<4; l++) { if(nT[l] && !this.laneTouch[l]) { this.hitKey(l); } }
             this.laneTouch = nT;
         }
       };
@@ -132,7 +119,6 @@ const Rhythm = {
         }
       }
     }
-    
     if(this.notes.length < 10) {
        this.notes = []; lastTime = 0; lastLane = -1;
        for(let t=2; t<buffer.duration; t+=minGap*1.5) {
@@ -150,13 +136,13 @@ const Rhythm = {
     this.source = audioCtx.createBufferSource();
     this.source.buffer = this.audioBuffer;
     
-    if(this.filterType === 1) { // RADIO
+    if(this.filterType === 1) { 
         let filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 1.5;
         this.source.connect(filter); filter.connect(audioCtx.destination);
-    } else if(this.filterType === 2) { // WATER
+    } else if(this.filterType === 2) { 
         let filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 400;
         this.source.connect(filter); filter.connect(audioCtx.destination);
-    } else if(this.filterType === 3) { // ECHO
+    } else if(this.filterType === 3) { 
         let delay = audioCtx.createDelay(); delay.delayTime.value = 0.35;
         let feedback = audioCtx.createGain(); feedback.gain.value = 0.3;
         delay.connect(feedback); feedback.connect(delay);
@@ -170,6 +156,9 @@ const Rhythm = {
       this.st = 'result'; let finalScore = Math.floor(this.score);
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
       if(finalScore > (rData[this.mode]||0)){ rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
+      
+      // ★ 監視ログ送信
+      SaveSys.addLog('BEAT BROS', `${this.mode.toUpperCase()}モードで スコア${finalScore}を叩き出した`);
     }; 
   },
 
@@ -187,8 +176,6 @@ const Rhythm = {
       if(hitNote) {
         hitNote.hit = true; let cx = 25 + lane * 50;
         let msg = '', pts = 0;
-        
-        // ★ 画面の揺れ (screenShake) を完全に削除
         if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); }
         else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); }
         else { msg = 'GOOD'; pts = 10; }
@@ -196,8 +183,6 @@ const Rhythm = {
         this.combo++; if(this.combo > this.maxCombo) this.maxCombo = this.combo;
         this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
         this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); 
-        
-        // ★ 打撃音(ピコピコ音)も削除しました
       }
   },
 
@@ -231,7 +216,6 @@ const Rhythm = {
     }
     else if(this.st === 'transform_in') {
       this.transformTimer--;
-      // 変形中の音と揺れは演出として残しています
       if(this.transformTimer % 20 === 0) playSnd('hit'); 
       if(this.transformTimer % 40 === 0) screenShake(5); 
       if(this.transformTimer <= 0) { this.loadFile(this.pendingFile); } 
@@ -264,7 +248,6 @@ const Rhythm = {
         if(!n.hit && !n.missed && n.y > 420) { 
            n.missed = true; this.combo = 0; 
            this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); 
-           // ★ MISS時の画面揺れも削除しました
         }
       }
       for(let i = this.judgements.length - 1; i >= 0; i--){ this.judgements[i].life--; if(this.judgements[i].life <= 0) this.judgements.splice(i, 1); }
@@ -277,13 +260,9 @@ const Rhythm = {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
     ctx.save();
     
-    // NIGHTMAREモード特有のうねる画面揺れ
     if(this.mode === 'nightmare' && this.st === 'play') {
-       ctx.translate(100, 200);
-       ctx.rotate(Math.sin(Date.now()/300) * 0.1);
-       ctx.translate(-100, -200);
+       ctx.translate(100, 200); ctx.rotate(Math.sin(Date.now()/300) * 0.1); ctx.translate(-100, -200);
     }
-    
     if(typeof shakeTimer !== 'undefined' && shakeTimer > 0){ ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; }
     
     if(this.st === 'menu') {
@@ -294,24 +273,17 @@ const Rhythm = {
     else if(this.st === 'settings') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('SYSTEM READY', 45, 50);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
-      
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
       let hi = rData[this.mode] || 0;
-      
       ctx.fillStyle = this.settingsCur === 0 ? (this.mode === 'nightmare' ? '#f00' : '#ff0') : '#fff';
       ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 30, 110);
-      
-      ctx.fillStyle = '#aaa'; ctx.font = '10px monospace';
-      ctx.fillText(`  HI-SCORE: ${hi}`, 30, 125);
-      
+      ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`  HI-SCORE: ${hi}`, 30, 125);
       ctx.font = '12px monospace';
       const filters = ['OFF', 'RADIO', 'WATER', 'ECHO'];
       ctx.fillStyle = this.settingsCur === 1 ? '#ff0' : '#fff';
       ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 30, 160);
-      
       ctx.fillStyle = this.settingsCur === 2 ? '#0f0' : '#fff';
       ctx.fillText((this.settingsCur===2?'> ':'  ') + `GAME START!`, 30, 210);
-      
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A/←→:変更  SEL:戻る', 25, 280);
     }
     else if(this.st === 'transform_in' || this.st === 'transform_out') {
@@ -345,9 +317,7 @@ const Rhythm = {
       
       if(this.mode === 'nightmare' && this.st === 'play' && Math.random() < 0.08) {
          ctx.fillStyle = ['rgba(255,0,0,0.5)', 'rgba(255,0,255,0.4)', 'rgba(255,255,0,0.3)'][Math.floor(Math.random()*3)];
-         ctx.font = 'bold ' + (20 + Math.random()*40) + 'px monospace';
-         ctx.fillText('ERROR', Math.random()*150, Math.random()*400);
-         ctx.fillRect(0,0,200,400);
+         ctx.font = 'bold ' + (20 + Math.random()*40) + 'px monospace'; ctx.fillText('ERROR', Math.random()*150, Math.random()*400); ctx.fillRect(0,0,200,400);
       }
 
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 60, 20);
@@ -371,9 +341,7 @@ const Rhythm = {
       if(h > 0) {
           ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 200, h); ctx.fillRect(0, 400 - h, 200, h);
           ctx.fillStyle = '#ff0'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff0'; ctx.fillRect(0, h - 2, 200, 4); ctx.fillRect(0, 400 - h - 2, 200, 4); ctx.shadowBlur = 0;
-          if(this.st === 'loading') {
-              ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 170, 180, 60); ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText('ANALYZING DATA...', 25, 195); ctx.fillRect(50, 210, (Date.now()%1000)/1000*100, 5); 
-          }
+          if(this.st === 'loading') { ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 170, 180, 60); ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText('ANALYZING DATA...', 25, 195); ctx.fillRect(50, 210, (Date.now()%1000)/1000*100, 5); }
       }
 
       if(this.st === 'result') {
