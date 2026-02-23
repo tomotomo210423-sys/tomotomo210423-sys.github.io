@@ -13,7 +13,6 @@
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-/* ★ ここを 100vh から 100dvh に変更しました！ */
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100dvh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100dvh; }
 
 #gameboy { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
@@ -31,7 +30,21 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 .boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
 
-#gameCanvas { background: #000; width: 100%; max-width: 320px; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; }
+/* ★ 修正ポイント：width 100% をやめ、常に枠内に収まるように自動調整する魔法をかけました */
+#gameCanvas { 
+  background: #000; 
+  height: 100%; 
+  width: auto;
+  max-width: 100%; 
+  max-height: 100%; 
+  aspect-ratio: 1 / 1.5; 
+  image-rendering: pixelated; 
+  box-shadow: 0 0 15px rgba(0,0,0,0.9); 
+  z-index: 1; 
+  border-radius: 2px; 
+  touch-action: none; 
+  transition: all 0.5s; 
+}
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 
 #controls { height: 300px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: all 0.8s; }
