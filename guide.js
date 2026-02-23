@@ -1,4 +1,4 @@
-// === GUIDE APP (Phase 6.3: King's Manual) ===
+// === GUIDE APP (Phase 6.4: Full Games Manual) ===
 const Guide = {
   cur: 0,
   page: 0,
@@ -31,6 +31,37 @@ const Guide = {
         '',
         '見えないブロックや 動く床など、',
         '理不尽な罠を 気合いで 乗り越えろ！'
+      ] 
+    },
+    { 
+      name: 'ONLINE対戦', 
+      text: [
+        '遠く離れた 別の勇者と',
+        'インターネット越しに バトルじゃ！',
+        '',
+        '【あそびかた】',
+        'ルームを作って 相手を待つか、',
+        'ルームIDを 入力して 参加しろ！',
+        '',
+        '※注意：',
+        '世界の繋がり（ネットワーク）が 安定した',
+        '電波の 良いところで あそぶのじゃぞ！'
+      ] 
+    },
+    { 
+      name: 'BEAT BROS', 
+      text: [
+        'イカした 音楽に 合わせて',
+        'タイミングよく ボタンを 押せ！',
+        '',
+        '【操作】',
+        '左レーン: 左ボタン',
+        '下レーン: 下ボタン',
+        '上レーン: 上ボタン',
+        '右レーン: 右ボタン',
+        '',
+        'リズムに乗って コンボを 繋げば、',
+        '気分は もう スーパースターじゃ！'
       ] 
     },
     { 
@@ -95,16 +126,16 @@ const Guide = {
       for (let i = 0; i < this.games.length; i++) {
         if (i === this.cur) {
           ctx.fillStyle = '#ff0';
-          ctx.fillRect(10, 55 + i * 25, 180, 18);
+          ctx.fillRect(10, 50 + i * 22, 180, 18);
           ctx.fillStyle = '#000';
         } else {
-          ctx.fillStyle = i === 3 ? '#0ff' : '#aaa'; // 王様の間だけ水色で目立たせる
+          ctx.fillStyle = i === 5 ? '#0ff' : '#aaa'; // 王様の間だけ水色
         }
-        ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, 68 + i * 25);
+        ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, 63 + i * 22);
       }
       
       ctx.fillStyle = '#888'; ctx.font = '9px monospace';
-      ctx.fillText('A: 読む  SELECT: 戻る', 45, 280);
+      ctx.fillText('A: 読む  SELECT: 戻る', 45, 290);
       
     } else {
       ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace';
