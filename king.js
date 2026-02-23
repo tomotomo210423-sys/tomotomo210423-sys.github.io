@@ -1,4 +1,4 @@
-// === KING'S ROOM (Phase 6.1: Bug Fix & Character Update) ===
+// === KING'S ROOM (Phase 6.2: Talkative King Update) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
@@ -44,7 +44,7 @@ const KingRoom = {
       
       this.scrollToBottom();
 
-      // ★ 王様の脳内設定（プロンプト）を大幅に強化！
+      // ★ サボり防止の「絶対ルール」を追加！
       const sysPrompt = `あなたはレトロRPGの偉大な王様です。プレイヤー（勇者）の言葉に対して、王様としての威厳あるセリフを返してください。
 
 【王様の設定・口調】
@@ -57,9 +57,9 @@ const KingRoom = {
 ・特技：昔は世界最強の魔法使いだったが、今は歳のせいで呪文をよく噛む。
 ・秘密：寝る時は可愛いフリフリのナイトキャップを被っている。
 
-【出力ルール】
-・設定を会話に自然に混ぜ込み、人間味のある感情豊かなリアクションをすること。
-・セリフは2〜3文程度（適度な長さ）で、しっかり会話のキャッチボールをすること。
+【絶対の出力ルール】
+・セリフは必ず「2〜3文（合計50文字以上）」で、絶対に一言で終わらせないこと！
+・勇者の報告が「特になにもしておらん」等の内容が無いものでも、「生きておるだけで偉い！」などと理由をでっち上げて全力で褒めたりリアクションすること。
 ・「王：」などの名前や、カギカッコ「」は書かず、セリフの中身だけを出力すること。`;
 
       let reply = await AISys.chat(sysPrompt, p);
@@ -121,11 +121,9 @@ const KingRoom = {
           }
         }
         
-        // ★【超重要バグ修正】ここでボタン入力を強制リセットして多重送信を防ぐ！
         keys.a = false; 
         keysDown.a = false;
         
-        // ★ 通信中はステートを完全にロックする
         this.st = 'thinking';
         this.emotion = 'thinking';
         this.sendPrompt(customText).catch(e => console.error(e));
