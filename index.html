@@ -13,7 +13,8 @@
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100vh; }
+/* ★ ここを 100vh から 100dvh に変更しました！ */
+body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100dvh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100dvh; }
 
 #gameboy { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
 #screen-container { flex: 1; background: #444; margin: 15px 15px 5px 15px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 10px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; transition: all 0.8s; }
