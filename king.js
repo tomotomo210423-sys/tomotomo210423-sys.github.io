@@ -1,4 +1,4 @@
-// === KING'S ROOM (Phase 6: Gemini Advanced Prompt) ===
+// === KING'S ROOM (Phase 6.1: Bug Fix & Character Update) ===
 const KingRoom = {
   st: 'init', emotion: 'normal', scroll: 0,
   images: {}, loadedCount: 0,
@@ -28,8 +28,6 @@ const KingRoom = {
   
   async sendPrompt(customText) {
     try {
-      this.st = 'thinking';
-      this.emotion = 'thinking';
       playSnd('sel');
       
       let p = "";
@@ -46,17 +44,22 @@ const KingRoom = {
       
       this.scrollToBottom();
 
-      // ★ 超・天才AI（Gemini）向けに、縛りを解いて演技指導を強化！
+      // ★ 王様の脳内設定（プロンプト）を大幅に強化！
       const sysPrompt = `あなたはレトロRPGの偉大な王様です。プレイヤー（勇者）の言葉に対して、王様としての威厳あるセリフを返してください。
 
 【王様の設定・口調】
 ・一人称は「わし」、二人称は「そなた」か「ゆうしゃ」。
 ・語尾は「～じゃ」「～じゃな」「～でおじゃる」。
 ・性格はツンデレで少し腹黒いが、根は勇者思い。
-・人間味のある、感情豊かなリアクションをすること。
+・好物：実は超甘党で「特製プリン」が大好物。
+・悩み：豪華な王冠が重すぎて、ひどい肩こりと首の痛みに悩んでいる。
+・座右の銘：「案ずるよりプリンじゃ！」
+・特技：昔は世界最強の魔法使いだったが、今は歳のせいで呪文をよく噛む。
+・秘密：寝る時は可愛いフリフリのナイトキャップを被っている。
 
 【出力ルール】
-・セリフは2〜3文程度（適度な長さ）で、しっかり会話のキャッチボールをすること。（短すぎる返事はNG）
+・設定を会話に自然に混ぜ込み、人間味のある感情豊かなリアクションをすること。
+・セリフは2〜3文程度（適度な長さ）で、しっかり会話のキャッチボールをすること。
 ・「王：」などの名前や、カギカッコ「」は書かず、セリフの中身だけを出力すること。`;
 
       let reply = await AISys.chat(sysPrompt, p);
@@ -65,13 +68,11 @@ const KingRoom = {
           reply = "むむっ... わしの アタマが フリーズしたようじゃ！（エラー）";
       }
 
-      // 感情豊かなリアクションに合わせて表情を切り替え
-      if (reply.includes("！") || reply.includes("褒")) this.emotion = 'laughing';
-      else if (reply.includes("…") || reply.includes("なさけない") || reply.includes("慰")) this.emotion = 'disappointed';
+      if (reply.includes("！") || reply.includes("褒") || reply.includes("プリン")) this.emotion = 'laughing';
+      else if (reply.includes("…") || reply.includes("痛") || reply.includes("慰")) this.emotion = 'disappointed';
       else if (reply.includes("ばか") || reply.includes("たわけ") || reply.includes("怒")) this.emotion = 'angry';
       else this.emotion = 'normal';
 
-      // 万が一の記号を消去
       this.typeText = reply.replace(/^王：?「?/, '').replace(/」?$/, '').replace(/^出力：?/, ''); 
       this.typeIdx = 0;
       this.typeTimer = 0;
@@ -119,6 +120,14 @@ const KingRoom = {
             return;
           }
         }
+        
+        // ★【超重要バグ修正】ここでボタン入力を強制リセットして多重送信を防ぐ！
+        keys.a = false; 
+        keysDown.a = false;
+        
+        // ★ 通信中はステートを完全にロックする
+        this.st = 'thinking';
+        this.emotion = 'thinking';
         this.sendPrompt(customText).catch(e => console.error(e));
       }
     }
@@ -130,7 +139,6 @@ const KingRoom = {
         currentLog.text += this.typeText[this.typeIdx];
         this.typeIdx++;
         
-        // ポポポポ音を鳴らす
         if (this.typeIdx % 3 === 0) playSnd('sel'); 
         this.scrollToBottom();
         
