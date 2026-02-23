@@ -1,24 +1,44 @@
-// === ONLINE BATTLE - ROYAL MEMORY (Phase 2: Lobby & Bot Match) ===
+// === ONLINE BATTLE - ROYAL MEMORY (Phase 3: Firebase Lobby) ===
 const Online = {
   st: 'boot', role: '', peer: null, conn: null, peerId: '', targetId: '', msg: 'LOADING NETWORK...',
   cursor: 0, hostPass: '', myPass: '', guestJoined: false, isBot: false, botTimer: 0,
+  roomName: '', roomList: [], roomCursor: 0,
   state: {
     brd: [], turn: 'host', sc: { host: 0, guest: 0 },
     skills: { host: [1, 2], guest: [1, 2] }, openIdx: [], wait: 0, msg: 'GAME START!'
   },
   
-  init() {
-    this.st = 'boot'; this.msg = 'LOADING NETWORK...'; this.role = ''; this.peerId = ''; 
-    this.targetId = ''; this.hostPass = ''; this.myPass = ''; this.guestJoined = false; this.isBot = false;
+  async init() {
+    this.st = 'boot'; this.msg = 'LOADING NETWORK...'; this.role = ''; 
+    this.peerId = ''; this.targetId = ''; this.hostPass = ''; this.myPass = ''; 
+    this.guestJoined = false; this.isBot = false; this.roomList = []; this.roomCursor = 0;
     
-    if (!window.Peer) {
-      const script = document.createElement('script');
-      script.src = "https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js";
-      script.onload = () => { this.st = 'menu'; };
-      document.head.appendChild(script);
-    } else {
-      this.st = 'menu';
+    // FirebaseとPeerJSを動的に読み込む
+    const loadScript = (src) => new Promise(r => {
+      if (document.querySelector(`script[src="${src}"]`)) return r();
+      const s = document.createElement('script'); s.src = src; s.onload = r; document.head.appendChild(s);
+    });
+
+    if (!window.firebase) {
+      await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
+      await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js");
     }
+    
+    // あなた専用のFirebaseの鍵をセット
+    if (window.firebase && !firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: "AIzaSyDEfsFzw9CKmBDBDqP0L21uDVTZ80HWXPY",
+        authDomain: "gorilla2-e0d2a.firebaseapp.com",
+        databaseURL: "https://gorilla2-e0d2a-default-rtdb.firebaseio.com",
+        projectId: "gorilla2-e0d2a",
+        storageBucket: "gorilla2-e0d2a.firebasestorage.app",
+        messagingSenderId: "616666674509",
+        appId: "1:616666674509:web:25d1633f21ba5b45edb304"
+      });
+    }
+    
+    if (!window.Peer) await loadScript("https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js");
+    this.st = 'menu';
   },
 
   // --- 通信＆ロビー管理 ---
@@ -30,12 +50,15 @@ const Online = {
     this.peer = new Peer(myId);
     
     this.peer.on('open', (id) => {
-      this.peerId = id.replace('RMB_', '');
+      this.peerId = id;
       if (isHost) {
+        // ★ Firebaseの掲示板に自分の部屋を登録する
+        const dbRef = firebase.database().ref('rooms/' + this.peerId);
+        dbRef.set({ name: this.roomName, hasPass: !!this.hostPass, status: 'waiting' });
+        dbRef.onDisconnect().remove(); // 接続が切れたら自動で消す魔法
+
         this.st = 'host_lobby';
-        this.peer.on('connection', (c) => {
-          this.conn = c; this.setupConn();
-        });
+        this.peer.on('connection', (c) => { this.conn = c; this.setupConn(); });
       } else {
         this.joinRoom();
       }
@@ -44,19 +67,16 @@ const Online = {
 
   joinRoom() {
     this.msg = 'CONNECTING TO ROOM...'; this.st = 'connecting';
-    this.conn = this.peer.connect('RMB_' + this.targetId);
+    this.conn = this.peer.connect(this.targetId);
     this.setupConn();
   },
 
   setupConn() {
     this.conn.on('open', () => {
-      if (this.role === 'guest') {
-        // ゲストは接続できたらパスワードを送信して認証を求める
-        this.conn.send({ type: 'auth', pass: this.myPass });
-      }
+      if (this.role === 'guest') this.conn.send({ type: 'auth', pass: this.myPass });
     });
     this.conn.on('data', (data) => {
-      // ホスト側の処理：ゲストからの認証パスワードをチェック
+      // ホスト側の認証処理
       if (this.role === 'host' && data.type === 'auth') {
         if (this.hostPass === '' || this.hostPass === data.pass) {
           this.guestJoined = true; playSnd('combo');
@@ -67,7 +87,7 @@ const Online = {
         }
       }
       
-      // ゲスト側の処理：ホストからの返答を受け取る
+      // ゲスト側の応答処理
       if (this.role === 'guest') {
         if (data.type === 'auth_ok') { this.st = 'guest_lobby'; playSnd('sel'); }
         if (data.type === 'auth_fail') { this.st = 'error'; this.msg = 'PASSWORD INCORRECT!'; playSnd('hit'); }
@@ -75,10 +95,7 @@ const Online = {
         if (data.type === 'sync') this.state = data.state; 
       }
       
-      // ゲームプレイ中のアクション受信
-      if (this.role === 'host' && data.type === 'action') {
-        this.processAction(data.action, 'guest'); 
-      }
+      if (this.role === 'host' && data.type === 'action') this.processAction(data.action, 'guest'); 
     });
     this.conn.on('close', () => { 
       this.st = 'error'; this.msg = 'CONNECTION LOST...'; playSnd('hit');
@@ -111,11 +128,7 @@ const Online = {
     if (actionData.type === 'flip') {
       let idx = actionData.idx;
       if (this.state.brd[idx].st !== 'hidden' || this.state.openIdx.length >= 2) return;
-      
-      this.state.brd[idx].st = 'open';
-      this.state.openIdx.push(idx);
-      playSnd('sel');
-
+      this.state.brd[idx].st = 'open'; this.state.openIdx.push(idx); playSnd('sel');
       if (this.state.openIdx.length === 2) this.state.wait = 60; 
     }
     this.syncState();
@@ -123,18 +136,13 @@ const Online = {
 
   handleLogicUpdate() {
     if (this.role !== 'host') return; 
-    
-    // カード判定ウェイト処理
     if (this.state.wait > 0) {
       this.state.wait--;
       if (this.state.wait === 0 && this.state.openIdx.length === 2) {
         let i1 = this.state.openIdx[0], i2 = this.state.openIdx[1];
-        
         if (this.state.brd[i1].v === this.state.brd[i2].v) {
           this.state.brd[i1].st = 'matched'; this.state.brd[i2].st = 'matched';
-          this.state.sc[this.state.turn]++;
-          this.state.msg = 'NICE MATCH!';
-          playSnd('combo');
+          this.state.sc[this.state.turn]++; this.state.msg = 'NICE MATCH!'; playSnd('combo');
           this.checkPlanA(); 
         } else {
           this.state.brd[i1].st = 'hidden'; this.state.brd[i2].st = 'hidden';
@@ -142,22 +150,15 @@ const Online = {
           this.state.msg = this.state.turn === 'host' ? 'YOUR TURN' : 'RIVAL TURN';
           playSnd('hit');
         }
-        this.state.openIdx = [];
-        this.syncState();
+        this.state.openIdx = []; this.syncState();
       }
     }
-
-    // Bot（AI）の思考ルーチン
     if (this.isBot && this.state.turn === 'guest' && this.state.wait === 0 && this.state.openIdx.length < 2) {
       this.botTimer = (this.botTimer || 0) - 1;
       if (this.botTimer <= 0) {
-        let hidden = [];
-        this.state.brd.forEach((c, i) => { if (c.st === 'hidden') hidden.push(i); });
-        if (hidden.length > 0) {
-          let pick = hidden[Math.floor(Math.random() * hidden.length)];
-          this.processAction({ type: 'flip', idx: pick }, 'guest');
-        }
-        this.botTimer = 30; // 次めくるまでの間隔（0.5秒）
+        let hidden = []; this.state.brd.forEach((c, i) => { if (c.st === 'hidden') hidden.push(i); });
+        if (hidden.length > 0) this.processAction({ type: 'flip', idx: hidden[Math.floor(Math.random() * hidden.length)] }, 'guest');
+        this.botTimer = 30;
       }
     }
   },
@@ -165,18 +166,20 @@ const Online = {
   checkPlanA() {
     let remain = this.state.brd.filter(c => c.st === 'hidden').length;
     if (remain === 6) {
-      let total = this.state.sc.host + this.state.sc.guest;
-      let half = Math.floor(total / 2);
-      this.state.sc.host = half;
-      this.state.sc.guest = total - half;
-      this.state.msg = '★ EQUALIZE EFFECT! ★';
-      this.state.wait = 120;
+      let total = this.state.sc.host + this.state.sc.guest; let half = Math.floor(total / 2);
+      this.state.sc.host = half; this.state.sc.guest = total - half;
+      this.state.msg = '★ EQUALIZE EFFECT! ★'; this.state.wait = 120;
     }
   },
 
   // --- 入力と描画 ---
   update() {
-    if (keysDown.select) { if(this.peer) this.peer.destroy(); switchApp(Menu); return; }
+    if (keysDown.select) { 
+      if(this.role === 'host' && this.peerId) firebase.database().ref('rooms/' + this.peerId).remove();
+      if(this.peer) this.peer.destroy(); 
+      firebase.database().ref('rooms').off(); // リスナー解除
+      switchApp(Menu); return; 
+    }
 
     if (this.st === 'menu') {
       if (keysDown.down) { this.cursor = (this.cursor + 1) % 3; playSnd('sel'); }
@@ -185,34 +188,55 @@ const Online = {
       if (keysDown.a) {
         keysDown.a = false;
         if (this.cursor === 0) {
-          // ホスト（部屋作成）
-          let pass = prompt("部屋のパスワードを設定しますか？\n（不要な場合は空欄のままOKを押してください）", "");
-          if (pass !== null) { this.hostPass = pass; playSnd('jmp'); this.startPeer(true); }
+          // 部屋を作る
+          let name = prompt("部屋の名前を入力してください\n（例：トモトモの部屋）", "名無しルーム");
+          if (name !== null) {
+            let pass = prompt("パスワードを設定しますか？\n（フリー部屋にする場合は空欄でOK）", "");
+            if (pass !== null) {
+              this.roomName = name; this.hostPass = pass; playSnd('jmp'); this.startPeer(true);
+            }
+          }
         }
         else if (this.cursor === 1) {
-          // ゲスト（部屋に入る）
-          let id = prompt("入室する4桁のルームIDを入力してください:", "");
-          if (id && id.length === 4 && !isNaN(id)) {
-            let pass = prompt("パスワードを入力してください\n（設定されていない場合は空欄のままOK）", "");
-            if (pass !== null) { this.targetId = id; this.myPass = pass; playSnd('jmp'); this.startPeer(false); }
-          } else if (id) { alert("エラー：4桁の数字を入力してください！"); }
+          // 部屋を探す（Firebaseから取得開始）
+          this.st = 'lobby_list'; this.roomCursor = 0; playSnd('jmp');
+          firebase.database().ref('rooms').on('value', (snap) => {
+            let rooms = [];
+            snap.forEach(child => { if (child.val().status === 'waiting') rooms.push({ id: child.key, ...child.val() }); });
+            this.roomList = rooms;
+          });
         }
-        else if (this.cursor === 2) {
-          // Bot対戦（ひとりで遊ぶ）
-          this.startBotMatch();
+        else if (this.cursor === 2) { this.startBotMatch(); }
+      }
+    }
+    else if (this.st === 'lobby_list') {
+      if (keysDown.b) { firebase.database().ref('rooms').off(); this.st = 'menu'; playSnd('hit'); return; }
+      if (this.roomList.length > 0) {
+        if (keysDown.down) { this.roomCursor = (this.roomCursor + 1) % this.roomList.length; playSnd('sel'); }
+        if (keysDown.up) { this.roomCursor = (this.roomCursor - 1 + this.roomList.length) % this.roomList.length; playSnd('sel'); }
+        if (keysDown.a) {
+          keysDown.a = false;
+          let targetRoom = this.roomList[this.roomCursor];
+          let pass = '';
+          if (targetRoom.hasPass) {
+             pass = prompt(`「${targetRoom.name}」には鍵がかかっています。\nパスワードを入力してください：`, "");
+             if (pass === null) return;
+          }
+          firebase.database().ref('rooms').off(); // 取得終了
+          this.targetId = targetRoom.id; this.myPass = pass; playSnd('jmp'); this.startPeer(false);
         }
       }
     }
     else if (this.st === 'host_lobby') {
-      // ゲストが参加後、ホストがAボタンで試合開始！
       if (this.guestJoined && keysDown.a) {
+        // 試合開始時に掲示板から部屋を消す（または状態変更）
+        firebase.database().ref('rooms/' + this.peerId).update({ status: 'playing' });
         this.conn.send({ type: 'start_game' });
         this.st = 'play'; this.cursor = 0; this.initGame(); playSnd('jmp');
       }
     }
     else if (this.st === 'play') {
       this.handleLogicUpdate(); 
-      
       if (this.state.turn === this.role && this.state.wait === 0) {
         if (keysDown.right) { this.cursor = (this.cursor + 1) % 20; playSnd('sel'); }
         if (keysDown.left) { this.cursor = (this.cursor - 1 + 20) % 20; playSnd('sel'); }
@@ -231,27 +255,42 @@ const Online = {
     ctx.fillStyle = '#012'; ctx.fillRect(0, 0, 200, 300);
     
     if (this.st === 'boot') {
-      ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('LOADING PEER.JS...', 30, 150);
+      ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('CONNECTING DATABASE...', 20, 150);
     }
     else if (this.st === 'menu') {
       ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('ROYAL MEMORY', 45, 40);
-      
-      const opts = ['ルームを作る (HOST)', 'ルームに入る (GUEST)', 'ひとりで遊ぶ (BOT)'];
+      const opts = ['部屋を作る (HOST)', '部屋を探す (GUEST)', 'ひとりで遊ぶ (BOT)'];
       for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = this.cursor === i ? '#0f0' : '#fff';
-        ctx.font = '11px monospace'; 
+        ctx.fillStyle = this.cursor === i ? '#0f0' : '#fff'; ctx.font = '11px monospace'; 
         ctx.fillText((this.cursor===i?'> ':'  ') + opts[i], 15, 100 + i*30);
       }
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 決定  SELECT: 戻る', 45, 280);
     }
+    else if (this.st === 'lobby_list') {
+      ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ROOM LIST】', 45, 30);
+      
+      if (this.roomList.length === 0) {
+        ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText('現在、待機中の部屋はありません', 15, 80);
+      } else {
+        // 最大6部屋まで表示
+        for (let i = 0; i < Math.min(this.roomList.length, 6); i++) {
+          let rm = this.roomList[i];
+          ctx.fillStyle = this.roomCursor === i ? '#ff0' : '#fff';
+          if(this.roomCursor === i) ctx.fillRect(10, 55 + i*25, 180, 20);
+          ctx.fillStyle = this.roomCursor === i ? '#000' : '#fff';
+          ctx.font = '11px monospace';
+          ctx.fillText(`${rm.hasPass ? '🔒' : '　'} ${rm.name.slice(0, 10)}`, 15, 70 + i*25);
+        }
+      }
+      ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 入室  B: 戻る', 55, 280);
+    }
     else if (this.st === 'host_lobby') {
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ROOM LOBBY】', 45, 50);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; 
-      ctx.fillText(`ROOM ID : ${this.peerId}`, 20, 90);
-      ctx.fillText(`PASSWORD: ${this.hostPass ? 'YES' : 'NONE'}`, 20, 115);
+      ctx.fillText(`ROOM : ${this.roomName.slice(0, 10)}`, 20, 90);
+      ctx.fillText(`PASS : ${this.hostPass ? 'YES' : 'NONE'}`, 20, 115);
       
       ctx.strokeStyle = '#555'; ctx.strokeRect(10, 140, 180, 80);
-      
       if (this.guestJoined) {
         ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace'; ctx.fillText('★ RIVAL JOINED! ★', 35, 170);
         ctx.fillStyle = '#0f0'; ctx.fillText('PRESS [A] TO START', 35, 195);
@@ -273,38 +312,27 @@ const Online = {
     else if (this.st === 'play') {
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
       let mySc = this.state.sc[this.role]; let enSc = this.state.sc[this.role === 'host' ? 'guest' : 'host'];
-      ctx.fillText(`YOU: ${mySc}`, 10, 20); 
-      ctx.fillText(`${this.isBot ? 'BOT' : 'RIVAL'}: ${enSc}`, 130, 20);
+      ctx.fillText(`YOU: ${mySc}`, 10, 20); ctx.fillText(`${this.isBot ? 'BOT' : 'RIVAL'}: ${enSc}`, 130, 20);
       
       ctx.fillStyle = this.state.turn === this.role ? '#0f0' : '#f00';
       ctx.fillText(this.state.msg, 100 - (this.state.msg.length*3), 40);
 
       for (let i = 0; i < 20; i++) {
-        let x = 20 + (i % 4) * 40; let y = 60 + Math.floor(i / 4) * 40;
-        let c = this.state.brd[i];
-        
-        if (c.st === 'matched') {
-          ctx.strokeStyle = '#333'; ctx.strokeRect(x, y, 30, 35);
-        } else {
-          ctx.fillStyle = c.st === 'hidden' ? '#a00' : '#ddd'; ctx.fillRect(x, y, 30, 35);
-          ctx.strokeStyle = '#fff'; ctx.strokeRect(x, y, 30, 35);
-          if (c.st === 'open') {
-            ctx.fillStyle = '#000'; ctx.font = 'bold 16px monospace'; ctx.fillText(c.v, x + 10, y + 22);
-          } else {
-            ctx.fillStyle = '#f88'; ctx.font = '10px monospace'; ctx.fillText('R', x + 12, y + 20);
-          }
+        let x = 20 + (i % 4) * 40; let y = 60 + Math.floor(i / 4) * 40; let c = this.state.brd[i];
+        if (c.st === 'matched') { ctx.strokeStyle = '#333'; ctx.strokeRect(x, y, 30, 35); } 
+        else {
+          ctx.fillStyle = c.st === 'hidden' ? '#a00' : '#ddd'; ctx.fillRect(x, y, 30, 35); ctx.strokeStyle = '#fff'; ctx.strokeRect(x, y, 30, 35);
+          if (c.st === 'open') { ctx.fillStyle = '#000'; ctx.font = 'bold 16px monospace'; ctx.fillText(c.v, x + 10, y + 22); } 
+          else { ctx.fillStyle = '#f88'; ctx.font = '10px monospace'; ctx.fillText('R', x + 12, y + 20); }
         }
         if (this.state.turn === this.role && this.cursor === i && this.state.wait === 0) {
           ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(x-2, y-2, 34, 39); ctx.lineWidth = 1;
         }
       }
 
-      ctx.fillStyle = '#0ff'; ctx.font = '9px monospace';
-      ctx.fillText('SKILL [B]:', 10, 280);
+      ctx.fillStyle = '#0ff'; ctx.font = '9px monospace'; ctx.fillText('SKILL [B]:', 10, 280);
       let mySkills = this.state.skills[this.role];
-      mySkills.forEach((s, idx) => {
-         ctx.fillText(s === 1 ? '[1:透視]' : '[2:連続]', 65 + idx*45, 280);
-      });
+      mySkills.forEach((s, idx) => { ctx.fillText(s === 1 ? '[1:透視]' : '[2:連続]', 65 + idx*45, 280); });
     }
   }
 };
