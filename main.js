@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.5: Gemini 2.5 Flash Update) ===
+// === CORE SYSTEM (Phase 5.6: Immersive Error Handling) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -79,7 +79,7 @@ const SaveSys = {
 };
 
 // ★============================================★
-// 【重要】先ほど認証に成功したAPIキーを、同じように分割して貼り付けてください！
+// 【重要】うまく作動したAPIキーを分割して貼り付けてください！
 const GEMINI_API_KEY = [
   "AIza",
   "SyDa7Ku8RWSO",
@@ -94,10 +94,9 @@ const AISys = {
     const key = GEMINI_API_KEY.trim();
     
     if (key.includes("ここに") || key.length < 30) {
-      return "【設定エラー】APIキーの 分割が おかしいぞ！ main.js を確認せい！";
+      return "わしの 頭脳（APIキー）が まだ 設定されておらぬようじゃ！ main.js を確認せい！";
     }
 
-    // ★ ここを最新の『gemini-2.5-flash』にアップデートしました！！
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
     
     const payload = {
@@ -115,20 +114,33 @@ const AISys = {
 
       if (!response.ok) {
         const errorDetail = await response.json();
-        const errMsg = errorDetail.error?.message || "原因不明";
-        return `【通信エラー:${response.status}】\n${errMsg}`;
+        const errMsg = errorDetail.error?.message || "";
+        
+        // ★ 429エラー（使いすぎ制限）の場合の世界観処理
+        if (response.status === 429) {
+          // 英語のシステム文から「retry in 〇〇s」の数字だけを抜き出す
+          const match = errMsg.match(/retry in ([\d\.]+)s/);
+          let waitSec = 60; // 読み取れなかった場合はとりあえず60秒
+          if (match && match[1]) {
+            waitSec = Math.ceil(parseFloat(match[1])); // 小数点を切り上げ
+          }
+          return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！\nすまぬが【あと ${waitSec}秒 】ほど休ませてから 話しかけてくれい！`;
+        }
+        
+        // その他のエラー
+        return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！ 電波の良いところで 頼むぞ！`;
       }
 
       const data = await response.json();
       
       if (!data.candidates || data.candidates.length === 0) {
-          return "かみさまが 沈黙しておる……（応答データが空じゃ）";
+          return "かみさまが 沈黙しておる…… もういちど 話しかけてみてくれい。";
       }
       
       return data.candidates[0].content.parts[0].text.trim();
       
     } catch (e) {
-      return `【接続エラー】\n${e.message}`;
+      return `むむっ… 世界の繋がり（ネットワーク）が 切れておるようじゃ！`;
     }
   }
 };
