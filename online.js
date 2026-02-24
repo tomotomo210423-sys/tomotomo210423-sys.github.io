@@ -1,4 +1,4 @@
-// === ONLINE BATTLE - ROYAL JOKER (Phase 6: Result & Surrender) ===
+// === ONLINE BATTLE - ROYAL JOKER (Phase 6.1: Result Menu Fix) ===
 const S_NAMES = ["", "1:透視", "2:交換", "3:贈物", "4:目隠し", "5:鉄壁", "6:予言", "7:重力", "8:慈悲", "9:加速", "10:革命"];
 
 const Online = {
@@ -83,11 +83,10 @@ const Online = {
   setupConn() {
     this.conn.on('open', () => { if (this.role === 'guest') this.conn.send({ type: 'auth', pass: this.myPass }); });
     this.conn.on('data', (data) => {
-      // 共通イベント（降参＆リザルト選択）
       if (data.type === 'surrender') {
          this.state.msg = 'OPPONENT SURRENDERED!';
          if (this.role === 'host') this.state.guestHand = []; else this.state.hostHand = [];
-         this.state.effects.global.revolution = false; // 降参した方が必ず負けるように
+         this.state.effects.global.revolution = false; 
          this.checkWinOrShuffle();
          if (this.role === 'host') this.syncState();
          return;
@@ -96,14 +95,12 @@ const Online = {
          this.opChoice = data.choice; this.checkResultAction(); return;
       }
       
-      // ホスト側の受信
       if (this.role === 'host' && data.type === 'auth') {
         if (this.hostPass === '' || this.hostPass === data.pass) { this.guestJoined = true; playSnd('combo'); this.conn.send({ type: 'auth_ok' }); } 
         else { this.conn.send({ type: 'auth_fail' }); setTimeout(() => this.conn.close(), 500); }
       }
       if (this.role === 'host' && data.type === 'action') this.processAction(data.action, 'guest'); 
       
-      // ゲスト側の受信
       if (this.role === 'guest') {
         if (data.type === 'auth_ok') { this.st = 'guest_lobby'; playSnd('sel'); }
         if (data.type === 'auth_fail') { this.st = 'error'; this.msg = 'PASSWORD INCORRECT!'; playSnd('hit'); }
@@ -113,7 +110,7 @@ const Online = {
     });
     this.conn.on('close', () => { 
       if (this.st === 'play' && this.isResult) {
-         this.opChoice = 'title'; this.checkResultAction(); // リザルト中に相手が切断した場合
+         this.opChoice = 'title'; this.checkResultAction(); 
       } else {
          this.st = 'error'; this.msg = 'CONNECTION LOST...'; playSnd('hit'); this.guestJoined = false; 
       }
@@ -220,9 +217,8 @@ const Online = {
       }
       this.state.wait = 9999; 
       
-      // ★ リザルト画面への移行
       this.isResult = true; this.resultCursor = 0; this.myChoice = '';
-      this.opChoice = this.isBot ? 'rematch' : ''; // BOT戦は常に「もう一度」を選ばせる
+      this.opChoice = this.isBot ? 'rematch' : ''; 
       playSnd('combo'); return true;
     }
     if (!this.state.shuffleTriggered && (hLen === 3 || gLen === 3)) {
@@ -232,7 +228,6 @@ const Online = {
   },
 
   checkResultAction() {
-    // どちらかがTitleを選んだ、または通信が切れた場合
     if (this.myChoice === 'title' || this.opChoice === 'title') {
       if (this.myChoice === 'title') { this.leaveGame(); } 
       else { this.st = 'error'; this.msg = 'OPPONENT LEFT TO TITLE.'; playSnd('hit'); }
@@ -240,14 +235,12 @@ const Online = {
     }
     if (this.myChoice === '') return;
 
-    // 双方が「もう一度遊ぶ」
     if (this.myChoice === 'rematch' && this.opChoice === 'rematch') {
       this.isResult = false; this.myChoice = ''; this.opChoice = '';
       if (this.role === 'host') this.initGame();
       return;
     }
 
-    // どちらかが「ロビー」で、もう一方が「ロビー」か「もう一度」を選んだ場合
     if (this.opChoice !== '' && (this.myChoice === 'lobby' || this.opChoice === 'lobby')) {
       this.isResult = false; this.myChoice = ''; this.opChoice = '';
       this.st = this.role === 'host' ? 'host_lobby' : 'guest_lobby';
@@ -310,7 +303,6 @@ const Online = {
   },
 
   update() {
-    // SELECTボタン：即抜けから「降参確認」へ変更
     if (keysDown.select && !this.confirmLeave) {
       keysDown.select = false;
       if (this.st === 'play' && !this.isResult) {
@@ -321,12 +313,11 @@ const Online = {
       return; 
     }
 
-    // 降参確認画面の操作
     if (this.confirmLeave) {
       if (keysDown.a) {
         keysDown.a = false; this.confirmLeave = false;
-        if (this.conn) this.conn.send({ type: 'surrender' }); // 相手に負けを送信
-        this.leaveGame(); // 自分はタイトルへ
+        if (this.conn) this.conn.send({ type: 'surrender' }); 
+        this.leaveGame(); 
       } else if (keysDown.b) {
         keysDown.b = false; this.confirmLeave = false; playSnd('sel');
       }
@@ -355,20 +346,20 @@ const Online = {
     else if (this.st === 'play') {
       this.handleLogicUpdate(); 
       
-      // ★ リザルト画面の操作
       if (this.isResult) {
         if (this.myChoice === '') {
-          if (keysDown.down) { this.resultCursor = (this.resultCursor + 1) % 3; playSnd('sel'); }
-          if (keysDown.up) { this.resultCursor = (this.resultCursor - 1 + 3) % 3; playSnd('sel'); }
+          // ★ BOT戦の場合は選択肢を2つにする（rematch と title）
+          const choices = this.isBot ? ['rematch', 'title'] : ['rematch', 'lobby', 'title'];
+          if (keysDown.down) { this.resultCursor = (this.resultCursor + 1) % choices.length; playSnd('sel'); }
+          if (keysDown.up) { this.resultCursor = (this.resultCursor - 1 + choices.length) % choices.length; playSnd('sel'); }
           if (keysDown.a) {
             keysDown.a = false; playSnd('sel');
-            const choices = ['rematch', 'lobby', 'title'];
             this.myChoice = choices[this.resultCursor];
             if (this.conn) this.conn.send({ type: 'result_choice', choice: this.myChoice });
             this.checkResultAction();
           }
         }
-        return; // リザルト中は他の操作を無視
+        return; 
       }
 
       let myHand = this.role === 'host' ? this.state.hostHand : this.state.guestHand;
@@ -464,24 +455,24 @@ const Online = {
         });
       }
 
-      // ★ 新UI：降参確認画面
       if (this.confirmLeave) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(15, 100, 170, 70);
         ctx.strokeStyle = '#f00'; ctx.lineWidth = 2; ctx.strokeRect(15, 100, 170, 70); ctx.lineWidth = 1;
         ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText('SURRENDER & LEAVE?', 30, 125);
         ctx.fillStyle = '#0f0'; ctx.fillText('A: YES(LOSE)  B: NO', 25, 150);
       }
-      // ★ 新UI：リザルト画面
       else if (this.isResult) {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(15, 80, 170, 110);
         ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(15, 80, 170, 110); ctx.lineWidth = 1;
         ctx.fillStyle = '#ff0'; ctx.font = '12px monospace'; ctx.fillText('=== MATCH END ===', 35, 100);
         
         if (this.myChoice === '') {
-          const opts = ['もう一度遊ぶ', 'ロビーに戻る', 'タイトルに戻る'];
+          // ★ BOT戦の場合は選択肢を2つにして描画する
+          const opts = this.isBot ? ['もう一度遊ぶ', 'タイトルに戻る'] : ['もう一度遊ぶ', 'ロビーに戻る', 'タイトルに戻る'];
           opts.forEach((opt, idx) => {
             ctx.fillStyle = this.resultCursor === idx ? '#0f0' : '#fff';
-            ctx.fillText((this.resultCursor===idx?'>':' ') + opt, 25, 130 + idx * 22);
+            // 2択の時は少し間隔を広げるなど、お好みで調整できます（ここではそのままの余白で並べます）
+            ctx.fillText((this.resultCursor===idx?'>':' ') + opt, 25, 130 + idx * 25);
           });
         } else {
           ctx.fillStyle = '#fff'; ctx.fillText('WAITING RIVAL...', 35, 140);
@@ -489,7 +480,6 @@ const Online = {
       }
     }
     else {
-      // メニューやエラー画面などは省略せず記載
       if (this.st === 'boot') { ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('CONNECTING DATABASE...', 20, 150); }
       else if (this.st === 'menu') {
         ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('ROYAL JOKER', 55, 40);
