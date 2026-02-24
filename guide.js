@@ -1,7 +1,8 @@
-// === GUIDE APP (Phase 6.5: Corrected Manual) ===
+// === GUIDE APP (Phase 7: Royal Joker Manual & Scroll) ===
 const Guide = {
   cur: 0,
   page: 0,
+  scroll: 0, // スクロール位置の管理用
   games: [
     { 
       name: 'テトリベーダー', 
@@ -35,12 +36,41 @@ const Guide = {
     { 
       name: 'ONLINE対戦', 
       text: [
-        '【 現在 リニューアル中 じゃ！ 】',
+        '【ロイヤル・ジョーカー】',
+        'スマホ2台で遊べる オンライン・ババ抜きじゃ！',
+        '手札のペアを 揃えて 捨てていき、',
+        '先に 手札が【0枚】になった者の 勝利となる！',
+        '最後まで【J】を持っていたら 負けじゃぞ。',
         '',
-        'さらに 白熱した バトルが できるよう',
-        'わしが 魔法を かけ直しておる。',
+        '【通信のやり方】',
+        '1人が【部屋を作る】で 部屋の名前を決める。',
+        'もう1人が【部屋を探す】で その部屋に入るのじゃ。',
+        'ひとりで 練習したい時は【BOT戦】じゃ！',
         '',
-        '完成を 楽しみに 待っておれ！'
+        '【遊び方と カオス・シャッフル】',
+        '【左右】で 相手のカードを選び 【A】で 引く！',
+        'どちらかの手札が【残り3枚】になった瞬間…',
+        '【カオス・シャッフル】が 発動するぞ！',
+        'すべてのカードが 没収＆配り直されるのじゃ！',
+        '',
+        '【降参と リザルト】',
+        '負けを認めるなら 試合中に【SELECTボタン】。',
+        '試合後は お互いに【もう一度遊ぶ】を選べば',
+        '即座に 再戦できるぞ！',
+        '',
+        '【王様スキル (Bボタン)】',
+        '試合開始時、ランダムで【2つ】配られる。',
+        '自分のターンに【B】で メニューを開き 発動！',
+        ' 1:透視 … 相手のジョーカーが 赤く光る',
+        ' 2:交換 … お互いの手札を 全て入れ替える',
+        ' 3:贈物 … 自分の手札1枚を 相手に押し付ける',
+        ' 4:目隠し … 相手の手札の並びを シャッフル',
+        ' 5:鉄壁 … 次のターン 相手は引けなくなる',
+        ' 6:予言 … 相手のカードが ペアになるか分かる',
+        ' 7:重力 … 相手が ジョーカーを 引けなくなる',
+        ' 8:慈悲 … 自分の手札(J以外)を 1枚消し去る',
+        ' 9:加速 … 自分のターンで 連続2枚 引ける',
+        '10:革命 … 【J】を持っている方が勝ちになる！'
       ] 
     },
     { 
@@ -96,6 +126,7 @@ const Guide = {
   init() { 
     this.cur = 0; 
     this.page = 0; 
+    this.scroll = 0;
   },
   
   update() {
@@ -103,9 +134,14 @@ const Guide = {
       if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
       if (keysDown.down) { this.cur = (this.cur + 1) % this.games.length; playSnd('sel'); }
       if (keysDown.up) { this.cur = (this.cur - 1 + this.games.length) % this.games.length; playSnd('sel'); }
-      if (keysDown.a) { this.page = 1; playSnd('jmp'); }
+      if (keysDown.a) { this.page = 1; this.scroll = 0; playSnd('jmp'); }
     } else {
-      if (keysDown.b || keysDown.select || keysDown.a) { this.page = 0; playSnd('hit'); }
+      if (keysDown.b || keysDown.select) { this.page = 0; playSnd('hit'); }
+      
+      // テキストスクロール処理 (最大スクロール量を計算)
+      const maxScroll = Math.max(0, this.games[this.cur].text.length - 13); 
+      if (keysDown.down) { this.scroll = Math.min(this.scroll + 3, maxScroll); playSnd('sel'); }
+      if (keysDown.up) { this.scroll = Math.max(this.scroll - 3, 0); playSnd('sel'); }
     }
   },
   
@@ -119,11 +155,9 @@ const Guide = {
       ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
       for (let i = 0; i < this.games.length; i++) {
         if (i === this.cur) {
-          ctx.fillStyle = '#ff0';
-          ctx.fillRect(10, 50 + i * 22, 180, 18);
-          ctx.fillStyle = '#000';
+          ctx.fillStyle = '#ff0'; ctx.fillRect(10, 50 + i * 22, 180, 18); ctx.fillStyle = '#000';
         } else {
-          ctx.fillStyle = i === 5 ? '#0ff' : '#aaa'; // 王様の間だけ水色
+          ctx.fillStyle = i === 5 ? '#0ff' : '#aaa'; 
         }
         ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, 63 + i * 22);
       }
@@ -132,24 +166,35 @@ const Guide = {
       ctx.fillText('A: 読む  SELECT: 戻る', 45, 290);
       
     } else {
+      const game = this.games[this.cur];
       ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace';
-      ctx.fillText(`【${this.games[this.cur].name}】`, 10, 25);
+      ctx.fillText(`【${game.name}】`, 10, 25);
       
       ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.moveTo(5, 35); ctx.lineTo(195, 35); ctx.stroke();
       
-      ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
-      const lines = this.games[this.cur].text;
-      for (let i = 0; i < lines.length; i++) {
-        // 特定のキーワードをハイライト
-        if (lines[i].includes('⚠')) ctx.fillStyle = '#f55';
-        else if (lines[i].includes('ヒント')) ctx.fillStyle = '#0ff';
+      // 描画する行をスクロール位置に合わせて取得 (1画面に13行表示)
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+      for (let i = 0; i < 13; i++) {
+        const lineIdx = i + this.scroll;
+        if (lineIdx >= game.text.length) break;
+        
+        let lineStr = game.text[lineIdx];
+        if (lineStr.includes('⚠')) ctx.fillStyle = '#f55';
+        else if (lineStr.includes('ヒント')) ctx.fillStyle = '#0ff';
+        else if (lineStr.includes('【')) ctx.fillStyle = '#ff0'; // 見出しを黄色に
         else ctx.fillStyle = '#fff';
         
-        ctx.fillText(lines[i], 10, 50 + i * 14);
+        ctx.fillText(lineStr, 10, 50 + i * 15);
       }
       
+      // スクロール可能な場合、上下の矢印ナビゲーションを表示
+      const maxScroll = Math.max(0, game.text.length - 13);
+      ctx.fillStyle = '#0ff'; ctx.font = 'bold 10px monospace';
+      if (this.scroll > 0) ctx.fillText('▲ UP', 160, 25);
+      if (this.scroll < maxScroll) ctx.fillText('▼ DOWN', 150, 265);
+      
       ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
-      ctx.fillText('▼ Bボタン で もどる ▼', 35, 285);
+      ctx.fillText('Bボタン で もどる', 50, 285);
     }
   }
 };
