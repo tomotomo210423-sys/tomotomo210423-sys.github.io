@@ -1,298 +1,514 @@
-// === CORE SYSTEM (Phase 5.6: Immersive Error Handling) ===
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+// === ONLINE BATTLE - ROYAL JOKER (Phase 6.1: Result Menu Fix) ===
+const S_NAMES = ["", "1:透視", "2:交換", "3:贈物", "4:目隠し", "5:鉄壁", "6:予言", "7:重力", "8:慈悲", "9:加速", "10:革命"];
 
-const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false, l0: false, l1: false, l2: false, l3: false };
-const keysDown = { ...keys };
-let prevKeys = { ...keys };
-const keyPressQueue = { ...keys };
-let activeApp = null;
-
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-let audioCtx, noiseBuffer = null, bgmInterval = null;
-
-function initAudio() { 
-  if (!audioCtx) {
-    audioCtx = new AudioContext(); 
-    const bs = audioCtx.sampleRate * 2;
-    noiseBuffer = audioCtx.createBuffer(1, bs, audioCtx.sampleRate);
-    const o = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bs; i++) o[i] = Math.random() * 2 - 1;
-  }
-  if (audioCtx.state === 'suspended') audioCtx.resume(); 
-}
-
-const BGM = {
-  stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
-  play(type) {
-    this.stop(); if (!audioCtx) return;
-    const mels = {
-      menu:   { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
-      tetri:  { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
-      action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
-      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
-    };
-    const tr = mels[type] || mels.menu; let i = 0;
-    bgmInterval = setInterval(() => {
-      const now = audioCtx.currentTime; const d = tr.spd / 1000;
-      const playNote = (f, w, v) => {
-        if (!f) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        o.type = w; o.frequency.value = f; g.gain.setValueAtTime(v, now); g.gain.exponentialRampToValueAtTime(0.001, now + d);
-        o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + d + 0.1); 
-      };
-      playNote(tr.t1[i % tr.t1.length], 'square', 0.05); playNote(tr.t2[i % tr.t2.length], 'square', 0.03); playNote(tr.t3[i % tr.t3.length], 'triangle', 0.08);
-      if (tr.n[i % tr.n.length] > 0 && noiseBuffer) {
-        const src = audioCtx.createBufferSource(); const g = audioCtx.createGain(); src.buffer = noiseBuffer; 
-        g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-        src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
-      }
-      i++; 
-    }, tr.spd);
-  }
-};
-
-let hitStopTimer = 0; function hitStop(f) { hitStopTimer = f; }
-function playSnd(t) {
-  if (!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
-  if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.05); } 
-  else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05, n); o.start(n); o.stop(n + 0.1); } 
-  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); } 
-  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
-}
-
-const SaveSys = {
-  data: (() => { 
-    let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
-    return { playerName: d.playerName || 'PLAYER', scores: d.scores || { n: 0, h: 0 }, rankings: d.rankings || { n: [], h: [] }, bgTheme: d.bgTheme || 0, slotCoins: d.slotCoins || 100, jackpotPool: d.jackpotPool || 1000, actStage: d.actStage||1, actLives: d.actLives||5, actSeed: d.actSeed||1, rhythm: d.rhythm||{easy:0,normal:0,hard:0}, logs: d.logs||[] }; 
-  })(),
-  save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
-  addScore(mode, score) { 
-    const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
-    rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
-    rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); 
+const Online = {
+  st: 'boot', role: '', peer: null, conn: null, peerId: '', targetId: '', msg: 'LOADING NETWORK...',
+  cursor: 0, hostPass: '', myPass: '', guestJoined: false, isBot: false, botTimer: 0,
+  roomName: '', roomList: [], roomCursor: 0,
+  isSkillMenu: false, skillCursor: 0,
+  confirmLeave: false, isResult: false, resultCursor: 0, myChoice: '', opChoice: '',
+  state: {
+    hostHand: [], guestHand: [],
+    skills: { host: [], guest: [] },
+    effects: { host: { shield: false, oracle: false, gravity: false, haste: 0 }, guest: { shield: false, oracle: false, gravity: false, haste: 0 }, global: { revolution: false } },
+    turn: 'host', nextTurn: '', msg: 'GAME START!', wait: 60,
+    shuffleTriggered: false, activeSkill: 0, pendingSkill: 0
   },
-  addLog(game, msg) {
-    this.data.logs.unshift(`【${game}】${msg}`);
-    if(this.data.logs.length > 10) this.data.logs.pop();
-    this.save();
-  }
-};
-
-// ★============================================★
-// 【重要】うまく作動したAPIキーを分割して貼り付けてください！
-const GEMINI_API_KEY = [
-  "AIza",
-  "SyDa7Ku8RWSO",
-  "OGDXKCQTdw",
-  "AObBHi6A8GcKA"
-].join("");
-// ★============================================★
-
-const AISys = {
-  status: 'ready',
-  async chat(sysPrompt, userPrompt) {
-    const key = GEMINI_API_KEY.trim();
+  
+  async init() {
+    this.st = 'boot'; this.msg = 'LOADING NETWORK...'; this.role = ''; 
+    this.peerId = ''; this.targetId = ''; this.hostPass = ''; this.myPass = ''; 
+    this.guestJoined = false; this.isBot = false; this.roomList = []; this.roomCursor = 0;
+    this.isSkillMenu = false; this.skillCursor = 0;
+    this.confirmLeave = false; this.isResult = false; this.myChoice = ''; this.opChoice = '';
     
-    if (key.includes("ここに") || key.length < 30) {
-      return "わしの 頭脳（APIキー）が まだ 設定されておらぬようじゃ！ main.js を確認せい！";
+    const loadScript = (src) => new Promise(r => {
+      if (document.querySelector(`script[src="${src}"]`)) return r();
+      const s = document.createElement('script'); s.src = src; s.onload = r; document.head.appendChild(s);
+    });
+
+    if (!window.firebase) {
+      await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
+      await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js");
     }
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
     
-    const payload = {
-      contents: [{ parts: [{ text: userPrompt }] }],
-      systemInstruction: { parts: [{ text: sysPrompt }] },
-      generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
-    };
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    if (window.firebase && !firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: "AIzaSyDEfsFzw9CKmBDBDqP0L21uDVTZ80HWXPY",
+        authDomain: "gorilla2-e0d2a.firebaseapp.com",
+        databaseURL: "https://gorilla2-e0d2a-default-rtdb.firebaseio.com",
+        projectId: "gorilla2-e0d2a"
       });
+    }
+    
+    if (!window.Peer) await loadScript("https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js");
+    this.st = 'menu';
+  },
 
-      if (!response.ok) {
-        const errorDetail = await response.json();
-        const errMsg = errorDetail.error?.message || "";
-        
-        // ★ 429エラー（使いすぎ制限）の場合の世界観処理
-        if (response.status === 429) {
-          // 英語のシステム文から「retry in 〇〇s」の数字だけを抜き出す
-          const match = errMsg.match(/retry in ([\d\.]+)s/);
-          let waitSec = 60; // 読み取れなかった場合はとりあえず60秒
-          if (match && match[1]) {
-            waitSec = Math.ceil(parseFloat(match[1])); // 小数点を切り上げ
+  leaveGame() {
+    if (this.role === 'host' && this.peerId) firebase.database().ref('rooms/' + this.peerId).remove();
+    if (this.conn) { this.conn.close(); }
+    if (this.peer) { this.peer.destroy(); }
+    firebase.database().ref('rooms').off(); 
+    this.isResult = false; this.confirmLeave = false;
+    switchApp(Menu); 
+  },
+
+  startPeer(isHost) {
+    this.role = isHost ? 'host' : 'guest';
+    this.st = 'connecting'; this.msg = 'CONNECTING TO SERVER...';
+    const myId = 'RJ_' + Math.floor(1000 + Math.random() * 9000);
+    this.peer = new Peer(myId);
+    
+    this.peer.on('open', (id) => {
+      this.peerId = id;
+      if (isHost) {
+        const dbRef = firebase.database().ref('rooms/' + this.peerId);
+        dbRef.set({ name: this.roomName, hasPass: !!this.hostPass, status: 'waiting' });
+        dbRef.onDisconnect().remove();
+        this.st = 'host_lobby';
+        this.peer.on('connection', (c) => { this.conn = c; this.setupConn(); });
+      } else {
+        this.joinRoom();
+      }
+    });
+  },
+
+  joinRoom() {
+    this.msg = 'CONNECTING TO ROOM...'; this.st = 'connecting';
+    this.conn = this.peer.connect(this.targetId);
+    this.setupConn();
+  },
+
+  setupConn() {
+    this.conn.on('open', () => { if (this.role === 'guest') this.conn.send({ type: 'auth', pass: this.myPass }); });
+    this.conn.on('data', (data) => {
+      if (data.type === 'surrender') {
+         this.state.msg = 'OPPONENT SURRENDERED!';
+         if (this.role === 'host') this.state.guestHand = []; else this.state.hostHand = [];
+         this.state.effects.global.revolution = false; 
+         this.checkWinOrShuffle();
+         if (this.role === 'host') this.syncState();
+         return;
+      }
+      if (data.type === 'result_choice') {
+         this.opChoice = data.choice; this.checkResultAction(); return;
+      }
+      
+      if (this.role === 'host' && data.type === 'auth') {
+        if (this.hostPass === '' || this.hostPass === data.pass) { this.guestJoined = true; playSnd('combo'); this.conn.send({ type: 'auth_ok' }); } 
+        else { this.conn.send({ type: 'auth_fail' }); setTimeout(() => this.conn.close(), 500); }
+      }
+      if (this.role === 'host' && data.type === 'action') this.processAction(data.action, 'guest'); 
+      
+      if (this.role === 'guest') {
+        if (data.type === 'auth_ok') { this.st = 'guest_lobby'; playSnd('sel'); }
+        if (data.type === 'auth_fail') { this.st = 'error'; this.msg = 'PASSWORD INCORRECT!'; playSnd('hit'); }
+        if (data.type === 'start_game') { this.st = 'play'; this.cursor = 0; playSnd('jmp'); }
+        if (data.type === 'sync') { this.state = data.state; this.adjustCursor(); }
+      }
+    });
+    this.conn.on('close', () => { 
+      if (this.st === 'play' && this.isResult) {
+         this.opChoice = 'title'; this.checkResultAction(); 
+      } else {
+         this.st = 'error'; this.msg = 'CONNECTION LOST...'; playSnd('hit'); this.guestJoined = false; 
+      }
+    });
+  },
+
+  syncState() { if (this.conn && this.conn.open) this.conn.send({ type: 'sync', state: this.state }); },
+
+  startBotMatch() { this.isBot = true; this.role = 'host'; this.st = 'play'; this.cursor = 0; this.initGame(); playSnd('jmp'); },
+
+  initGame() {
+    let deck = [0]; 
+    for(let i=1; i<=10; i++) deck.push(i, i);
+    deck.sort(() => Math.random() - 0.5); 
+    
+    this.state.hostHand = deck.slice(0, 11).map((v, i) => ({v: v, id: 'h'+i}));
+    this.state.guestHand = deck.slice(11, 21).map((v, i) => ({v: v, id: 'g'+i}));
+    
+    const getSkills = () => { let s = []; while(s.length < 2) { let r = Math.floor(Math.random() * 10) + 1; if(!s.includes(r)) s.push(r); } return s; };
+    this.state.skills.host = getSkills(); this.state.skills.guest = getSkills();
+    
+    this.state.effects = { host: { shield: false, oracle: false, gravity: false, haste: 0 }, guest: { shield: false, oracle: false, gravity: false, haste: 0 }, global: { revolution: false } };
+    this.state.turn = 'host'; this.state.nextTurn = ''; this.state.msg = 'GAME START!';
+    this.state.wait = 60; this.state.shuffleTriggered = false; this.state.activeSkill = 0; this.state.pendingSkill = 0;
+    
+    this.isResult = false; this.myChoice = ''; this.opChoice = '';
+    this.removePairs(); this.syncState();
+  },
+
+  removePairs() {
+    const removeDuplicate = (hand) => {
+      let result = [], seen = {}, toRemove = {};
+      hand.forEach(c => { if(c.v === 0) return; if(seen[c.v]) { toRemove[c.v] = true; delete seen[c.v]; } else seen[c.v] = true; });
+      hand.forEach(c => { if(c.v === 0 || (!toRemove[c.v] && seen[c.v])) result.push(c); });
+      return result;
+    };
+    let oldHLen = this.state.hostHand.length, oldGLen = this.state.guestHand.length;
+    this.state.hostHand = removeDuplicate(this.state.hostHand); this.state.guestHand = removeDuplicate(this.state.guestHand);
+    let matched = (oldHLen !== this.state.hostHand.length || oldGLen !== this.state.guestHand.length);
+    if(matched) playSnd('combo');
+    return matched;
+  },
+
+  processAction(actionData, playerRole) {
+    if (this.state.wait > 0 || this.state.turn !== playerRole) return;
+    let opRole = playerRole === 'host' ? 'guest' : 'host';
+    let myHand = this.state[playerRole + 'Hand'], opHand = this.state[opRole + 'Hand'];
+
+    if (actionData.type === 'draw') {
+      if (actionData.idx >= opHand.length) actionData.idx = Math.max(0, opHand.length - 1);
+      if (this.state.effects[playerRole].gravity && opHand[actionData.idx].v === 0) {
+        this.state.msg = 'GRAVITY: CANNOT DRAW!'; this.state.wait = 60; this.state.nextTurn = opRole; playSnd('hit'); this.syncState(); return;
+      }
+      myHand.push(opHand.splice(actionData.idx, 1)[0]); playSnd('sel');
+      this.state.activeSkill = 0; 
+      let matched = this.removePairs();
+      this.state.msg = matched ? 'PAIR MATCHED!' : 'CARD DRAWN!'; this.state.wait = 60; 
+
+      if (!this.checkWinOrShuffle()) {
+         if (this.state.effects[playerRole].haste > 0) { this.state.effects[playerRole].haste--; this.state.msg = 'HASTE: DRAW AGAIN!'; } 
+         else { this.state.nextTurn = opRole; }
+      }
+      this.syncState();
+    }
+    else if (actionData.type === 'skill') {
+      let skillId = actionData.skillId;
+      this.state.skills[playerRole].splice(this.state.skills[playerRole].indexOf(skillId), 1);
+      this.state.msg = `SKILL: ${S_NAMES[skillId]}!`; this.state.wait = 90; playSnd('jmp');
+
+      if (skillId === 1) { this.state.activeSkill = 1; }
+      else if (skillId === 2) { let t = this.state.hostHand; this.state.hostHand = this.state.guestHand; this.state.guestHand = t; }
+      else if (skillId === 3) { this.state.pendingSkill = 3; this.state.msg = 'CHOOSE OWN CARD!'; this.state.wait = 0; }
+      else if (skillId === 4) { this.state[opRole+'Hand'].sort(() => Math.random() - 0.5); }
+      else if (skillId === 5) { this.state.effects[playerRole].shield = true; }
+      else if (skillId === 6) { this.state.effects[playerRole].oracle = true; }
+      else if (skillId === 7) { this.state.effects[playerRole].gravity = true; }
+      else if (skillId === 8) {
+        let n = myHand.map((c, i) => ({c, i})).filter(x => x.c.v !== 0);
+        if(n.length > 0) myHand.splice(n[Math.floor(Math.random() * n.length)].i, 1);
+      }
+      else if (skillId === 9) { this.state.effects[playerRole].haste = 1; }
+      else if (skillId === 10) { this.state.effects.global.revolution = true; }
+      
+      if (skillId !== 3) { this.removePairs(); this.checkWinOrShuffle(); }
+      this.syncState();
+    }
+    else if (actionData.type === 'give') {
+      let card = myHand.splice(actionData.idx, 1)[0];
+      opHand.push(card); opHand.sort(() => Math.random() - 0.5); 
+      this.state.pendingSkill = 0; this.state.msg = 'CARD GIVEN!'; this.state.wait = 60; playSnd('sel');
+      this.removePairs(); if(!this.checkWinOrShuffle()) this.state.nextTurn = opRole;
+      this.syncState();
+    }
+  },
+
+  checkWinOrShuffle() {
+    let hLen = this.state.hostHand.length, gLen = this.state.guestHand.length;
+    let rev = this.state.effects.global.revolution;
+
+    if (hLen === 0 || gLen === 0) {
+      if (!this.state.msg.includes('SURRENDER')) {
+         if (rev) this.state.msg = hLen === 0 ? 'GUEST WINS(REV)!!' : 'HOST WINS(REV)!!';
+         else this.state.msg = hLen === 0 ? 'HOST WINS!!' : 'GUEST WINS!!';
+      }
+      this.state.wait = 9999; 
+      
+      this.isResult = true; this.resultCursor = 0; this.myChoice = '';
+      this.opChoice = this.isBot ? 'rematch' : ''; 
+      playSnd('combo'); return true;
+    }
+    if (!this.state.shuffleTriggered && (hLen === 3 || gLen === 3)) {
+      this.state.shuffleTriggered = true; this.state.msg = '⚠️ CHAOS SHUFFLE ⚠️'; this.state.wait = 180; playSnd('hit'); return true;
+    }
+    return false;
+  },
+
+  checkResultAction() {
+    if (this.myChoice === 'title' || this.opChoice === 'title') {
+      if (this.myChoice === 'title') { this.leaveGame(); } 
+      else { this.st = 'error'; this.msg = 'OPPONENT LEFT TO TITLE.'; playSnd('hit'); }
+      return;
+    }
+    if (this.myChoice === '') return;
+
+    if (this.myChoice === 'rematch' && this.opChoice === 'rematch') {
+      this.isResult = false; this.myChoice = ''; this.opChoice = '';
+      if (this.role === 'host') this.initGame();
+      return;
+    }
+
+    if (this.opChoice !== '' && (this.myChoice === 'lobby' || this.opChoice === 'lobby')) {
+      this.isResult = false; this.myChoice = ''; this.opChoice = '';
+      this.st = this.role === 'host' ? 'host_lobby' : 'guest_lobby';
+      if (this.role === 'host' && this.peerId) {
+        firebase.database().ref('rooms/' + this.peerId).update({ status: 'waiting' });
+      }
+      playSnd('jmp'); return;
+    }
+  },
+
+  handleLogicUpdate() {
+    if (this.role !== 'host') return; 
+    
+    if (this.state.wait > 0 && !this.isResult) {
+      this.state.wait--;
+      if (this.state.wait === 0) {
+        if (this.state.msg === '⚠️ CHAOS SHUFFLE ⚠️') {
+          let allCards = this.state.hostHand.concat(this.state.guestHand); allCards.sort(() => Math.random() - 0.5);
+          let half = Math.ceil(allCards.length / 2);
+          this.state.hostHand = allCards.slice(0, half); this.state.guestHand = allCards.slice(half);
+          this.state.msg = 'CARDS SHUFFLED!'; this.state.wait = 60; this.state.nextTurn = this.state.turn === 'host' ? 'guest' : 'host';
+          this.removePairs(); this.syncState();
+        } 
+        else if (this.state.nextTurn !== '') {
+          let next = this.state.nextTurn; let opRole = next === 'host' ? 'guest' : 'host';
+          this.state.nextTurn = '';
+          if (this.state.effects[opRole].shield) {
+             this.state.effects[opRole].shield = false; this.state.msg = 'BLOCKED BY SHIELD!'; this.state.wait = 60; this.state.nextTurn = opRole;
+          } else {
+             this.state.turn = next; this.state.msg = next === 'host' ? 'HOST TURN' : 'GUEST TURN';
+             this.state.activeSkill = 0; this.state.effects[next].oracle = false; this.state.effects[next].gravity = false;
           }
-          return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！\nすまぬが【あと ${waitSec}秒 】ほど休ませてから 話しかけてくれい！`;
+          this.syncState();
+        } else {
+          if (!this.state.msg.includes('WINS')) this.state.msg = this.state.turn === 'host' ? 'HOST TURN' : 'GUEST TURN';
+          this.syncState();
         }
+      }
+    }
+    
+    if (this.isBot && this.state.turn === 'guest' && this.state.wait === 0 && !this.isResult) {
+      if (this.state.pendingSkill === 3 && this.state.guestHand.length > 0) {
+         this.processAction({ type: 'give', idx: Math.floor(Math.random() * this.state.guestHand.length) }, 'guest');
+      } else {
+        this.botTimer = (this.botTimer || 0) - 1;
+        if (this.botTimer <= 0) {
+          let mySkills = this.state.skills.guest;
+          if (mySkills.length > 0 && Math.random() < 0.3) this.processAction({ type: 'skill', skillId: mySkills[0] }, 'guest');
+          else if (this.state.hostHand.length > 0) this.processAction({ type: 'draw', idx: Math.floor(Math.random() * this.state.hostHand.length) }, 'guest');
+          this.botTimer = 40;
+        }
+      }
+    }
+  },
+
+  adjustCursor() {
+    let len = this.state.pendingSkill === 3 ? (this.role === 'host' ? this.state.hostHand.length : this.state.guestHand.length) 
+                                            : (this.role === 'host' ? this.state.guestHand.length : this.state.hostHand.length);
+    if (this.cursor >= len) this.cursor = Math.max(0, len - 1);
+  },
+
+  update() {
+    if (keysDown.select && !this.confirmLeave) {
+      keysDown.select = false;
+      if (this.st === 'play' && !this.isResult) {
+        this.confirmLeave = true; playSnd('sel');
+      } else {
+        this.leaveGame();
+      }
+      return; 
+    }
+
+    if (this.confirmLeave) {
+      if (keysDown.a) {
+        keysDown.a = false; this.confirmLeave = false;
+        if (this.conn) this.conn.send({ type: 'surrender' }); 
+        this.leaveGame(); 
+      } else if (keysDown.b) {
+        keysDown.b = false; this.confirmLeave = false; playSnd('sel');
+      }
+      return;
+    }
+
+    if (this.st === 'menu') {
+      if (keysDown.down) { this.cursor = (this.cursor + 1) % 3; playSnd('sel'); }
+      if (keysDown.up) { this.cursor = (this.cursor - 1 + 3) % 3; playSnd('sel'); }
+      if (keysDown.a) {
+        keysDown.a = false;
+        if (this.cursor === 0) { let name = prompt("部屋名を入力", "ジョーカールーム"); if (name !== null) { let pass = prompt("パスワード", ""); if (pass !== null) { this.roomName = name; this.hostPass = pass; this.startPeer(true); } } }
+        else if (this.cursor === 1) { this.st = 'lobby_list'; this.roomCursor = 0; playSnd('jmp'); firebase.database().ref('rooms').on('value', (snap) => { let rooms = []; snap.forEach(child => { if (child.val().status === 'waiting') rooms.push({ id: child.key, ...child.val() }); }); this.roomList = rooms; }); }
+        else if (this.cursor === 2) { this.startBotMatch(); }
+      }
+    }
+    else if (this.st === 'lobby_list') {
+      if (keysDown.b) { firebase.database().ref('rooms').off(); this.st = 'menu'; playSnd('hit'); return; }
+      if (this.roomList.length > 0) {
+        if (keysDown.down) { this.roomCursor = (this.roomCursor + 1) % this.roomList.length; playSnd('sel'); }
+        if (keysDown.up) { this.roomCursor = (this.roomCursor - 1 + this.roomList.length) % this.roomList.length; playSnd('sel'); }
+        if (keysDown.a) { keysDown.a = false; let rm = this.roomList[this.roomCursor]; let p = ''; if (rm.hasPass) { p = prompt(`パスワード：`, ""); if (p === null) return; } firebase.database().ref('rooms').off(); this.targetId = rm.id; this.myPass = p; this.startPeer(false); }
+      }
+    }
+    else if (this.st === 'host_lobby') { if (this.guestJoined && keysDown.a) { firebase.database().ref('rooms/' + this.peerId).update({ status: 'playing' }); this.conn.send({ type: 'start_game' }); this.st = 'play'; this.cursor = 0; this.initGame(); playSnd('jmp'); } }
+    else if (this.st === 'play') {
+      this.handleLogicUpdate(); 
+      
+      if (this.isResult) {
+        if (this.myChoice === '') {
+          // ★ BOT戦の場合は選択肢を2つにする（rematch と title）
+          const choices = this.isBot ? ['rematch', 'title'] : ['rematch', 'lobby', 'title'];
+          if (keysDown.down) { this.resultCursor = (this.resultCursor + 1) % choices.length; playSnd('sel'); }
+          if (keysDown.up) { this.resultCursor = (this.resultCursor - 1 + choices.length) % choices.length; playSnd('sel'); }
+          if (keysDown.a) {
+            keysDown.a = false; playSnd('sel');
+            this.myChoice = choices[this.resultCursor];
+            if (this.conn) this.conn.send({ type: 'result_choice', choice: this.myChoice });
+            this.checkResultAction();
+          }
+        }
+        return; 
+      }
+
+      let myHand = this.role === 'host' ? this.state.hostHand : this.state.guestHand;
+      let opLen = this.role === 'host' ? this.state.guestHand.length : this.state.hostHand.length;
+      let mySkills = this.state.skills[this.role];
+
+      if (this.isSkillMenu) {
+        if (keysDown.b) { this.isSkillMenu = false; keysDown.b = false; playSnd('sel'); return; }
+        if (keysDown.right && mySkills.length > 1) { this.skillCursor = 1; playSnd('sel'); }
+        if (keysDown.left && mySkills.length > 1) { this.skillCursor = 0; playSnd('sel'); }
+        if (keysDown.a && mySkills.length > 0) {
+          keysDown.a = false; this.isSkillMenu = false;
+          if (this.role === 'host') this.processAction({ type: 'skill', skillId: mySkills[this.skillCursor] }, 'host');
+          else if (this.conn) this.conn.send({ type: 'action', action: { type: 'skill', skillId: mySkills[this.skillCursor] } });
+        }
+        return;
+      }
+
+      if (this.state.turn === this.role && this.state.wait === 0) {
+        if (this.state.pendingSkill === 3) {
+           if (keysDown.right) { this.cursor = (this.cursor + 1) % myHand.length; playSnd('sel'); }
+           if (keysDown.left) { this.cursor = (this.cursor - 1 + myHand.length) % myHand.length; playSnd('sel'); }
+           if (keysDown.a) {
+             keysDown.a = false;
+             if (this.role === 'host') this.processAction({ type: 'give', idx: this.cursor }, 'host');
+             else if (this.conn) this.conn.send({ type: 'action', action: { type: 'give', idx: this.cursor } });
+           }
+           return;
+        }
+
+        if (keysDown.b && mySkills.length > 0) { this.isSkillMenu = true; this.skillCursor = 0; keysDown.b = false; playSnd('jmp'); return; }
+        if (keysDown.right) { this.cursor = (this.cursor + 1) % opLen; playSnd('sel'); }
+        if (keysDown.left) { this.cursor = (this.cursor - 1 + opLen) % opLen; playSnd('sel'); }
+        if (keysDown.a && opLen > 0) {
+          keysDown.a = false;
+          if (this.role === 'host') this.processAction({ type: 'draw', idx: this.cursor }, 'host');
+          else if (this.conn) this.conn.send({ type: 'action', action: { type: 'draw', idx: this.cursor } });
+        }
+      }
+    }
+  },
+
+  draw() {
+    ctx.fillStyle = '#012'; ctx.fillRect(0, 0, 200, 300);
+    
+    if (this.st === 'play') {
+      let myHand = this.role === 'host' ? this.state.hostHand : this.state.guestHand;
+      let opHand = this.role === 'host' ? this.state.guestHand : this.state.hostHand;
+
+      if (this.state.effects.global.revolution) { ctx.fillStyle = '#f0f'; ctx.font = 'bold 10px monospace'; ctx.fillText('REVOLUTION ACTIVE!', 40, 100); }
+
+      let startX = 100 - (opHand.length * 15) / 2;
+      for (let i = 0; i < opHand.length; i++) {
+        let x = startX + i * 15; let y = 20;
+        ctx.fillStyle = '#a00'; ctx.fillRect(x, y, 25, 35); ctx.strokeStyle = '#fff'; ctx.strokeRect(x, y, 25, 35);
+        if (this.state.activeSkill === 1 && opHand[i].v === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x+2, y+2, 21, 31); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('J', x+8, y+20); }
+        if (this.state.turn === this.role && this.cursor === i && !this.isSkillMenu && this.state.pendingSkill !== 3 && this.state.wait === 0 && !this.isResult) {
+          ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(x-2, y-6, 29, 39); ctx.lineWidth = 1;
+          if (this.state.effects[this.role].oracle) {
+             let isMatch = myHand.some(c => c.v === opHand[i].v && opHand[i].v !== 0);
+             ctx.fillStyle = isMatch ? '#0f0' : '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText(isMatch ? 'O' : 'X', x + 8, y - 10);
+          }
+        }
+      }
+
+      if (this.state.shuffleTriggered && this.state.wait > 0 && this.state.msg === '⚠️ CHAOS SHUFFLE ⚠️') {
+        if (Math.floor(this.state.wait / 20) % 2 === 0) { ctx.fillStyle = 'rgba(200, 0, 0, 0.4)'; ctx.fillRect(0,0,200,300); }
+      }
+      ctx.fillStyle = this.state.turn === this.role ? '#0f0' : '#f00'; ctx.font = '12px monospace';
+      ctx.fillText(this.state.msg, 100 - (this.state.msg.length*3.5), 140);
+
+      startX = 100 - (myHand.length * 15) / 2;
+      for (let i = 0; i < myHand.length; i++) {
+        let x = startX + i * 15; let y = 200;
+        ctx.fillStyle = '#ddd'; ctx.fillRect(x, y, 25, 35); ctx.strokeStyle = '#000'; ctx.strokeRect(x, y, 25, 35);
+        ctx.fillStyle = myHand[i].v === 0 ? '#f00' : '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText(myHand[i].v === 0 ? 'J' : myHand[i].v, x + 6, y + 22);
         
-        // その他のエラー
-        return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！ 電波の良いところで 頼むぞ！`;
+        if (this.state.turn === this.role && this.cursor === i && this.state.pendingSkill === 3 && this.state.wait === 0 && !this.isResult) {
+           ctx.strokeStyle = '#f0f'; ctx.lineWidth = 2; ctx.strokeRect(x-2, y-2, 29, 39); ctx.lineWidth = 1;
+        }
       }
 
-      const data = await response.json();
-      
-      if (!data.candidates || data.candidates.length === 0) {
-          return "かみさまが 沈黙しておる…… もういちど 話しかけてみてくれい。";
+      let mySkills = this.state.skills[this.role];
+      ctx.fillStyle = '#0ff'; ctx.font = '10px monospace';
+      if (mySkills.length > 0) ctx.fillText(`[B] SKILLS: ${mySkills.length}`, 10, 280);
+      else ctx.fillStyle = '#555'; ctx.fillText('NO SKILLS', 10, 280);
+
+      if (this.isSkillMenu) {
+        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(15, 160, 170, 60); ctx.strokeStyle = '#0ff'; ctx.strokeRect(15, 160, 170, 60);
+        ctx.fillStyle = '#ff0'; ctx.fillText('SELECT SKILL (A:発動 B:戻る)', 20, 175);
+        mySkills.forEach((sId, idx) => {
+          ctx.fillStyle = this.skillCursor === idx ? '#0f0' : '#fff'; ctx.fillText((this.skillCursor===idx?'>':' ') + S_NAMES[sId], 25 + idx*70, 200);
+        });
       }
-      
-      return data.candidates[0].content.parts[0].text.trim();
-      
-    } catch (e) {
-      return `むむっ… 世界の繋がり（ネットワーク）が 切れておるようじゃ！`;
+
+      if (this.confirmLeave) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(15, 100, 170, 70);
+        ctx.strokeStyle = '#f00'; ctx.lineWidth = 2; ctx.strokeRect(15, 100, 170, 70); ctx.lineWidth = 1;
+        ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText('SURRENDER & LEAVE?', 30, 125);
+        ctx.fillStyle = '#0f0'; ctx.fillText('A: YES(LOSE)  B: NO', 25, 150);
+      }
+      else if (this.isResult) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(15, 80, 170, 110);
+        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(15, 80, 170, 110); ctx.lineWidth = 1;
+        ctx.fillStyle = '#ff0'; ctx.font = '12px monospace'; ctx.fillText('=== MATCH END ===', 35, 100);
+        
+        if (this.myChoice === '') {
+          // ★ BOT戦の場合は選択肢を2つにして描画する
+          const opts = this.isBot ? ['もう一度遊ぶ', 'タイトルに戻る'] : ['もう一度遊ぶ', 'ロビーに戻る', 'タイトルに戻る'];
+          opts.forEach((opt, idx) => {
+            ctx.fillStyle = this.resultCursor === idx ? '#0f0' : '#fff';
+            // 2択の時は少し間隔を広げるなど、お好みで調整できます（ここではそのままの余白で並べます）
+            ctx.fillText((this.resultCursor===idx?'>':' ') + opt, 25, 130 + idx * 25);
+          });
+        } else {
+          ctx.fillStyle = '#fff'; ctx.fillText('WAITING RIVAL...', 35, 140);
+        }
+      }
+    }
+    else {
+      if (this.st === 'boot') { ctx.fillStyle = '#0f0'; ctx.font = '12px monospace'; ctx.fillText('CONNECTING DATABASE...', 20, 150); }
+      else if (this.st === 'menu') {
+        ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText('ROYAL JOKER', 55, 40);
+        const opts = ['部屋を作る (HOST)', '部屋を探す (GUEST)', 'ひとりで遊ぶ (BOT)'];
+        for (let i = 0; i < 3; i++) { ctx.fillStyle = this.cursor === i ? '#0f0' : '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.cursor===i?'> ':'  ') + opts[i], 15, 100 + i*30); }
+        ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 決定  SELECT: 戻る', 45, 280);
+      }
+      else if (this.st === 'lobby_list') {
+        ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ROOM LIST】', 45, 30);
+        if (this.roomList.length === 0) { ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText('待機中の部屋はありません', 15, 80); } 
+        else {
+          for (let i = 0; i < Math.min(this.roomList.length, 6); i++) {
+            let rm = this.roomList[i]; ctx.fillStyle = this.roomCursor === i ? '#ff0' : '#fff'; if(this.roomCursor === i) ctx.fillRect(10, 55 + i*25, 180, 20);
+            ctx.fillStyle = this.roomCursor === i ? '#000' : '#fff'; ctx.font = '11px monospace'; ctx.fillText(`${rm.hasPass ? '🔒' : '　'} ${rm.name.slice(0, 10)}`, 15, 70 + i*25);
+          }
+        }
+        ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 入室  B: 戻る', 55, 280);
+      }
+      else if (this.st === 'host_lobby') {
+        ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ROOM LOBBY】', 45, 50); ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`ROOM : ${this.roomName.slice(0, 10)}`, 20, 90);
+        ctx.strokeStyle = '#555'; ctx.strokeRect(10, 140, 180, 80);
+        if (this.guestJoined) { ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace'; ctx.fillText('★ RIVAL JOINED! ★', 35, 170); ctx.fillStyle = '#0f0'; ctx.fillText('PRESS [A] TO START', 35, 195); } 
+        else { ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText('WAITING FOR RIVAL...', 40, 180); }
+      }
+      else if (this.st === 'guest_lobby') { ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('【WAITING HOST】', 40, 150); }
+      else if (this.st === 'connecting' || this.st === 'error') {
+        ctx.fillStyle = this.st === 'error' ? '#f00' : '#0f0'; ctx.font = '10px monospace'; let lines = this.msg.split('\n'); for(let i=0; i<lines.length; i++) ctx.fillText(lines[i], 10, 140 + i*15);
+        if (this.st === 'error') { ctx.fillStyle = '#fff'; ctx.fillText('SELECT TO RETURN', 45, 250); }
+      }
     }
   }
 };
-
-const particles = [];
-function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 12 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, life: 30 + Math.random()*10, color: color, size: type === 'explosion' ? 3 : 1 }); } }
-function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
-function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
-
-const bgThemes = [
-  { name: 'MATRIX', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); c.fillStyle='#0f0'; c.font='10px monospace'; for(let i=0;i<20;i++) c.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)),(i*10)+(Date.now()/50)%10,(Date.now()/20+i*15)%300); } },
-  { name: 'STARS', draw: (c) => { c.fillStyle='#000822'; c.fillRect(0,0,200,300); c.fillStyle='#fff'; for(let i=0;i<50;i++){ const s=1+(i%3); c.fillRect((i*37)%200,(i*67+Date.now()/10)%300,s,s); } } },
-  { name: 'GAMEBOY', draw: (c) => { c.fillStyle='#8bac0f'; c.fillRect(0,0,200,300); c.strokeStyle='#9bbc0f'; c.lineWidth=1; for(let i=0;i<200;i+=4){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,300); c.stroke(); } for(let i=0;i<300;i+=4){ c.beginPath(); c.moveTo(0,i); c.lineTo(200,i); c.stroke(); } c.fillStyle='#306230'; c.fillRect(0,0,6,300); c.fillRect(194,0,6,300); c.fillRect(0,0,200,6); c.fillRect(0,294,200,6); } }
-];
-
-let shakeTimer = 0; function screenShake(i = 2) { shakeTimer = i; }
-function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; } }
-function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
-
-const PALETTE = {'2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#00f','8':'#ff0','9':'#842','a':'#aaa','b':'#0ff','c':'#f0f','d':'#80f','e':'#531','f':'#141'};
-const drawSprite = (x, y, c, d, s = 2.5) => { 
-  if (!d) return; const str = Array.isArray(d) ? d[Math.floor(Date.now() / 300) % d.length] : d; const l = str.length > 100 ? 16 : 8; const ds = (8 / l) * s; 
-  for (let i = 0; i < str.length; i++) { if (i >= l * l) break; const ch = str[i]; if (ch === '0') continue; ctx.fillStyle = (ch === '1') ? c : (PALETTE[ch] || c); ctx.fillRect(x + (i % l) * ds, y + Math.floor(i / l) * ds, ds, ds); }
-};
-
-let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
-function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
-
-const Menu = {
-  cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'ローカルランキング', '設定', '王様の間'], holdTimer: 0,
-  init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
-  update() {
-    if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
-    if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
-    if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
-    if (keysDown.a) { const appObjs = [Guide, Tetri, Action, Online, Rhythm, Slot, Ranking, Settings, KingRoom]; switchApp(appObjs[this.cur]); }
-  },
-  draw() {
-    bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v8.0', 60, 40);
-    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 20); }
-    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
-  }
-};
-
-const Settings = {
-  cur: 0, init() { this.cur = 0; },
-  update() {
-    if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
-    if (keysDown.up) { this.cur = 0; playSnd('sel'); } if (keysDown.down) { this.cur = 1; playSnd('sel'); }
-    if (keysDown.a) { if (this.cur === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } else { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } }
-  },
-  draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
-    ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.cur === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.cur === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
-    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
-  }
-};
-
-const Ranking = {
-  mode: 'n', input: false, name: '', c: 0, mc: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
-  init() { if (!this.input) this.mode = 'n'; this.c = 0; this.mc = 0; },
-  update() {
-    if (!this.input && (keysDown.select || keysDown.b)) { switchApp(Menu); return; } if (this.input && keysDown.select) { this.input = false; switchApp(Menu); return; }
-    if (!this.input) { if (keysDown.left || keysDown.right) { this.mode = this.mode === 'n' ? 'h' : 'n'; playSnd('sel'); } if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.c = 0; this.mc = 0; playSnd('jmp'); } } else {
-      if (this.mc === 0) { if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else if (this.mc === 1) { if (keysDown.up) { this.mc = 0; playSnd('sel'); } if (keysDown.down) { this.mc = 2; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else { if (keysDown.up) { this.mc = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Menu); } }
-    }
-  },
-  draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
-    if (!this.input) {
-      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mode === 'n' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'h' ? '[HARD]' : '<HARD>'), 120, 40);
-      const rank = this.mode === 'n' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
-      for (let i = 0; i < 10; i++) { ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa'; if (rank[i]) { ctx.fillText(`${String(i+1).padStart(2,' ')}. ${rank[i].name.padEnd(10,' ')} ${String(rank[i].score).padStart(6,' ')}`, 15, 76 + i * 18); } else { ctx.fillText(`${String(i+1).padStart(2,' ')}. ----------  ----`, 15, 76 + i * 18); } }
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
-    } else {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
-      for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.c && this.mc === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
-      ctx.fillStyle = this.mc === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.mc === 1 ? '#fff' : '#666'; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.mc === 1 ? '#fff' : '#ccc'; ctx.fillText('DELETE', 30, 191);
-      const okEn = this.name.length > 0; ctx.fillStyle = this.mc === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.mc === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.mc === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
-    }
-  }
-};
-
-function loop() {
-  try {
-    if (hitStopTimer <= 0) { 
-      for (let k in keys) { 
-        keysDown[k] = (keys[k] && !prevKeys[k]) || keyPressQueue[k]; 
-        keyPressQueue[k] = false; 
-        prevKeys[k] = keys[k]; 
-      } 
-    }
-    
-    if (transTimer > 0) { 
-        transTimer--; 
-        if (transTimer === 0 && nextApp) { activeApp = nextApp; activeApp.init(); nextApp = null; } 
-    } 
-    else if (hitStopTimer > 0) { hitStopTimer--; } 
-    else { if (activeApp && activeApp.update) activeApp.update(); }
-    
-    if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
-  } catch (err) {
-    console.error(err); ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = "#fff"; ctx.fillText("ERROR CRASHED", 10, 50);
-  }
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-const setBtn = (id, k) => {
-  const e = document.getElementById(id); if (!e) return;
-  const p = (ev) => { ev.preventDefault(); keys[k] = true; keyPressQueue[k] = true; initAudio(); };
-  const r = (ev) => { ev.preventDefault(); keys[k] = false; };
-  e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('touchcancel', r, {passive: false});
-  e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
-};
-['btn-up','btn-down','btn-left','btn-right','btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['up','down','left','right','a','b','select'][i]); });
-['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
-
-window.addEventListener('keydown', e => {
-  let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
-  if (e.key === 'ArrowDown') { keys.down = true; keyPressQueue.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { keys.left = true; keyPressQueue.left = true; initAudio(); } 
-  if (e.key === 'ArrowRight') { keys.right = true; keyPressQueue.right = true; initAudio(); }
-  if (k === 'z' || e.key === ' ') { keys.a = true; keyPressQueue.a = true; initAudio(); } 
-  if (k === 'x') { keys.b = true; keyPressQueue.b = true; initAudio(); }
-  if (e.key === 'Shift') { keys.select = true; keyPressQueue.select = true; initAudio(); }
-});
-
-window.addEventListener('keyup', e => {
-  let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') keys.up = false; if (e.key === 'ArrowDown') keys.down = false;
-  if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false;
-  if (k === 'z' || e.key === ' ') keys.a = false; if (k === 'x') keys.b = false;
-  if (e.key === 'Shift') keys.select = false;
-});
-// ==========================================
-// iOS Safari 音声強制ブロック解除システム
-// ==========================================
-
-// 音声システム（AudioContext）を叩き起こす関数
-const unlockAudio = () => {
-  if (typeof audioCtx !== 'undefined' && audioCtx !== null) {
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume().then(() => {
-        console.log("Safariの音声ブロックを解除しました！");
-      }).catch(err => console.error("音声ブロック解除エラー:", err));
-    }
-  }
-};
-
-// プレイヤーが画面の「どこか」をタッチ、クリック、またはキーを押した瞬間に作動
-window.addEventListener('touchstart', unlockAudio, { passive: true });
-window.addEventListener('mousedown', unlockAudio);
-window.addEventListener('keydown', unlockAudio);
