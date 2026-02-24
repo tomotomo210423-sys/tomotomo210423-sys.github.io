@@ -1,15 +1,23 @@
-// === BEAT BROS - LOGGING UPDATE ===
+// === BEAT BROS - MV EDITION ===
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, pendingFile: null,
   touchBound: false, laneTouch: [false,false,false,false],
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
+  video: null, // ★ MV用のvideo要素を追加
+  isVideo: false, // ★ 動画ファイルかどうかのフラグ
 
   init() {
     this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0;
     this.laneTouch = [false,false,false,false];
-    this.audioBuffer = null; if(this.source){ this.source.stop(); this.source.disconnect(); this.source=null; }
+    this.audioBuffer = null; 
+    if(this.source){ this.source.stop(); this.source.disconnect(); this.source=null; }
+    
+    // ★ ビデオ要素の初期化
+    if(this.video) { this.video.pause(); this.video.removeAttribute('src'); this.video.load(); this.video = null; }
+    this.isVideo = false;
+
     document.getElementById('gameboy').classList.remove('mode-tall');
     const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 300; 
     BGM.play('menu'); this.showFileUI();
@@ -56,9 +64,13 @@ const Rhythm = {
       ui.style.position = 'absolute'; ui.style.bottom = '80px'; ui.style.left = '50%'; ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; ui.style.width = '100%';
       let label = document.createElement('label');
       label.style.display = 'inline-block'; label.style.background = '#ff0'; label.style.color = '#000'; label.style.padding = '10px 15px'; label.style.fontFamily = 'monospace'; label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; label.style.cursor = 'pointer'; label.style.border = '2px solid #fff'; label.style.boxShadow = '0 0 15px #ff0';
-      label.innerHTML = '📁 曲ファイルを選ぶ';
+      label.innerHTML = '📁 曲・動画を選ぶ'; // ★ 動画も選べることを明記
+      
+      // ★ accept属性を広げて動画も許可する
+      let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*, video/*'; input.style.display = 'none';
+      
       label.onclick = () => { initAudio(); }; label.ontouchstart = () => { initAudio(); };
-      let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*'; input.style.display = 'none';
+      
       input.onchange = (e) => {
         if(e.target.files[0]) { 
           initAudio(); this.hideFileUI(); this.pendingFile = e.target.files[0]; e.target.value = ''; 
@@ -78,10 +90,25 @@ const Rhythm = {
     this.st = 'transform_out'; this.transformTimer = 120; 
     document.getElementById('gameboy').classList.remove('mode-tall');
     if(this.source) { this.source.stop(); this.source = null; }
+    if(this.video) { this.video.pause(); } // ★ 動画を停止
   },
 
   loadFile(file) {
-    this.st = 'loading'; BGM.stop(); const reader = new FileReader();
+    this.st = 'loading'; BGM.stop(); 
+    
+    // ★ 動画ファイルかどうかの判定
+    this.isVideo = file.type.startsWith('video/');
+    
+    if (this.isVideo) {
+      // 動画ファイルの場合、裏側でVideo要素を作成
+      this.video = document.createElement('video');
+      this.video.src = URL.createObjectURL(file);
+      this.video.muted = true; // 音声はWebAudioAPIで鳴らすためミュート
+      this.video.playsInline = true; // スマホでの全画面再生を防ぐ
+      this.video.load();
+    }
+
+    const reader = new FileReader();
     reader.onload = e => {
       audioCtx.decodeAudioData(e.target.result, buffer => {
         this.audioBuffer = buffer; this.generateNotes(buffer);
@@ -156,9 +183,8 @@ const Rhythm = {
       this.st = 'result'; let finalScore = Math.floor(this.score);
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
       if(finalScore > (rData[this.mode]||0)){ rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
-      
-      // ★ 監視ログ送信
       SaveSys.addLog('BEAT BROS', `${this.mode.toUpperCase()}モードで スコア${finalScore}を叩き出した`);
+      if(this.video) { this.video.pause(); } // ★ 終了時に動画も止める
     }; 
   },
 
@@ -228,7 +254,16 @@ const Rhythm = {
     }
     else if(this.st === 'intro') {
       this.transformTimer++;
-      if(this.transformTimer === 60){ this.st = 'play'; this.startTime = audioCtx.currentTime + 1.5; this.source.start(this.startTime); }
+      if(this.transformTimer === 60){ 
+        this.st = 'play'; 
+        this.startTime = audioCtx.currentTime + 1.5; 
+        this.source.start(this.startTime); 
+        // ★ 音楽の再生に合わせて動画も再生開始
+        if(this.video) {
+            this.video.currentTime = 0;
+            setTimeout(() => { this.video.play().catch(e=>console.log("Video AutoPlay Blocked", e)); }, 1500);
+        }
+      }
     }
     else if(this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
@@ -257,7 +292,22 @@ const Rhythm = {
 
   draw() {
     const cvs = document.getElementById('gameCanvas');
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); 
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+    
+    // ★ 動画の描画処理を追加
+    if (this.st === 'play' && this.video && !this.video.paused && !this.video.ended) {
+        try {
+            // アスペクト比を維持して画面上部に描画（例：16:9）
+            let vW = cvs.width;
+            let vH = cvs.width * (9 / 16);
+            ctx.drawImage(this.video, 0, 30, vW, vH);
+            // ノーツが見えるように少し暗くする
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, cvs.width, cvs.height);
+        } catch(e) {} // 描画エラー回避
+    }
+
     ctx.save();
     
     if(this.mode === 'nightmare' && this.st === 'play') {
@@ -291,7 +341,9 @@ const Rhythm = {
       ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()*0.3})`; ctx.fillRect(0, 0, cvs.width, cvs.height);
     }
     else if(this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
-      ctx.strokeStyle = '#121'; ctx.lineWidth = 1;
+      // 罫線の描画（動画再生時は目立たなくする）
+      ctx.strokeStyle = (this.st === 'play' && this.video && !this.video.paused) ? 'rgba(17, 34, 17, 0.3)' : '#121'; 
+      ctx.lineWidth = 1;
       for(let i=0; i<30; i++){ ctx.beginPath(); ctx.moveTo(0, i*15 + (Date.now()%15)); ctx.lineTo(200, i*15 + (Date.now()%15)); ctx.stroke(); }
       
       let k = typeof keys !== 'undefined' ? keys : {};
