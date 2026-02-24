@@ -1,8 +1,9 @@
-// === GUIDE APP (Phase 7: Royal Joker Manual & Scroll) ===
+// === GUIDE APP (Phase 8: XY Scrolling) ===
 const Guide = {
   cur: 0,
   page: 0,
-  scroll: 0, // スクロール位置の管理用
+  scrollY: 0, // 縦スクロール位置
+  scrollX: 0, // 横スクロール位置 ★追加
   games: [
     { 
       name: 'テトリベーダー', 
@@ -41,7 +42,7 @@ const Guide = {
         '手札のペアを 揃えて 捨てていき、',
         '先に 手札が【0枚】になった者の 勝利となる！',
         '最後まで【J】を持っていたら 負けじゃぞ。',
-        '',
+        '------------------------------------------', // 長い線のテスト
         '【通信のやり方】',
         '1人が【部屋を作る】で 部屋の名前を決める。',
         'もう1人が【部屋を探す】で その部屋に入るのじゃ。',
@@ -126,7 +127,8 @@ const Guide = {
   init() { 
     this.cur = 0; 
     this.page = 0; 
-    this.scroll = 0;
+    this.scrollY = 0;
+    this.scrollX = 0; // ★初期化
   },
   
   update() {
@@ -134,14 +136,19 @@ const Guide = {
       if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
       if (keysDown.down) { this.cur = (this.cur + 1) % this.games.length; playSnd('sel'); }
       if (keysDown.up) { this.cur = (this.cur - 1 + this.games.length) % this.games.length; playSnd('sel'); }
-      if (keysDown.a) { this.page = 1; this.scroll = 0; playSnd('jmp'); }
+      if (keysDown.a) { this.page = 1; this.scrollY = 0; this.scrollX = 0; playSnd('jmp'); }
     } else {
       if (keysDown.b || keysDown.select) { this.page = 0; playSnd('hit'); }
       
-      // テキストスクロール処理 (最大スクロール量を計算)
-      const maxScroll = Math.max(0, this.games[this.cur].text.length - 13); 
-      if (keysDown.down) { this.scroll = Math.min(this.scroll + 3, maxScroll); playSnd('sel'); }
-      if (keysDown.up) { this.scroll = Math.max(this.scroll - 3, 0); playSnd('sel'); }
+      // 縦スクロール
+      const maxScrollY = Math.max(0, this.games[this.cur].text.length - 13); 
+      if (keysDown.down) { this.scrollY = Math.min(this.scrollY + 3, maxScrollY); playSnd('sel'); }
+      if (keysDown.up) { this.scrollY = Math.max(this.scrollY - 3, 0); playSnd('sel'); }
+
+      // ★横スクロール（最大200pxまで右にずらせるように設定）
+      const maxScrollX = 200;
+      if (keysDown.right) { this.scrollX = Math.min(this.scrollX + 10, maxScrollX); playSnd('sel'); }
+      if (keysDown.left) { this.scrollX = Math.max(this.scrollX - 10, 0); playSnd('sel'); }
     }
   },
   
@@ -149,49 +156,48 @@ const Guide = {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
     
     if (this.page === 0) {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace';
-      ctx.fillText('【ゲーム解説館】', 40, 30);
-      
+      // メニュー画面（変更なし）
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ゲーム解説館】', 40, 30);
       ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
       for (let i = 0; i < this.games.length; i++) {
-        if (i === this.cur) {
-          ctx.fillStyle = '#ff0'; ctx.fillRect(10, 50 + i * 22, 180, 18); ctx.fillStyle = '#000';
-        } else {
-          ctx.fillStyle = i === 5 ? '#0ff' : '#aaa'; 
-        }
+        if (i === this.cur) { ctx.fillStyle = '#ff0'; ctx.fillRect(10, 50 + i * 22, 180, 18); ctx.fillStyle = '#000'; } 
+        else { ctx.fillStyle = i === 5 ? '#0ff' : '#aaa'; }
         ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, 63 + i * 22);
       }
-      
-      ctx.fillStyle = '#888'; ctx.font = '9px monospace';
-      ctx.fillText('A: 読む  SELECT: 戻る', 45, 290);
+      ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 読む  SELECT: 戻る', 45, 290);
       
     } else {
+      // 本文画面
       const game = this.games[this.cur];
       ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace';
       ctx.fillText(`【${game.name}】`, 10, 25);
-      
       ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.moveTo(5, 35); ctx.lineTo(195, 35); ctx.stroke();
       
-      // 描画する行をスクロール位置に合わせて取得 (1画面に13行表示)
+      // テキスト描画（横スクロール適用）
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
       for (let i = 0; i < 13; i++) {
-        const lineIdx = i + this.scroll;
+        const lineIdx = i + this.scrollY;
         if (lineIdx >= game.text.length) break;
         
         let lineStr = game.text[lineIdx];
         if (lineStr.includes('⚠')) ctx.fillStyle = '#f55';
         else if (lineStr.includes('ヒント')) ctx.fillStyle = '#0ff';
-        else if (lineStr.includes('【')) ctx.fillStyle = '#ff0'; // 見出しを黄色に
+        else if (lineStr.includes('【') && !lineStr.includes('操作')) ctx.fillStyle = '#ff0';
         else ctx.fillStyle = '#fff';
         
-        ctx.fillText(lineStr, 10, 50 + i * 15);
+        // ★ X座標を scrollX 分だけずらして描画
+        ctx.fillText(lineStr, 10 - this.scrollX, 50 + i * 15);
       }
       
-      // スクロール可能な場合、上下の矢印ナビゲーションを表示
-      const maxScroll = Math.max(0, game.text.length - 13);
+      // スクロールナビゲーション表示
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 10px monospace';
-      if (this.scroll > 0) ctx.fillText('▲ UP', 160, 25);
-      if (this.scroll < maxScroll) ctx.fillText('▼ DOWN', 150, 265);
+      const maxScrollY = Math.max(0, game.text.length - 13);
+      if (this.scrollY > 0) ctx.fillText('▲', 185, 45); // 上矢印
+      if (this.scrollY < maxScrollY) ctx.fillText('▼', 185, 250); // 下矢印
+
+      // ★ 横スクロール矢印
+      if (this.scrollX > 0) ctx.fillText('◀', 2, 150); // 左矢印
+      if (this.scrollX < 200) ctx.fillText('▶', 190, 150); // 右矢印
       
       ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
       ctx.fillText('Bボタン で もどる', 50, 285);
