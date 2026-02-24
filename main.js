@@ -277,3 +277,22 @@ window.addEventListener('keyup', e => {
   if (k === 'z' || e.key === ' ') keys.a = false; if (k === 'x') keys.b = false;
   if (e.key === 'Shift') keys.select = false;
 });
+// ==========================================
+// iOS Safari 音声強制ブロック解除システム
+// ==========================================
+
+// 音声システム（AudioContext）を叩き起こす関数
+const unlockAudio = () => {
+  if (typeof audioCtx !== 'undefined' && audioCtx !== null) {
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().then(() => {
+        console.log("Safariの音声ブロックを解除しました！");
+      }).catch(err => console.error("音声ブロック解除エラー:", err));
+    }
+  }
+};
+
+// プレイヤーが画面の「どこか」をタッチ、クリック、またはキーを押した瞬間に作動
+window.addEventListener('touchstart', unlockAudio, { passive: true });
+window.addEventListener('mousedown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
