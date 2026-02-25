@@ -1,10 +1,10 @@
-// === BEAT BROS - ENDLESS & MEDLEY EDITION ===
+// === BEAT BROS - ENDLESS TIME SURVIVAL EDITION ===
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0,
   audioBuffer: null, source: null, startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, 
-  pendingFile: null, playlist: [], trackIndex: 0, // ★メドレー用
-  isEndless: false, endlessLevel: 1, endlessBpm: 120, endlessBeat: 0, logicalBeatTime: 0, life: 5, // ★ENDLESS用
+  pendingFile: null, playlist: [], trackIndex: 0, 
+  isEndless: false, endlessBpm: 120, endlessBeat: 0, logicalBeatTime: 0, life: 5, finalTime: 0,
   touchBound: false, laneTouch: [false,false,false,false],
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
   video: null, isVideo: false,
@@ -63,7 +63,7 @@ const Rhythm = {
       label.style.display = 'inline-block'; label.style.background = '#ff0'; label.style.color = '#000'; label.style.padding = '10px 15px'; label.style.fontFamily = 'monospace'; label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; label.style.cursor = 'pointer'; label.style.border = '2px solid #fff'; label.style.boxShadow = '0 0 15px #ff0'; label.style.marginBottom = '15px';
       label.innerHTML = '📁 曲・動画を選ぶ(複数可)';
       
-      let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*, video/*'; input.multiple = true; input.style.display = 'none'; // ★複数選択ON
+      let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*, video/*'; input.multiple = true; input.style.display = 'none'; 
       label.onclick = () => { initAudio(); }; label.ontouchstart = () => { initAudio(); };
       
       input.onchange = (e) => {
@@ -76,11 +76,10 @@ const Rhythm = {
       };
       label.appendChild(input); ui.appendChild(label);
       
-      // ★ ENDLESSボタン追加
       ui.appendChild(document.createElement('br'));
       let btnEndless = document.createElement('div');
       btnEndless.style.display = 'inline-block'; btnEndless.style.background = '#f00'; btnEndless.style.color = '#fff'; btnEndless.style.padding = '10px 15px'; btnEndless.style.fontFamily = 'monospace'; btnEndless.style.fontWeight = 'bold'; btnEndless.style.fontSize = '12px'; btnEndless.style.borderRadius = '5px'; btnEndless.style.cursor = 'pointer'; btnEndless.style.border = '2px solid #fff'; btnEndless.style.boxShadow = '0 0 15px #f00';
-      btnEndless.innerHTML = '💀 ENDLESS (無限耐久)';
+      btnEndless.innerHTML = '💀 ENDLESS SURVIVAL';
       const startEndless = (e) => { if(e) e.preventDefault(); initAudio(); this.hideFileUI(); this.isEndless = true; this.st = 'settings'; this.settingsCur = 0; };
       btnEndless.onclick = startEndless; btnEndless.ontouchstart = startEndless;
       ui.appendChild(btnEndless);
@@ -154,15 +153,14 @@ const Rhythm = {
   startPlay() {
     this.st = 'intro'; this.transformTimer = 0; 
     
-    // ★ リセット処理（メドレーの2曲目以降はスコア維持）
     if(this.trackIndex === 0 || this.isEndless) {
        this.score = 0; this.combo = 0; this.maxCombo = 0; this.judgements = [];
     }
     
     if(this.isEndless) {
        BGM.stop(); this.notes = [];
-       this.life = 5; this.endlessLevel = 1; this.endlessBpm = 120;
-       this.endlessBeat = 0; this.logicalBeatTime = 0;
+       this.life = 5; this.endlessBpm = 120;
+       this.endlessBeat = 0; this.logicalBeatTime = 0; this.finalTime = 0;
        this.startTime = audioCtx.currentTime + 1.5;
        return;
     }
@@ -180,9 +178,8 @@ const Rhythm = {
     if(this.video) { this.video.pause(); }
     if(this.isEndless) return;
     
-    // ★ メドレー分岐
     if(this.trackIndex < this.playlist.length - 1) {
-       this.st = 'intermission'; this.transformTimer = 180; // 約3秒インターバル
+       this.st = 'intermission'; this.transformTimer = 180; 
     } else {
        this.st = 'result'; let finalScore = Math.floor(this.score);
        let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
@@ -191,24 +188,24 @@ const Rhythm = {
     }
   },
 
-  // ★ ENDLESS 専用ジェネレーター
+  // ★ 時間経過によるシームレスな自動生成（レベル概念廃止）
   scheduleEndless(now) {
     if (!this.isEndless || this.st !== 'play' || this.life <= 0) return;
     
-    // レベル判定
-    if (this.combo > 100) { this.endlessLevel = 4; this.endlessBpm = 180; }
-    else if (this.combo > 50) { this.endlessLevel = 3; this.endlessBpm = 160; }
-    else if (this.combo > 20) { this.endlessLevel = 2; this.endlessBpm = 140; }
-    else { this.endlessLevel = 1; this.endlessBpm = 120; }
-
     while(this.logicalBeatTime < now + 2.0) { // 2秒先までチャンク生成
-      let beatLen = 60 / this.endlessBpm;
       let targetRealTime = this.startTime + this.logicalBeatTime;
+      
+      // 経過時間による難易度計算 (0秒〜300秒 で 0.0〜1.0)
+      let elapsed = targetRealTime - this.startTime;
+      if (elapsed < 0) elapsed = 0;
+      let difficulty = Math.min(elapsed / 300, 1.0);
+      
+      this.endlessBpm = 120 + difficulty * 60; // 120〜180 BPM
+      let stepLen = 60 / this.endlessBpm / 2;  // 8分音符(半拍)ステップ
       
       // --- 音源生成 ---
       const playOsci = (f, type, dur, vol) => {
-        let o = audioCtx.createOscillator(); let g = audioCtx.createGain();
-        o.type = type; o.frequency.value = f;
+        let o = audioCtx.createOscillator(); let g = audioCtx.createGain(); o.type = type; o.frequency.value = f;
         g.gain.setValueAtTime(vol, targetRealTime); g.gain.exponentialRampToValueAtTime(0.001, targetRealTime + dur);
         o.connect(g); g.connect(audioCtx.destination); o.start(targetRealTime); o.stop(targetRealTime + dur + 0.1);
       };
@@ -219,37 +216,54 @@ const Rhythm = {
         s.connect(g); g.connect(audioCtx.destination); s.start(targetRealTime); s.stop(targetRealTime + dur + 0.1);
       };
       
-      const chords = [ [440,523,659], [349,440,523], [261,329,392], [392,493,587] ];
-      let cIdx = Math.floor(this.endlessBeat / 4) % 4; let chord = chords[cIdx];
+      // 飽きさせないコード進行パターン
+      const chordProgressions = [
+        [ [440,523,659], [349,440,523], [261,329,392], [392,493,587] ], 
+        [ [261,329,392], [392,493,587], [440,523,659], [349,440,523] ], 
+        [ [349,440,523], [329,392,493], [440,523,659], [440,523,659] ]
+      ];
+      let progIdx = Math.floor(this.endlessBeat / 32) % chordProgressions.length; // 4小節ごとに進行変更
+      let chords = chordProgressions[progIdx];
+      let chord = chords[Math.floor(this.endlessBeat / 8) % 4]; // 1小節ごとにコード変更
       
-      // ベース・リズム
-      if (this.endlessBeat % 2 === 0 || this.endlessLevel >= 3) playOsci(chord[0]/2, this.endlessLevel>=3?'sawtooth':'square', 0.2, 0.05);
-      if (this.endlessBeat % 4 === 0) playOsci(100, 'sine', 0.1, 0.1); // Kick
-      if (this.endlessLevel >= 1 && this.endlessBeat % 4 === 2) playNoise(0.1, 0.05); // Snare
-      if (this.endlessLevel >= 2 && this.endlessBeat % 1 === 0) playNoise(0.05, 0.02); // Hihat
+      let bt = this.endlessBeat % 8; // 8ビート（0〜7）
+
+      // ドラム (Kick & Snare & Hihat)
+      if (bt % 2 === 0) playOsci(100, 'sine', 0.1, 0.1); // 4つ打ちキック
+      if (bt === 2 || bt === 6) playNoise(0.1, 0.05); // 2・4拍目スネア
+      let hhFreq = difficulty > 0.6 ? 1 : 2; // 時間経過でハイハットが細かくなる
+      if (this.endlessBeat % hhFreq === (hhFreq === 2 ? 1 : 0)) playNoise(0.05, 0.02);
       
-      // メロディ
-      if (this.endlessBeat % 1 === 0 && Math.random() < 0.7) {
+      // ベースとメロディ
+      let waveType = difficulty > 0.7 ? 'sawtooth' : difficulty > 0.4 ? 'square' : 'sine';
+      if (Math.random() < 0.6) {
          let note = chord[Math.floor(Math.random() * chord.length)];
-         if(this.endlessLevel === 4 && Math.random() < 0.2) note *= 1.5; // グリッチ
-         playOsci(note * 2, this.endlessLevel===1?'sine':this.endlessLevel===2?'square':'sawtooth', 0.15, 0.03);
+         if(difficulty > 0.5 && Math.random() < 0.3) note *= 2.0; // オクターブジャンプ
+         playOsci(note * (difficulty > 0.8 ? 2 : 1), waveType, 0.1, 0.03);
       }
 
       // --- ノーツ生成 ---
-      let laneCount = this.endlessLevel >= 3 ? (Math.random()<0.3 ? 2 : 1) : 1;
-      let lanes = [0,1,2,3].sort(()=>Math.random()-0.5).slice(0,laneCount);
-      lanes.forEach(l => {
-         let n = { time: this.logicalBeatTime, lane: l, hit: false, y: -50, missed: false };
-         if (this.endlessLevel >= 4 && Math.random() < 0.3) { n.curve = true; } // カーブ
-         if (this.endlessLevel >= 4 && Math.random() < 0.2) { n.accel = true; } // 急加速
-         this.notes.push(n);
-      });
+      let spawnProb = 0.25 + (difficulty * 0.55); // 0.25 〜 0.80 (HardとNightmareの中間程度に落ち着く)
+      if (bt % 2 !== 0) spawnProb *= 0.5; // 裏拍は出にくくする
+
+      if (Math.random() < spawnProb) {
+         let laneCount = 1;
+         if (difficulty > 0.4 && Math.random() < difficulty * 0.5) laneCount = 2; // 時間経過で同時押し解禁
+         let lanes = [0,1,2,3].sort(()=>Math.random()-0.5).slice(0,laneCount);
+         lanes.forEach(l => {
+            let n = { time: this.logicalBeatTime, lane: l, hit: false, y: -50, missed: false };
+            // 時間経過（難易度上昇）に伴う理不尽要素の解禁
+            if (elapsed > 240 && Math.random() < 0.15) n.curve = true; // 4分経過でカーブ解禁
+            if (elapsed > 270 && Math.random() < 0.1) n.accel = true;  // 4分半経過で急加速解禁
+            this.notes.push(n);
+         });
+      }
       
       this.endlessBeat++;
-      this.logicalBeatTime += beatLen;
+      this.logicalBeatTime += stepLen;
     }
     
-    // メモリ節約（過ぎたノーツを消す）
+    // メモリ節約
     if (this.notes.length > 100) this.notes = this.notes.filter(n => !n.hit && !n.missed && n.y < 500);
   },
 
@@ -319,8 +333,7 @@ const Rhythm = {
       if(this.transformTimer % 40 === 0) screenShake(5); 
       if(this.transformTimer <= 0){ const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 300; switchApp(Menu); }
     }
-    // ★ インターバル（メドレー待機）
-    else if(this.st === 'intermission') {
+    else if(this.st === 'intermission') { 
       this.transformTimer--;
       if(this.transformTimer <= 0) {
           this.trackIndex++;
@@ -341,18 +354,23 @@ const Rhythm = {
     }
     else if(this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      let speed = this.isEndless ? 200 + (this.endlessLevel*20) : (this.mode === 'nightmare' ? 666 : this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150);
+      let speed = 150;
       
-      if(this.isEndless) this.scheduleEndless(now);
-      
-      if(this.mode === 'nightmare' && this.source) this.source.playbackRate.value = 1.0 + Math.sin(Date.now()/200)*0.3;
+      if(this.isEndless) {
+          this.scheduleEndless(now);
+          // 経過時間でスピード上昇 (150 〜 最大350)
+          let diff = Math.min(Math.max(now, 0) / 300, 1.0);
+          speed = 150 + (diff * 200);
+      } else {
+          speed = (this.mode === 'nightmare' ? 666 : this.mode === 'hard' ? 320 : this.mode === 'normal' ? 250 : 150);
+          if(this.mode === 'nightmare' && this.source) this.source.playbackRate.value = 1.0 + Math.sin(Date.now()/200)*0.3;
+      }
 
       if(kD.left || kD.l0) this.hitKey(0); if(kD.down || kD.l1) this.hitKey(1); if(kD.up || kD.l2) this.hitKey(2); if(kD.right|| kD.l3) this.hitKey(3);
       
       for(let n of this.notes) {
         let tDiff = n.time - now;
         
-        // ★ 理不尽ノーツ計算
         if(n.accel && tDiff > 0) n.y = this.lineY - (tDiff * tDiff) * (speed / 1.5); 
         else n.y = this.lineY - tDiff * speed;
         
@@ -362,7 +380,11 @@ const Rhythm = {
            
            if(this.isEndless) {
                this.life--; playSnd('hit'); screenShake(5);
-               if(this.life <= 0) { this.st = 'result'; this.msg = 'GAME OVER'; SaveSys.addLog('BEAT BROS', `ENDLESSで スコア${Math.floor(this.score)}`); }
+               if(this.life <= 0) { 
+                   this.st = 'result'; this.finalTime = Math.max(0, now);
+                   let tStr = Math.floor(this.finalTime / 60) + ":" + String(Math.floor(this.finalTime % 60)).padStart(2, '0');
+                   SaveSys.addLog('BEAT BROS', `ENDLESSで ${tStr} 生き残った`); 
+               }
            }
         }
       }
@@ -376,19 +398,39 @@ const Rhythm = {
     ctx.setTransform(1, 0, 0, 1, 0, 0); 
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
     
-    // ★ MV描画
+    let now = audioCtx.currentTime - this.startTime;
+
     if (this.st === 'play' && this.video && !this.video.paused && !this.video.ended) {
         try { let vH = cvs.width * (9 / 16); ctx.drawImage(this.video, 0, 30, cvs.width, vH); ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, cvs.width, cvs.height); } catch(e) {} 
     }
     
-    // ★ ENDLESS 背景
+    // ★ ENDLESS 時間経過によるシームレス背景変化 & 5分(300秒)経過時の「妨害てんこ盛りセット」
     if (this.isEndless && this.st === 'play') {
-       if (this.endlessLevel === 1) { ctx.fillStyle = 'rgba(0, 0, 50, 0.6)'; ctx.fillRect(0,0,200,400); }
-       if (this.endlessLevel === 2) { ctx.fillStyle = 'rgba(0, 50, 0, 0.6)'; ctx.fillRect(0,0,200,400); }
-       if (this.endlessLevel === 3) { ctx.fillStyle = 'rgba(50, 0, 0, 0.6)'; ctx.fillRect(0,0,200,400); }
-       if (this.endlessLevel === 4 && Math.random() < 0.1) {
-           ctx.fillStyle = ['rgba(255,0,0,0.5)', 'rgba(255,0,255,0.4)', 'rgba(255,255,0,0.3)'][Math.floor(Math.random()*3)];
-           ctx.font = 'bold ' + (20 + Math.random()*40) + 'px monospace'; ctx.fillText('ERROR', Math.random()*150, Math.random()*400); ctx.fillRect(0,0,200,400);
+       let elapsed = Math.max(now, 0);
+       let diff = Math.min(elapsed / 300, 1.0);
+       
+       // 青から赤へ徐々に変色
+       let r = Math.floor(diff * 80);
+       let b = Math.floor((1 - diff) * 80);
+       ctx.fillStyle = `rgba(${r}, 0, ${b}, 0.6)`;
+       ctx.fillRect(0,0,200,400);
+
+       // 5分(300秒)経過時の画面妨害
+       if (elapsed >= 300) {
+           ctx.translate(100, 200); 
+           ctx.rotate(Math.sin(Date.now()/400) * 0.15); // 画面がゆらゆら回る
+           ctx.translate(-100, -200);
+           
+           // ランダムなノイズ四角形
+           if(Math.random() < 0.3) {
+               ctx.fillStyle = ['rgba(255,0,0,0.5)', 'rgba(0,255,0,0.5)', 'rgba(0,0,255,0.5)'][Math.floor(Math.random()*3)];
+               ctx.fillRect(Math.random()*200, Math.random()*300, Math.random()*100, Math.random()*50);
+           }
+           // 警告文字
+           if(Math.random() < 0.1) {
+               ctx.fillStyle = '#f0f'; ctx.font = 'bold 30px monospace';
+               ctx.fillText('WARNING', Math.random()*50, Math.random()*400);
+           }
        }
     }
 
@@ -406,7 +448,7 @@ const Rhythm = {
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
       
       if(this.isEndless) {
-         ctx.fillText('MODE: ENDLESS SURVIVAL', 20, 110);
+         ctx.fillText('MODE: ENDLESS TIME SURVIVAL', 5, 110);
          ctx.fillStyle = '#f00'; ctx.fillText('⚠ DANGER ⚠', 60, 140);
       } else {
          let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
@@ -425,7 +467,7 @@ const Rhythm = {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
       ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()*0.3})`; ctx.fillRect(0, 0, cvs.width, cvs.height);
     }
-    else if(this.st === 'intermission') { // ★ メドレー待機画面
+    else if(this.st === 'intermission') { 
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText(`TRACK ${this.trackIndex} CLEARED!`, 30, 150);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText('NEXT TRACK LOADING...', 30, 180);
     }
@@ -445,7 +487,7 @@ const Rhythm = {
       this.notes.forEach(n => {
         if(!n.missed && !n.hit && n.y > -30 && n.y < 420) {
            let cx = 25 + n.lane * 50;
-           if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40; // ★ カーブノーツ
+           if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40; 
            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill();
            ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke();
            ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5);
@@ -453,13 +495,16 @@ const Rhythm = {
       });
       drawParticles();
 
-      // ★ スコアとENDLESSライフ表示
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 60, 20);
-      if(this.combo > 5){ ctx.fillStyle = '#f0f'; ctx.font = 'bold 14px monospace'; ctx.fillText(`${this.combo} COMBO!`, 120, 30); }
+      // ★ スコア または TIME 表示
       if(this.isEndless) {
+         let elapsed = Math.max(0, now);
+         let timeStr = Math.floor(elapsed / 60) + ":" + String(Math.floor(elapsed % 60)).padStart(2, '0');
+         ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`TIME: ${timeStr}`, 60, 20);
          ctx.fillStyle = '#f00'; ctx.font = '12px monospace'; ctx.fillText('LIFE: ' + '❤️'.repeat(this.life), 10, 40);
-         ctx.fillStyle = '#0ff'; ctx.font = '10px monospace'; ctx.fillText(`LV.${this.endlessLevel}`, 10, 55);
+      } else {
+         ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 60, 20);
       }
+      if(this.combo > 5){ ctx.fillStyle = '#f0f'; ctx.font = 'bold 14px monospace'; ctx.fillText(`${this.combo} COMBO!`, 120, 30); }
       
       for(let j of this.judgements) {
          ctx.fillStyle = j.color; ctx.font = 'bold 12px monospace'; ctx.globalAlpha = j.life / 30;
@@ -469,7 +514,6 @@ const Rhythm = {
       ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(5, 5, 40, 20); ctx.strokeStyle = '#f00'; ctx.strokeRect(5, 5, 40, 20);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 10px monospace'; ctx.fillText('EXIT', 12, 18);
       
-      let now = audioCtx.currentTime - this.startTime;
       if(this.st === 'play' && now < 0 && !this.isEndless){ ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 200, 400); ctx.fillStyle = '#ff0'; ctx.font = 'bold 40px monospace'; ctx.fillText(Math.ceil(-now), 85, 200); }
       
       let h = 0;
@@ -483,10 +527,20 @@ const Rhythm = {
 
       if(this.st === 'result') {
         ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 100, 180, 180); ctx.strokeStyle = '#f00'; ctx.strokeRect(10, 100, 180, 180);
-        ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.isEndless?'GAME OVER...':'TRACK CLEARED!', 30, 130);
-        ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`SCORE:    ${Math.floor(this.score)}`, 25, 170); ctx.fillText(`MAX COMBO:${this.maxCombo}`, 25, 190);
-        let rank = this.isEndless ? (this.score > 5000 ? 'S' : 'A') : (this.score > this.notes.length * 80 ? 'S' : 'C');
-        ctx.fillStyle = '#ff0'; ctx.font = 'bold 30px monospace'; ctx.fillText(`RANK: ${rank}`, 50, 240);
+        
+        if (this.isEndless) {
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('SURVIVED!', 60, 130);
+            let tStr = Math.floor(this.finalTime / 60) + ":" + String(Math.floor(this.finalTime % 60)).padStart(2, '0');
+            ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`TIME:      ${tStr}`, 25, 170); 
+            ctx.fillText(`MAX COMBO: ${this.maxCombo}`, 25, 190);
+            let rank = this.finalTime >= 300 ? 'S' : this.finalTime >= 180 ? 'A' : this.finalTime >= 60 ? 'B' : 'C';
+            ctx.fillStyle = '#ff0'; ctx.font = 'bold 30px monospace'; ctx.fillText(`RANK: ${rank}`, 50, 240);
+        } else {
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('TRACK CLEARED!', 30, 130);
+            ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`SCORE:    ${Math.floor(this.score)}`, 25, 170); ctx.fillText(`MAX COMBO:${this.maxCombo}`, 25, 190);
+            let rank = this.score > this.notes.length * 80 ? 'S' : this.score > this.notes.length * 50 ? 'A' : this.score > this.notes.length * 30 ? 'B' : 'C';
+            ctx.fillStyle = '#ff0'; ctx.font = 'bold 30px monospace'; ctx.fillText(`RANK: ${rank}`, 50, 240);
+        }
         ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('左上の [EXIT] で戻る', 40, 265);
       }
     }
