@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.6: Immersive Error Handling) ===
+// === CORE SYSTEM (Phase 5.7: Added AutoFighter) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -118,16 +118,14 @@ const AISys = {
         
         // ★ 429エラー（使いすぎ制限）の場合の世界観処理
         if (response.status === 429) {
-          // 英語のシステム文から「retry in 〇〇s」の数字だけを抜き出す
           const match = errMsg.match(/retry in ([\d\.]+)s/);
-          let waitSec = 60; // 読み取れなかった場合はとりあえず60秒
+          let waitSec = 60; 
           if (match && match[1]) {
-            waitSec = Math.ceil(parseFloat(match[1])); // 小数点を切り上げ
+            waitSec = Math.ceil(parseFloat(match[1])); 
           }
           return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！\nすまぬが【あと ${waitSec}秒 】ほど休ませてから 話しかけてくれい！`;
         }
         
-        // その他のエラー
         return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！ 電波の良いところで 頼むぞ！`;
       }
 
@@ -169,18 +167,27 @@ const drawSprite = (x, y, c, d, s = 2.5) => {
 let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
+// ★============================================★
+// 【変更点】メニューの配列に「AI闘技場」を追加しました！
+// ★============================================★
 const Menu = {
-  cur: 0, apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'ローカルランキング', '設定', '王様の間'], holdTimer: 0,
+  cur: 0, 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'ローカルランキング', '設定', '王様の間', 'AI闘技場'], 
+  holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
   update() {
     if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
     if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
-    if (keysDown.a) { const appObjs = [Guide, Tetri, Action, Online, Rhythm, Slot, Ranking, Settings, KingRoom]; switchApp(appObjs[this.cur]); }
+    if (keysDown.a) { 
+        const appObjs = [Guide, Tetri, Action, Online, Rhythm, Slot, Ranking, Settings, KingRoom, AutoFighter]; 
+        switchApp(appObjs[this.cur]); 
+    }
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v8.0', 60, 40);
-    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 20); }
+    // メニュー項目が多いため、縦の行間を少し詰める（20px -> 18px）
+    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 18); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };
@@ -281,7 +288,6 @@ window.addEventListener('keyup', e => {
 // iOS Safari 音声強制ブロック解除システム
 // ==========================================
 
-// 音声システム（AudioContext）を叩き起こす関数
 const unlockAudio = () => {
   if (typeof audioCtx !== 'undefined' && audioCtx !== null) {
     if (audioCtx.state === 'suspended') {
@@ -292,7 +298,6 @@ const unlockAudio = () => {
   }
 };
 
-// プレイヤーが画面の「どこか」をタッチ、クリック、またはキーを押した瞬間に作動
 window.addEventListener('touchstart', unlockAudio, { passive: true });
 window.addEventListener('mousedown', unlockAudio);
 window.addEventListener('keydown', unlockAudio);
