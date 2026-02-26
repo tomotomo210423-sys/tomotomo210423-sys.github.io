@@ -1,4 +1,4 @@
-// === UNREASONABLE BROS - STAGE SELECT & BUG FIX EDITION ===
+// === UNREASONABLE BROS - TRUE COMPLETE EDITION ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   fallingSpikes: [], fireballs: [], sun: null, blackHole: null,
@@ -10,7 +10,6 @@ const Action = {
   init() { 
     this.st = 'title'; BGM.play('action'); 
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
-    if (isNaN(SaveSys.data.actMaxStage)) SaveSys.data.actMaxStage = SaveSys.data.actStage;
     if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
     if (SaveSys.data.actLives === undefined) { SaveSys.data.actLives = 5; SaveSys.save(); }
     this.checkpointX = 20; this.bgTimer = 0; this.titleCur = 0;
@@ -127,9 +126,9 @@ const Action = {
       if (keysDown.up || keysDown.down) { this.titleCur = this.titleCur === 0 ? 1 : 0; playSnd('sel'); }
       
       if (this.titleCur === 0) {
-          let maxSt = SaveSys.data.actMaxStage || SaveSys.data.actStage;
+          // ★ ステージ選択のロックを解除し、未クリアでも1〜6まで選べるように修正
           if (keysDown.left && this.stageSelect > 1) { this.stageSelect--; playSnd('sel'); }
-          if (keysDown.right && this.stageSelect < maxSt) { this.stageSelect++; playSnd('sel'); }
+          if (keysDown.right && this.stageSelect < 6) { this.stageSelect++; playSnd('sel'); }
       }
       
       if (keysDown.a) { 
@@ -146,7 +145,7 @@ const Action = {
       if (keysDown.up || keysDown.down) { this.mIdx = this.mIdx === 0 ? 1 : 0; playSnd('sel'); }
       if (keysDown.a) {
         if (this.mIdx === 0) { 
-            SaveSys.data.actStage = 1; SaveSys.data.actMaxStage = 1; SaveSys.data.actLives = 5; 
+            SaveSys.data.actStage = 1; SaveSys.data.actLives = 5; 
             SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save(); 
             this.stageSelect = 1; playSnd('hit'); this.st = 'title'; 
         } 
@@ -197,7 +196,6 @@ const Action = {
         } else if (m.type === 'goal') {
            SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}クリア`);
            SaveSys.data.actStage++; 
-           if(SaveSys.data.actStage > (SaveSys.data.actMaxStage || 1)) SaveSys.data.actMaxStage = SaveSys.data.actStage;
            this.checkpointX = 20; SaveSys.save(); playSnd('combo');
            if (SaveSys.data.actStage > 6) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
         } else {
@@ -223,6 +221,13 @@ const Action = {
       if (!fc.touched && Math.abs(nx + 10 - fc.x) < 15 && Math.abs(ny + 10 - fc.y) < 15) { fc.touched = true; this.p.vy = -12; playSnd('hit'); addParticle(fc.x, fc.y, '#f00', 'explosion'); screenShake(5); }
     }
     
+    // ★ 消滅していた「本物のコイン」の当たり判定を復活！
+    for (let coin of this.coins) {
+      if (!coin.collected && Math.abs(nx + 10 - coin.x) < 15 && Math.abs(ny + 10 - coin.y) < 15) { 
+          coin.collected = true; this.score += 100; playSnd('combo'); addParticle(coin.x, coin.y, '#ff0', 'explosion'); 
+      }
+    }
+
     for (let s of this.fallingSpikes) {
        if (!s.falling && Math.abs(this.p.x - s.x) < 40 && this.p.y > s.y) { s.falling = true; playSnd('hit'); }
        if (s.falling) s.y += 10;
@@ -231,7 +236,6 @@ const Action = {
 
     for (let spike of this.spikes) { if (nx + 20 > spike.x && nx < spike.x + spike.w && ny + 20 > spike.y) { this.die("トゲに刺さった"); return; } }
     
-    // ★ 敵の処理（不死身バグ修正）
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       let e = this.enemies[i];
       e.vy = (e.vy || 0) + gravity; e.y += e.vy; 
@@ -248,7 +252,6 @@ const Action = {
       
       if (Math.abs(nx + 10 - e.x) < 18 && Math.abs(ny + 10 - e.y) < 18) {
         if (this.p.vy > 0 && ny < e.y) { 
-           // ★ 配列から完全に削除することで復活を阻止
            this.enemies.splice(i, 1);
            this.p.vy = -6; this.score += 50; playSnd('hit'); addParticle(e.x, e.y, '#a00', 'explosion'); screenShake(4); 
         } 
@@ -311,16 +314,15 @@ const Action = {
       for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; drawSprite(x, y, '#00f', sprs.player, 2.5); }
       
       if (this.st === 'title') {
-        let maxSt = SaveSys.data.actMaxStage || SaveSys.data.actStage;
-        
         ctx.fillStyle = this.titleCur === 0 ? '#ff0' : '#fff'; ctx.font = 'bold 12px monospace'; 
         ctx.fillText((this.titleCur === 0 ? '> ' : '  ') + 'はじめる', 50, 220);
         
         if (this.titleCur === 0) {
             ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
             ctx.fillText(`[STAGE ${this.stageSelect}]`, 60, 235);
+            // ★ STAGE 1〜6まで自由に選べるように描画も修正
             if (this.stageSelect > 1) ctx.fillText('◀', 45, 235);
-            if (this.stageSelect < maxSt) ctx.fillText('▶', 130, 235);
+            if (this.stageSelect < 6) ctx.fillText('▶', 130, 235);
         }
 
         ctx.fillStyle = this.titleCur === 1 ? '#ff0' : '#ccc'; ctx.font = '10px monospace'; 
@@ -414,8 +416,6 @@ const Action = {
         } 
     }
     for (let spike of this.spikes) { if (spike.x - this.camX > -50 && spike.x - this.camX < 250) drawSprite(spike.x, spike.y, '#aaa', sprs.spike, 2.5); }
-    
-    // ★ 敵の描画
     for (let e of this.enemies) {
       if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;
@@ -423,7 +423,6 @@ const Action = {
         drawSprite(e.x - 4, e.y + offsetY - 4, color, sprs.enemyNew, 2.5);
       }
     }
-    
     if (this.st !== 'dead' && this.st !== 'gameover') {
       ctx.save(); 
       for(let i=0; i<this.p.trail.length; i++) {
@@ -441,11 +440,14 @@ const Action = {
 
     drawParticles();
     
+    // ★ 消滅していたスコア表示を復活！
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 25); 
-    ctx.fillStyle = this.stageTheme === 'final' ? '#f0f' : '#0f0'; ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = this.stageTheme === 'final' ? '#f0f' : '#0f0'; ctx.font = 'bold 10px monospace';
     let stName = this.stageTheme.toUpperCase();
-    ctx.fillText(`ST:${SaveSys.data.actStage} [${stName}]`, 5, 17);
-    ctx.fillStyle = '#f00'; ctx.fillText(`♥:${SaveSys.data.actLives}`, 145, 17);
+    ctx.fillText(`ST${SaveSys.data.actStage}[${stName}]`, 5, 17);
+    
+    ctx.fillStyle = '#ff0'; ctx.fillText(`SC:${this.score}`, 85, 17); // ここにスコア表示を追加
+    ctx.fillStyle = '#f00'; ctx.fillText(`♥:${SaveSys.data.actLives}`, 150, 17);
     
     if (this.st === 'dead' || this.st === 'gameover') { 
       ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 100, 200, 80); ctx.strokeStyle = '#f00'; ctx.strokeRect(0, 100, 200, 80);
