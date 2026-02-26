@@ -1,266 +1,243 @@
-// === ULTIMATE AI FIGHTER (Phase 9: UNITY LOGIC INTEGRATION) ===
+// === AUTO FIGHTER (Phase 8-1: ULTIMATE AI LABORATORY) ===
+
+// 1. 基盤となる列挙型（定数）の定義
+const PassiveType = { NONE: 'なし', VAMPIRE: '吸血鬼', DESPERATION: '背水の陣', GIANT: '巨人の体', NINJA: '忍' };
+const IntroType = { DROP: 'メテオ落下', WARP: '瞬間移動', TAUNT: '挑発' };
+const AtkAttr = { NEUTRAL: '無属性', FIRE: '炎', ICE: '氷', THUNDER: '雷' };
+const AwakenCondition = { NONE: 'なし', HP_UNDER_20: 'HP20%以下', TIME_60S: '60秒経過' };
+
 const AutoFighter = {
   st: 'menu', menuCur: 0, timer: 0,
-  p1: null, p2: null,
-  stageWidth: 800, stageHeight: 500, groundY: 420,
-  scale: 0.6, camX: 0, camY: 0,
-  texts: [], vfx: [],
   
-  // ==========================================
-  // 1. 基盤データ（Enumsの代替）
-  // ==========================================
-  PassiveTypes: { NONE:0, VAMPIRE:1, DESPERATION:2, GIANT:3, NINJA:4 },
-  Attributes: { NEUTRAL:0, FIRE:1, ICE:2, THUNDER:3 },
-  BodyParts: { HEAD:0, TORSO:1, ARMS:2, LEGS:3 },
-  AIStates: { ENEMY_FAR:0, ENEMY_DOWN:1, SELF_LOW_HP:2, DEFAULT:3 },
-
-  // ==========================================
-  // 2. カスタムAIデータ（セーブ対応）
-  // ==========================================
+  // ★ 究極のAIデータ構造（C#の設計図をJSに翻訳）
   myAI: {
-      name: SaveSys.data.playerName || 'AI-PROTOTYPE',
-      // Body & Color
-      body: { width: 1.0, height: 1.0, head: 1.0, color: '#0ff', aura: '#ff0' },
-      // Physics
-      weight: 100, massY: 0,
-      partMultipliers: [2.0, 1.0, 0.5, 1.0], // HEAD, TORSO, ARMS, LEGS
-      // Combat & Skills
-      passive: 0, 
-      skillKeys: ['jab', 'upper', 'smash', 'beam'],
-      // Awakening
-      awakening: { active: false, trigger: 'hp20', triggered: false },
-      // AI Logic (Gambit System)
-      gambits: {
-          ENEMY_FAR: 'beam',
-          SELF_LOW_HP: 'move_back',
-          DEFAULT: 'attack_combo'
+      name: 'ULTIMA-AI',
+      
+      // Part 1: Body & Physics
+      body: { width: 1.0, height: 1.0, head: 1.0 },
+      color: { body: '#0ff', aura: '#ff0' },
+      physics: { weight: 100, centerOfMassY: 0 },
+      
+      // ベースステータス（コスト制用）
+      base: { hp: 1000, atk: 1.0, res: 1.0, spd: 1.0 },
+      
+      // Part 2: Passives & Intro
+      passive: PassiveType.NONE,
+      intro: IntroType.WARP,
+      
+      // Part 3: Awakening
+      awakening: {
+          condition: AwakenCondition.HP_UNDER_20,
+          color: { body: '#000', aura: '#f00' },
+          passive: PassiveType.DESPERATION
       },
-      aggressiveness: 0.5
+      
+      // AI Logic (ガンビットは第2回で実装)
+      aggro: 0.5, guardRate: 0.2, dodgeRate: 0.2, prefRange: 40,
+      
+      skillKeys: ['jab', 'upper', 'smash', 'meteor']
   },
 
-  Skills: {
-      jab:   {name:'ジャブ', dmg:15, kb:2,  range:35,  start:4,  act:10, rec:10, cd:15, vx:3,  type:'jab', attr:0},
-      upper: {name:'アッパー', dmg:25, kb:2,  range:40,  start:7,  act:15, rec:20, cd:25, vx:5,  type:'upper', attr:0},
-      smash: {name:'スマッシュ', dmg:50, kb:14, range:45,  start:14, act:20, rec:30, cd:40, vx:8,  type:'smash', attr:1},
-      beam:  {name:'ビーム', dmg:40, kb:10, range:250, start:25, act:15, rec:40, cd:60, vx:-2, type:'beam', attr:3},
-      meteor:{name:'メテオ', dmg:60, kb:18, range:45,  start:10, act:15, rec:30, cd:45, vx:6,  type:'meteor', attr:0}
-  },
+  // 育成UI用の変数
+  labSt: 'main', labCur: 0, labVals: [0, 0, 0], // 体型変更などの一時保存用
 
-  // ==========================================
-  // 3. エンジンコア
-  // ==========================================
-  init() { this.st = 'menu'; this.menuCur = 0; BGM.play('menu'); },
-
-  startBattle() {
-    this.st = 'intro'; this.timer = 0; this.texts = []; this.vfx = [];
-    
-    const createFighter = (isP2, data) => ({
-      ...data, id: isP2?2:1, x: isP2?550:250, y: this.groundY, dir: isP2?-1:1,
-      hp: 1000, maxHp: 1000, vx:0, vy:0, state:'idle', stateFrame:0, cd:0,
-      guarding: false, justGuardWindow: 0, trail: [], combo: 0, hitCancel: false,
-      isAwakened: false,
-      // 内部計算用
-      get curAtk() { return (this.isAwakened ? 1.5 : 1.0) * (this.passive === 2 && this.hp < 300 ? 1.5 : 1.0); },
-      get curRes() { return (this.passive === 3 ? 1.2 : 1.0); }
-    });
-
-    this.p1 = createFighter(false, JSON.parse(JSON.stringify(this.myAI)));
-    // P2はランダム生成
-    this.p2 = createFighter(true, JSON.parse(JSON.stringify(this.myAI)));
-    this.p2.name = "CPU-ULTIMATE"; this.p2.body.color = '#f55';
-
-    this.camX = (this.p1.x + this.p2.x)/2 - 100/this.scale;
-    this.camY = this.groundY - 150/this.scale;
-    BGM.play('action');
+  init() { 
+      this.st = 'menu'; this.menuCur = 0; 
+      BGM.play('menu'); 
   },
 
   update() {
     if (keysDown.select) { switchApp(Menu); return; }
+
+    // --- メインメニュー ---
     if (this.st === 'menu') {
         if (keysDown.up) { this.menuCur = (this.menuCur - 1 + 2) % 2; playSnd('sel'); }
         if (keysDown.down) { this.menuCur = (this.menuCur + 1) % 2; playSnd('sel'); }
-        if (keysDown.a) { if(this.menuCur===0) this.startBattle(); else this.st = 'lab'; }
+        if (keysDown.a) {
+            playSnd('jmp');
+            if (this.menuCur === 0) { 
+                // バトル開始（第3回で実装）
+                alert("バトルシステムは現在改修中じゃ！育成を試してくれい！");
+            }
+            else { 
+                // 究極のAIラボへ
+                this.st = 'lab_main'; this.labCur = 0; 
+            }
+        }
         return;
     }
-    if (this.st === 'lab') { /* ラボ画面は後述のUI拡張で実装 */ if(keysDown.b) this.st='menu'; return; }
 
-    // --- バトル中 ---
-    this.processFighter(this.p1, this.p2);
-    this.processFighter(this.p2, this.p1);
-    this.updateVFX();
-
-    // 覚醒チェック
-    [this.p1, this.p2].forEach(f => {
-        if (!f.isAwakened && f.hp < 200) { 
-            f.isAwakened = true; playSnd('combo'); screenShake(20);
-            this.addText(f.x, f.y-60, "AWAKEN!!", f.body.aura);
-            this.addVFX('shockwave', f.x, f.y, f.body.aura, {size:100, life:30});
+    // --- 究極のAIラボ（メインメニュー） ---
+    if (this.st === 'lab_main') {
+        const labItems = ['体型＆カラー設定', 'パッシブ＆覚醒', 'ステータス調整', '戻る'];
+        if (keysDown.up) { this.labCur = (this.labCur - 1 + labItems.length) % labItems.length; playSnd('sel'); }
+        if (keysDown.down) { this.labCur = (this.labCur + 1) % labItems.length; playSnd('sel'); }
+        if (keysDown.a) {
+            playSnd('hit');
+            if (this.labCur === 0) { this.st = 'lab_body'; this.labCur = 0; }
+            else if (this.labCur === 1) { this.st = 'lab_awaken'; this.labCur = 0; }
+            else if (this.labCur === 2) { this.st = 'lab_stats'; this.labCur = 0; }
+            else { this.st = 'menu'; this.menuCur = 0; }
         }
-    });
-
-    // カメラ
-    let targetX = (this.p1.x + this.p2.x)/2 - (200/this.scale)/2;
-    let targetY = (this.p1.y + this.p2.y)/2 - (300/this.scale)*0.6;
-    this.camX += (targetX - this.camX) * 0.1; this.camY += (targetY - this.camY) * 0.1;
-
-    if (this.p1.hp <= 0 || this.p2.hp <= 0) { this.st = 'result'; playSnd('combo'); }
-  },
-
-  processFighter(f, opp) {
-    f.stateFrame++;
-    if (f.cd > 0) f.cd -= (f.spd);
-
-    // 物理
-    f.x += f.vx; f.y += f.vy; f.vx *= 0.85;
-    if (f.y < this.groundY) f.vy += 0.6; else { f.y = this.groundY; f.vy = 0; }
-    f.x = Math.max(10, Math.min(this.stageWidth - 10, f.x));
-
-    // ガンビットAIロジック
-    if (f.state === 'idle' && f.cd <= 0) {
-        let dist = Math.abs(f.x - opp.x);
-        let condition = this.AIStates.DEFAULT;
-        if (dist > 150) condition = this.AIStates.ENEMY_FAR;
-        if (f.hp < 300) condition = this.AIStates.SELF_LOW_HP;
-
-        let command = f.gambits[Object.keys(this.AIStates)[condition]];
-        this.executeCommand(f, opp, command, dist);
+        if (keysDown.b) { this.st = 'menu'; playSnd('hit'); }
+        return;
     }
 
-    // 攻撃演出
-    if (f.state.startsWith('atk_')) {
-        let s = this.Skills[f.state.split('_')[1]];
-        if (f.stateFrame === s.start) this.createHitbox(f, s, opp);
-        if (f.stateFrame > s.start + s.rec) { f.state = 'idle'; f.stateFrame = 0; }
+    // --- 体型＆カラー設定 ---
+    if (this.st === 'lab_body') {
+        if (keysDown.up) { this.labCur = (this.labCur - 1 + 4) % 4; playSnd('sel'); }
+        if (keysDown.down) { this.labCur = (this.labCur + 1) % 4; playSnd('sel'); }
+        if (keysDown.b) { this.st = 'lab_main'; this.labCur = 0; playSnd('hit'); return; }
+
+        let valChange = 0;
+        if (keys.left) valChange = -0.05;
+        if (keys.right) valChange = 0.05;
+
+        if (valChange !== 0) {
+            if (this.labCur === 0) this.myAI.body.width = Math.max(0.5, Math.min(2.0, this.myAI.body.width + valChange));
+            if (this.labCur === 1) this.myAI.body.height = Math.max(0.5, Math.min(2.0, this.myAI.body.height + valChange));
+            if (this.labCur === 2) this.myAI.physics.weight = Math.max(50, Math.min(200, this.myAI.physics.weight + valChange * 100));
+            // 色はとりあえずランダム変更（後で詳細パレット化可能）
+            if (this.labCur === 3 && keysDown.right) this.myAI.color.body = '#' + Math.floor(Math.random()*16777215).toString(16).padEnd(6,'0');
+        }
+        return;
     }
-    
-    // 残像
-    if (Math.abs(f.vx) > 5 || f.isAwakened) {
-        f.trail.unshift({x:f.x, y:f.y, f:f.stateFrame});
-        if (f.trail.length > 6) f.trail.pop();
-    } else if (f.trail.length > 0) f.trail.pop();
-  },
 
-  executeCommand(f, opp, cmd, dist) {
-    if (cmd === 'beam') { f.state = 'atk_beam'; f.stateFrame = 0; f.cd = 60; }
-    else if (cmd === 'move_back') { f.vx = -f.dir * 8; f.cd = 20; }
-    else {
-        if (dist < 40) { f.state = 'atk_jab'; f.stateFrame = 0; f.cd = 15; }
-        else { f.vx = f.dir * 5; }
-    }
-  },
+    // --- パッシブ＆覚醒設定 ---
+    if (this.st === 'lab_awaken') {
+        if (keysDown.up) { this.labCur = (this.labCur - 1 + 3) % 3; playSnd('sel'); }
+        if (keysDown.down) { this.labCur = (this.labCur + 1) % 3; playSnd('sel'); }
+        if (keysDown.b) { this.st = 'lab_main'; this.labCur = 1; playSnd('hit'); return; }
 
-  createHitbox(attacker, skill, victim) {
-    let dist = Math.abs(attacker.x - victim.x);
-    if (dist < skill.range) {
-        // 部位判定（簡易）
-        let hitPart = this.BodyParts.TORSO;
-        if (victim.y < this.groundY - 20) hitPart = this.BodyParts.LEGS;
-        if (Math.random() > 0.8) hitPart = this.BodyParts.HEAD;
-
-        // ダメージ計算（Unityロジック移植）
-        let baseDmg = skill.dmg * attacker.curAtk;
-        let partMul = victim.partMultipliers[hitPart];
-        let finalDmg = (baseDmg * partMul) - (victim.weight - 100) * 0.1;
-        
-        // パッシブ（巨人の体）
-        if (victim.passive === 3) finalDmg *= 0.8;
-
-        victim.hp -= Math.max(1, finalDmg);
-        victim.vx = attacker.dir * skill.kb * (1/victim.curRes);
-        victim.state = 'hurt'; victim.stateFrame = 0;
-        
-        // パッシブ（吸血鬼）
-        if (attacker.passive === 1) attacker.hp = Math.min(attacker.maxHp, attacker.hp + finalDmg * 0.2);
-
-        this.addVFX('impact', victim.x, victim.y-20, attacker.body.color, {size: 30});
-        if (hitPart === this.BodyParts.HEAD) this.addText(victim.x, victim.y-50, "CRITICAL!!", "#ff0");
-        playSnd('hit');
+        if (keysDown.right || keysDown.left) {
+            playSnd('sel');
+            let dir = keysDown.right ? 1 : -1;
+            if (this.labCur === 0) {
+                let keys = Object.keys(PassiveType);
+                let idx = keys.indexOf(Object.keys(PassiveType).find(k => PassiveType[k] === this.myAI.passive));
+                this.myAI.passive = PassiveType[keys[(idx + dir + keys.length) % keys.length]];
+            }
+            else if (this.labCur === 1) {
+                let keys = Object.keys(AwakenCondition);
+                let idx = keys.indexOf(Object.keys(AwakenCondition).find(k => AwakenCondition[k] === this.myAI.awakening.condition));
+                this.myAI.awakening.condition = AwakenCondition[keys[(idx + dir + keys.length) % keys.length]];
+            }
+            else if (this.labCur === 2) {
+                let keys = Object.keys(IntroType);
+                let idx = keys.indexOf(Object.keys(IntroType).find(k => IntroType[k] === this.myAI.intro));
+                this.myAI.intro = IntroType[keys[(idx + dir + keys.length) % keys.length]];
+            }
+        }
+        return;
     }
   },
 
-  updateVFX() {
-    for (let i = this.texts.length - 1; i >= 0; i--) { this.texts[i].life--; if (this.texts[i].life <= 0) this.texts.splice(i,1); }
-    for (let i = this.vfx.length - 1; i >= 0; i--) { this.vfx[i].life--; if (this.vfx[i].life <= 0) this.vfx.splice(i,1); }
-    if (typeof updateParticles === 'function') updateParticles();
+  // プレビュー用の棒人間描画（体型スケール対応）
+  drawPreviewStickman(x, y, aiData, isAwakened = false) {
+      let b = aiData.body;
+      let c = isAwakened ? aiData.awakening.color : aiData.color;
+      
+      ctx.save();
+      ctx.translate(x, y);
+      
+      // ★ C#の ApplyBodyScale を Canvas の scale で再現
+      ctx.scale(b.width, b.height); 
+      
+      ctx.strokeStyle = c.body; ctx.lineWidth = 3 / Math.max(b.width, b.height); 
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      
+      // 息継ぎアニメーション
+      let t = Date.now() / 300;
+      let breath = Math.sin(t) * 2;
+      
+      let p = { h:{x:0,y:-30+breath}, n:{x:0,y:-20+breath}, hip:{x:0,y:-5}, sL:{x:-10,y:-10+breath}, sR:{x:10,y:-10+breath}, eL:{x:-15,y:5+breath}, eR:{x:15,y:5+breath}, hL:{x:-10,y:15+breath}, hR:{x:10,y:15+breath}, kL:{x:-10,y:10}, kR:{x:10,y:10}, fL:{x:-15,y:25}, fR:{x:15,y:25} };
+
+      // オーラ（覚醒時は激しく）
+      ctx.shadowBlur = isAwakened ? 20 + Math.random()*10 : 10; 
+      ctx.shadowColor = c.aura;
+
+      ctx.beginPath();
+      ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.hip.x, p.hip.y); // 胴
+      ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.sL.x, p.sL.y); ctx.lineTo(p.eL.x, p.eL.y); ctx.lineTo(p.hL.x, p.hL.y); // 左腕
+      ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.sR.x, p.sR.y); ctx.lineTo(p.eR.x, p.eR.y); ctx.lineTo(p.hR.x, p.hR.y); // 右腕
+      ctx.moveTo(p.hip.x, p.hip.y); ctx.lineTo(p.kL.x, p.kL.y); ctx.lineTo(p.fL.x, p.fL.y); // 左脚
+      ctx.moveTo(p.hip.x, p.hip.y); ctx.lineTo(p.kR.x, p.kR.y); ctx.lineTo(p.fR.x, p.fR.y); // 右脚
+      ctx.stroke();
+      
+      ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(p.h.x, p.h.y, 8 * b.head, 0, Math.PI * 2); 
+      ctx.fillStyle = c.body; ctx.fill();
+
+      ctx.restore();
   },
 
-  // ==========================================
-  // 4. レンダリング（多関節＆体型反映）
-  // ==========================================
   draw() {
-    const grad = ctx.createLinearGradient(0, 0, 0, 300);
-    grad.addColorStop(0, '#050510'); grad.addColorStop(1, '#101025');
+    // --- 共通背景 ---
+    const grad = ctx.createLinearGradient(0, 0, 0, 300); grad.addColorStop(0, '#001'); grad.addColorStop(1, '#003');
     ctx.fillStyle = grad; ctx.fillRect(0, 0, 200, 300);
 
-    ctx.save();
-    ctx.scale(this.scale, this.scale);
-    ctx.translate(-this.camX, -this.camY);
-
-    // 地面
-    ctx.strokeStyle = '#334'; ctx.strokeRect(0, this.groundY, this.stageWidth, 100);
-
-    [this.p1, this.p2].forEach(f => this.drawFighter(f));
-    this.vfx.forEach(v => this.drawVFX(v));
-    this.texts.forEach(t => { ctx.fillStyle=t.color; ctx.font="bold 20px monospace"; ctx.fillText(t.text, t.x-30, t.y); });
-
-    ctx.restore();
-    
-    // UI
-    this.drawUI();
-  },
-
-  drawFighter(f) {
-    let b = f.body;
-    ctx.save();
-    ctx.translate(f.x, f.y);
-    if (f.dir === -1) ctx.scale(-1, 1);
-    
-    // ★ 覚醒オーラ
-    if (f.isAwakened) {
-        ctx.shadowBlur = 15; ctx.shadowColor = b.aura;
-        this.addVFX('aura', f.x, f.y, b.aura, {life:1, size: 40});
+    // --- メインメニュー ---
+    if (this.st === 'menu') {
+        ctx.fillStyle = '#0ff'; ctx.font = 'bold 16px monospace'; ctx.fillText('ULTIMATE AI LAB', 25, 50);
+        ctx.fillStyle = this.menuCur === 0 ? '#ff0' : '#fff'; ctx.font = '12px monospace';
+        ctx.fillText((this.menuCur === 0 ? '> ' : '  ') + 'BATTLE START', 40, 150);
+        ctx.fillStyle = this.menuCur === 1 ? '#ff0' : '#fff';
+        ctx.fillText((this.menuCur === 1 ? '> ' : '  ') + 'AI CUSTOMIZE', 40, 180);
     }
-
-    // ★ Unityロジックの体型反映
-    // 横幅(width), 縦幅(height), 頭(headSize)
-    ctx.strokeStyle = b.color; ctx.lineWidth = 3;
-    let hY = -35 * b.height;
-    let headR = 7 * b.head;
     
-    // 胴体
-    ctx.beginPath();
-    ctx.moveTo(0, hY + 5); ctx.lineTo(0, -5); // 背骨
-    // 腕（横幅反映）
-    ctx.moveTo(-15 * b.width, hY + 15); ctx.lineTo(15 * b.width, hY + 15);
-    // 脚
-    ctx.moveTo(0, -5); ctx.lineTo(-10 * b.width, 0);
-    ctx.moveTo(0, -5); ctx.lineTo(10 * b.width, 0);
-    ctx.stroke();
+    // --- AIラボ（育成画面共通 UI） ---
+    else if (this.st.startsWith('lab_')) {
+        // 上部に常にプレビューを表示
+        ctx.fillStyle = '#112'; ctx.fillRect(10, 10, 180, 110);
+        ctx.strokeStyle = '#335'; ctx.strokeRect(10, 10, 180, 110);
+        
+        // 通常状態と覚醒状態のプレビュー
+        ctx.fillStyle = '#888'; ctx.font = '8px monospace';
+        ctx.fillText('NORMAL', 40, 25); ctx.fillText('AWAKENED', 130, 25);
+        this.drawPreviewStickman(50, 70, this.myAI, false);
+        this.drawPreviewStickman(145, 70, this.myAI, true);
 
-    // 頭
-    ctx.fillStyle = b.color;
-    ctx.beginPath(); ctx.arc(0, hY, headR, 0, Math.PI*2); ctx.fill();
-    
-    ctx.restore();
-  },
-
-  drawVFX(v) {
-    ctx.globalAlpha = v.life / v.maxLife;
-    ctx.fillStyle = v.color;
-    if (v.type === 'impact') ctx.fillRect(v.x-v.size/2, v.y-v.size/2, v.size, v.size);
-    if (v.type === 'shockwave') { ctx.strokeStyle=v.color; ctx.beginPath(); ctx.arc(v.x, v.y, v.size*(1-v.life/v.maxLife), 0, Math.PI*2); ctx.stroke(); }
-    ctx.globalAlpha = 1;
-  },
-
-  drawUI() {
-    ctx.fillStyle = '#000'; ctx.fillRect(0,0,200,40);
-    [this.p1, this.p2].forEach((f, i) => {
-        let x = i===0?10:110;
-        ctx.fillStyle = '#333'; ctx.fillRect(x, 10, 80, 10);
-        ctx.fillStyle = f.hp > 300 ? f.body.color : '#f00';
-        ctx.fillRect(x, 10, (f.hp/1000)*80, 10);
-        ctx.fillStyle = '#fff'; ctx.font = '8px monospace';
-        ctx.fillText(f.name, x, 30);
-    });
+        // 各種設定メニュー
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace';
+        
+        if (this.st === 'lab_main') {
+            ctx.fillText('【CUSTOMIZE MENU】', 30, 145);
+            const items = ['体型＆カラー設定', 'パッシブ＆覚醒', 'ステータス調整', '戻る'];
+            ctx.font = '10px monospace';
+            for(let i=0; i<items.length; i++) {
+                ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff';
+                ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 170 + i * 25);
+            }
+        }
+        else if (this.st === 'lab_body') {
+            ctx.fillText('【BODY & PHYSICS】', 30, 145);
+            ctx.font = '10px monospace';
+            const items = [
+                `横幅(W) : ${this.myAI.body.width.toFixed(2)}`,
+                `縦幅(H) : ${this.myAI.body.height.toFixed(2)}`,
+                `重量(WT): ${Math.floor(this.myAI.physics.weight)}kg`,
+                `ボディ色: [CHANGE]`
+            ];
+            for(let i=0; i<items.length; i++) {
+                ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff';
+                ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 170 + i * 25);
+            }
+            ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右キーで調整 ▶', 45, 275);
+        }
+        else if (this.st === 'lab_awaken') {
+            ctx.fillText('【SKILL & AWAKEN】', 30, 145);
+            ctx.font = '10px monospace';
+            const items = [
+                `常時 : ${this.myAI.passive}`,
+                `条件 : ${this.myAI.awakening.condition}`,
+                `登場 : ${this.myAI.intro}`
+            ];
+            for(let i=0; i<items.length; i++) {
+                ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff';
+                ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 15, 170 + i * 30);
+            }
+            ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右キーで変更 ▶', 45, 275);
+        }
+    }
   }
 };
