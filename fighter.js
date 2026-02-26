@@ -1,94 +1,110 @@
-// === AUTO FIGHTER (Phase 9: ULTIMATE BATTLE INTEGRATION) ===
+// === AUTO FIGHTER (Phase 10: ULTIMATE STYLE & SKILLS) ===
 
-const PassiveType = { NONE: 'なし', VAMPIRE: '吸血鬼', DESPERATION: '背水の陣', GIANT: '巨人の体', NINJA: '忍' };
-const IntroType = { DROP: 'メテオ落下', WARP: '瞬間移動', TAUNT: '挑発' };
-const AwakenCondition = { NONE: 'なし', HP_UNDER_20: 'HP20%以下', TIME_60S: '60秒経過' };
+const Styles = {
+    RUSH: { name: 'インファイター', desc: '常に前進し、接近戦でのコンボを狙う。手数が多く攻撃的。', aggro: 0.8, guard: 0.1, dodge: 0.1, range: 35 },
+    ZONE: { name: 'アウトレンジャー', desc: '距離を保ち、遠距離技でじわじわ削る。近づかれると逃げる。', aggro: 0.3, guard: 0.2, dodge: 0.5, range: 120 },
+    COUNTER: { name: 'カウンター特化', desc: 'ガードと回避を多用して敵の攻撃を誘い、隙に強烈な反撃を叩き込む。', aggro: 0.2, guard: 0.6, dodge: 0.2, range: 50 },
+    TRICKY: { name: 'トリッキー', desc: '不規則なステップやワープ技を駆使し、相手を翻弄する変則スタイル。', aggro: 0.5, guard: 0.2, dodge: 0.3, range: 80 }
+};
 
-const CondType = { FAR: '敵と距離が遠い時', AIR: '敵が空中にいる時', HP_LOW: '自分のHP30%以下', DEFAULT: 'それ以外の基本行動' };
-const ActType = { COMBO: 'コンボ始動', BEAM: 'ビーム(遠距離)', SLIDE: 'スライド(突進)', RETREAT: '後退・様子見', GUARD: 'ガード・待機' };
-const SkillDict = { jab: 'ジャブ', upper: 'アッパー', smash: 'スマッシュ', meteor: 'メテオ', slide: 'スライド', beam: 'ビーム' };
+const Passives = {
+    NONE: { name: 'なし', desc: '特別な効果を持たない。' },
+    VAMPIRE: { name: '吸血鬼', desc: '与えたダメージの20%だけ、自身のHPを回復する。' },
+    DESPERATION: { name: '背水の陣', desc: '自身のHPが30%以下の時、与えるダメージが1.5倍になる。' },
+    GIANT: { name: '巨人の体', desc: '常に受けるダメージを20%カットする。重量級向け。' },
+    NINJA: { name: '忍', desc: '移動スピードと回避距離がアップする。軽量級向け。' }
+};
+
+const AwakenConds = {
+    NONE: { name: 'なし', desc: '覚醒を行わない。' },
+    HP20: { name: 'HP20%以下', desc: 'HPが残り20%を切ると、強力なオーラと共に覚醒する。' },
+    TIME: { name: '30秒経過', desc: 'バトル開始から30秒経つと強制的に覚醒する。' }
+};
+
+const Skills = {
+    jab: {name:'ジャブ', dmg: 10, kb: 2, range: 35, start: 4, act: 8, rec: 12, cd: 10, vx: 4, type: 'melee', desc: '発生が最速の基本技。コンボの起点になる。'},
+    upper: {name:'アッパー', dmg: 20, kb: 2, range: 40, start: 7, act: 12, rec: 20, cd: 20, vx: 5, type: 'melee', desc: '相手を高く打ち上げる。空中コンボへ繋げやすい。'},
+    smash: {name:'スマッシュ', dmg: 40, kb: 12, range: 45, start: 14, act: 15, rec: 35, cd: 40, vx: 8, type: 'melee', desc: '大振りだが、相手を強烈に吹き飛ばす必殺の一撃。'},
+    meteor: {name:'メテオ', dmg: 50, kb: 15, range: 45, start: 10, act: 15, rec: 30, cd: 40, vx: 6, type: 'air', desc: '【空中専用】空中の敵を地面に叩き落とす。'},
+    slide: {name:'スライド', dmg: 20, kb: 4, range: 45, start: 6, act: 20, rec: 20, cd: 25, vx: 12, type: 'melee', desc: '姿勢を低くして高速で突進する奇襲技。'},
+    beam: {name:'ビーム', dmg: 40, kb: 10, range: 250, start: 25, act: 15, rec: 40, cd: 60, vx: -2, type: 'range', desc: '長距離レーザー。発生は遅いが画面端まで届く。'},
+    // ★ 新規追加スキル
+    sonic: {name:'ソニック', dmg: 25, kb: 4, range: 200, start: 12, act: 1, rec: 25, cd: 30, vx: 0, type: 'shot', desc: '前方に高速で飛んでいく衝撃波（飛び道具）を放つ。'},
+    dive: {name:'急降下', dmg: 35, kb: 8, range: 60, start: 8, act: 15, rec: 25, cd: 30, vx: 10, type: 'air', desc: '【空中専用】空中から斜め下へ鋭く突進蹴りを行う。'},
+    shoryu: {name:'昇龍拳', dmg: 30, kb: 10, range: 40, start: 5, act: 15, rec: 35, cd: 35, vx: 4, type: 'melee', desc: '無敵の勢いで飛び上がりながら攻撃。対空に優れる。'},
+    tackle: {name:'タックル', dmg: 35, kb: 12, range: 50, start: 15, act: 15, rec: 30, cd: 40, vx: 14, type: 'melee', desc: '怯みにくい強烈なショルダータックル。'},
+    heal: {name:'ヒール', dmg: 0, kb: 0, range: 0, start: 30, act: 5, rec: 30, cd: 120, vx: 0, type: 'buff', desc: '無防備な構えを取るが、自身のHPを200回復する。'},
+    warpAtk: {name:'幻影斬', dmg: 25, kb: 5, range: 150, start: 15, act: 10, rec: 25, cd: 50, vx: 0, type: 'warp', desc: '相手の背後に一瞬でワープして斬りつける。'}
+};
+
+const SkillKeys = Object.keys(Skills);
+const CounterData = {name:'カウンター', dmg: 70, kb: 15, range: 45, start: 4, act: 15, rec: 20, cd: 0, vx: 8, type: 'melee'};
 
 const AutoFighter = {
   st: 'menu', menuCur: 0, timer: 0,
   stageWidth: 800, stageHeight: 500, groundY: 420, scale: 0.65, camX: 0, camY: 0,
-  texts: [], vfx: [],
+  texts: [], vfx: [], bullets: [],
   
+  // ★ 自分専用AIのデータ構造（わかりやすく整理）
   myAI: {
       name: 'MY-ULTIMA',
       body: { width: 1.0, height: 1.0, head: 1.0 },
       color: { body: '#0ff', aura: '#ff0' },
-      physics: { weight: 100, centerOfMassY: 0 },
-      base: { atk: 1.0, res: 1.0, spd: 1.0 }, // ステータス割り振り用（合計3.0）
-      passive: PassiveType.NONE,
-      intro: IntroType.WARP,
-      awakening: { condition: AwakenCondition.HP_UNDER_20, color: { body: '#000', aura: '#f00' }, passive: PassiveType.DESPERATION },
-      gambits: [
-          { cond: CondType.HP_LOW, act: ActType.RETREAT }, 
-          { cond: CondType.FAR, act: ActType.BEAM },       
-          { cond: CondType.AIR, act: ActType.GUARD },      
-          { cond: CondType.DEFAULT, act: ActType.COMBO }   
-      ],
-      comboRoute: ['jab', 'upper', 'meteor'] 
-  },
-
-  Skills: {
-      jab: {name:'ジャブ', dmg: 15, kb: 2, range: 35, start: 4, act: 10, rec: 15, cd: 15, vx: 4, hitType: 'jab'},
-      upper: {name:'アッパー', dmg: 25, kb: 2, range: 40, start: 7, act: 15, rec: 20, cd: 25, vx: 5, hitType: 'upper'},
-      smash: {name:'スマッシュ', dmg: 50, kb: 14, range: 45, start: 14, act: 20, rec: 35, cd: 40, vx: 8, hitType: 'smash'},
-      meteor: {name:'メテオ', dmg: 60, kb: 18, range: 45, start: 10, act: 15, rec: 30, cd: 40, vx: 6, hitType: 'meteor'},
-      slide: {name:'スライド', dmg: 20, kb: 4, range: 45, start: 6, act: 20, rec: 20, cd: 25, vx: 12, hitType: 'slide'}, 
-      beam: {name:'ビーム', dmg: 40, kb: 10, range: 250, start: 25, act: 15, rec: 40, cd: 60, vx: -2, hitType: 'beam'},
-      counter: {name:'カウンター', dmg: 90, kb: 15, range: 45, start: 4, act: 15, rec: 20, cd: 0, vx: 8, hitType: 'counter'} 
+      physics: { weight: 100 },
+      base: { atk: 1.0, res: 1.0, spd: 1.0 },
+      
+      styleKey: 'RUSH', 
+      skillKeys: ['jab', 'upper', 'smash', 'sonic'], // スロット4つ
+      
+      passiveKey: 'NONE',
+      awakenCond: 'HP20',
+      awakenPassive: 'DESPERATION',
+      awakenColor: '#f00' 
   },
 
   labSt: 'main', labCur: 0, 
 
   init() { this.st = 'menu'; this.menuCur = 0; BGM.play('menu'); },
 
-  // ★ バトルセットアップ
   startBattle() {
-    this.st = 'intro'; this.timer = 0; this.texts = []; this.vfx = [];
+    this.st = 'intro'; this.timer = 0; this.texts = []; this.vfx = []; this.bullets = [];
     
     const createFighter = (isP2, data) => ({
       id: isP2 ? 2 : 1, x: isP2 ? 550 : 250, y: this.groundY, dir: isP2 ? -1 : 1, 
       hp: 1000, maxHp: 1000, 
       base: data.base, body: data.body, color: data.color, physics: data.physics,
-      passive: data.passive, intro: data.intro, awakening: data.awakening,
-      gambits: data.gambits, comboRoute: data.comboRoute,
+      styleKey: data.styleKey, skillKeys: data.skillKeys,
+      passiveKey: data.passiveKey, awakenCond: data.awakenCond, awakenPassive: data.awakenPassive, awakenColor: data.awakenColor,
       
-      counterSkill: this.Skills.counter,
       state: 'idle', stateFrame: 0, cd: 0, name: data.name,
       vx: 0, vy: 0, guarding: false, justGuardWindow: 0, trail: [],
-      hitCancel: false, combo: 0, comboTimer: 0, comboIndex: 0,
-      isAwakened: false
+      hitCancel: false, combo: 0, comboTimer: 0, isAwakened: false
     });
     
     this.p1 = createFighter(false, this.myAI);
     
-    // CPU側の設定（強力なボス仕様）
-    let cpuAI = {
-        name: 'CPU-BOSS',
-        body: { width: 1.2, height: 1.2, head: 0.9 }, color: { body: '#500', aura: '#f00' }, physics: { weight: 140, centerOfMassY: 0 },
-        base: { atk: 1.2, res: 1.2, spd: 0.6 }, // 鈍重だが高火力
-        passive: PassiveType.GIANT, intro: IntroType.DROP,
-        awakening: { condition: AwakenCondition.TIME_60S, color: { body: '#000', aura: '#f0f' }, passive: PassiveType.VAMPIRE },
-        gambits: [
-            { cond: CondType.HP_LOW, act: ActType.BEAM },
-            { cond: CondType.FAR, act: ActType.SLIDE },
-            { cond: CondType.AIR, act: ActType.COMBO },
-            { cond: CondType.DEFAULT, act: ActType.COMBO }
-        ],
-        comboRoute: ['slide', 'upper', 'meteor']
-    };
-    this.p2 = createFighter(true, cpuAI);
+    // 敵はランダムなスタイルと技を持つ汎用型
+    let eStyle = Object.keys(Styles)[Math.floor(Math.random()*4)];
+    let eSkills = [...SkillKeys].sort(()=>Math.random()-0.5).slice(0,4);
+    this.p2 = createFighter(true, { 
+        name: 'CPU-' + eStyle, body: { width: 1.0, height: 1.0, head: 1.0 }, color: { body: '#f0f', aura: '#f00' }, physics: { weight: 100 },
+        base: { atk: 1.0, res: 1.0, spd: 1.0 }, styleKey: eStyle, skillKeys: eSkills,
+        passiveKey: 'NONE', awakenCond: 'NONE', awakenPassive: 'NONE', awakenColor: '#f00'
+    });
     
-    this.camX = (this.p1.x + this.p2.x) / 2 - (200 / this.scale) / 2; 
-    this.camY = this.groundY - (300 / this.scale) / 2;
+    this.camX = (this.p1.x + this.p2.x) / 2 - (200 / this.scale) / 2; this.camY = this.groundY - (300 / this.scale) / 2;
     BGM.play('action');
   },
 
-  addText(x, y, text, color) { this.texts.push({x, y, text, color, life: 40}); },
-  addVFX(type, x, y, color, extra={}) { this.vfx.push({type, x, y, color, life: extra.life||20, maxLife: extra.life||20, ...extra}); },
+  // ★ 説明文を描画するヘルパー関数
+  drawDescBox(title, descStr) {
+      ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(5, 205, 190, 90);
+      ctx.strokeStyle = '#555'; ctx.strokeRect(5, 205, 190, 90);
+      ctx.fillStyle = '#ff0'; ctx.font = 'bold 11px monospace'; ctx.fillText(title, 15, 220);
+      ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+      let lines = []; for(let i=0; i<descStr.length; i+=17) lines.push(descStr.substring(i, i+17));
+      for(let i=0; i<lines.length; i++) ctx.fillText(lines[i], 15, 238 + i*13);
+  },
 
   update() {
     if (keysDown.select) { switchApp(Menu); return; }
@@ -96,51 +112,85 @@ const AutoFighter = {
     if (this.st === 'menu') {
         if (keysDown.up) { this.menuCur = (this.menuCur - 1 + 2) % 2; playSnd('sel'); }
         if (keysDown.down) { this.menuCur = (this.menuCur + 1) % 2; playSnd('sel'); }
-        if (keysDown.a) { playSnd('jmp'); if (this.menuCur === 0) { this.startBattle(); } else { this.st = 'lab_main'; this.labCur = 0; } }
+        if (keysDown.a) { playSnd('jmp'); if (this.menuCur === 0) this.startBattle(); else { this.st = 'lab_main'; this.labCur = 0; } }
         return;
     }
 
     if (this.st === 'lab_main') {
-        const labItems = ['体型＆カラー設定', 'ステータス配分', 'パッシブ＆覚醒', 'ガンビット(思考AI)', 'コンボルート', '戻る'];
+        const labItems = ['戦闘スタイル設定', 'スキルセット', 'パッシブ＆覚醒', 'ステータス配分', '体型＆カラー', '戻る'];
         if (keysDown.up) { this.labCur = (this.labCur - 1 + labItems.length) % labItems.length; playSnd('sel'); }
         if (keysDown.down) { this.labCur = (this.labCur + 1) % labItems.length; playSnd('sel'); }
         if (keysDown.a) {
             playSnd('hit');
-            if (this.labCur === 0) { this.st = 'lab_body'; this.labCur = 0; }
-            else if (this.labCur === 1) { this.st = 'lab_stats'; this.labCur = 0; }
+            if (this.labCur === 0) { this.st = 'lab_style'; this.labCur = 0; }
+            else if (this.labCur === 1) { this.st = 'lab_skills'; this.labCur = 0; }
             else if (this.labCur === 2) { this.st = 'lab_awaken'; this.labCur = 0; }
-            else if (this.labCur === 3) { this.st = 'lab_gambit'; this.labCur = 0; }
-            else if (this.labCur === 4) { this.st = 'lab_combo'; this.labCur = 0; }
+            else if (this.labCur === 3) { this.st = 'lab_stats'; this.labCur = 0; }
+            else if (this.labCur === 4) { this.st = 'lab_body'; this.labCur = 0; }
             else { this.st = 'menu'; this.menuCur = 0; }
         }
         if (keysDown.b) { this.st = 'menu'; playSnd('hit'); } return;
+    }
+
+    // --- UI: 戦闘スタイル ---
+    if (this.st === 'lab_style') {
+        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 0; playSnd('hit'); return; }
+        if (keysDown.right || keysDown.left) {
+            playSnd('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(Styles); 
+            let idx = keys.indexOf(this.myAI.styleKey); this.myAI.styleKey = keys[(idx + dir + keys.length) % keys.length];
+        } return;
+    }
+
+    // --- UI: スキルセット ---
+    if (this.st === 'lab_skills') {
+        if (keysDown.up) { this.labCur = (this.labCur - 1 + 4) % 4; playSnd('sel'); }
+        if (keysDown.down) { this.labCur = (this.labCur + 1) % 4; playSnd('sel'); }
+        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 1; playSnd('hit'); return; }
+        if (keysDown.right || keysDown.left) {
+            playSnd('sel'); let dir = keysDown.right ? 1 : -1;
+            let idx = SkillKeys.indexOf(this.myAI.skillKeys[this.labCur]);
+            this.myAI.skillKeys[this.labCur] = SkillKeys[(idx + dir + SkillKeys.length) % SkillKeys.length];
+        } return;
+    }
+
+    // --- UI: パッシブ＆覚醒 ---
+    if (this.st === 'lab_awaken') {
+        if (keysDown.up) { this.labCur = (this.labCur - 1 + 4) % 4; playSnd('sel'); }
+        if (keysDown.down) { this.labCur = (this.labCur + 1) % 4; playSnd('sel'); }
+        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 2; playSnd('hit'); return; }
+        if (keysDown.right || keysDown.left) {
+            playSnd('sel'); let dir = keysDown.right ? 1 : -1;
+            if (this.labCur === 0) { let keys = Object.keys(Passives); let idx = keys.indexOf(this.myAI.passiveKey); this.myAI.passiveKey = keys[(idx + dir + keys.length) % keys.length]; }
+            else if (this.labCur === 1) { let keys = Object.keys(AwakenConds); let idx = keys.indexOf(this.myAI.awakenCond); this.myAI.awakenCond = keys[(idx + dir + keys.length) % keys.length]; }
+            else if (this.labCur === 2) { let keys = Object.keys(Passives); let idx = keys.indexOf(this.myAI.awakenPassive); this.myAI.awakenPassive = keys[(idx + dir + keys.length) % keys.length]; }
+            else if (this.labCur === 3 && keysDown.right) { this.myAI.awakenColor = '#' + Math.floor(Math.random()*16777215).toString(16).padEnd(6,'0'); }
+        } return;
     }
 
     // --- UI: ステータス配分 ---
     if (this.st === 'lab_stats') {
         if (keysDown.up) { this.labCur = (this.labCur - 1 + 3) % 3; playSnd('sel'); }
         if (keysDown.down) { this.labCur = (this.labCur + 1) % 3; playSnd('sel'); }
-        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 1; playSnd('hit'); return; }
+        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 3; playSnd('hit'); return; }
 
         let valChange = 0; if (keysDown.left) valChange = -0.1; if (keysDown.right) valChange = 0.1;
         if (valChange !== 0) {
             let total = this.myAI.base.atk + this.myAI.base.res + this.myAI.base.spd;
             let current = this.labCur === 0 ? this.myAI.base.atk : this.labCur === 1 ? this.myAI.base.res : this.myAI.base.spd;
             let next = Math.max(0.5, Math.min(2.0, current + valChange));
-            if (total - current + next <= 3.01) { // 3.0ポイント制
+            if (total - current + next <= 3.01) { 
                 if (this.labCur === 0) this.myAI.base.atk = next;
                 if (this.labCur === 1) this.myAI.base.res = next;
                 if (this.labCur === 2) this.myAI.base.spd = next;
                 playSnd('sel');
-            } else { playSnd('hit'); } // コストオーバー
-        }
-        return;
+            } else playSnd('hit'); 
+        } return;
     }
 
     if (this.st === 'lab_body') {
         if (keysDown.up) { this.labCur = (this.labCur - 1 + 4) % 4; playSnd('sel'); }
         if (keysDown.down) { this.labCur = (this.labCur + 1) % 4; playSnd('sel'); }
-        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 0; playSnd('hit'); return; }
+        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 4; playSnd('hit'); return; }
         let valChange = 0; if (keys.left) valChange = -0.05; if (keys.right) valChange = 0.05;
         if (valChange !== 0) {
             if (this.labCur === 0) this.myAI.body.width = Math.max(0.5, Math.min(2.0, this.myAI.body.width + valChange));
@@ -150,45 +200,11 @@ const AutoFighter = {
         } return;
     }
 
-    if (this.st === 'lab_awaken') {
-        if (keysDown.up) { this.labCur = (this.labCur - 1 + 3) % 3; playSnd('sel'); }
-        if (keysDown.down) { this.labCur = (this.labCur + 1) % 3; playSnd('sel'); }
-        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 2; playSnd('hit'); return; }
-        if (keysDown.right || keysDown.left) {
-            playSnd('sel'); let dir = keysDown.right ? 1 : -1;
-            if (this.labCur === 0) { let keys = Object.keys(PassiveType); let idx = keys.indexOf(Object.keys(PassiveType).find(k => PassiveType[k] === this.myAI.passive)); this.myAI.passive = PassiveType[keys[(idx + dir + keys.length) % keys.length]]; }
-            else if (this.labCur === 1) { let keys = Object.keys(AwakenCondition); let idx = keys.indexOf(Object.keys(AwakenCondition).find(k => AwakenCondition[k] === this.myAI.awakening.condition)); this.myAI.awakening.condition = AwakenCondition[keys[(idx + dir + keys.length) % keys.length]]; }
-            else if (this.labCur === 2) { let keys = Object.keys(IntroType); let idx = keys.indexOf(Object.keys(IntroType).find(k => IntroType[k] === this.myAI.intro)); this.myAI.intro = IntroType[keys[(idx + dir + keys.length) % keys.length]]; }
-        } return;
-    }
-
-    if (this.st === 'lab_gambit') {
-        if (keysDown.up) { this.labCur = (this.labCur - 1 + 4) % 4; playSnd('sel'); }
-        if (keysDown.down) { this.labCur = (this.labCur + 1) % 4; playSnd('sel'); }
-        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 3; playSnd('hit'); return; }
-        if (keysDown.right || keysDown.left) {
-            playSnd('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(ActType); 
-            let idx = keys.indexOf(Object.keys(ActType).find(k => ActType[k] === this.myAI.gambits[this.labCur].act));
-            this.myAI.gambits[this.labCur].act = ActType[keys[(idx + dir + keys.length) % keys.length]];
-        } return;
-    }
-
-    if (this.st === 'lab_combo') {
-        if (keysDown.up) { this.labCur = (this.labCur - 1 + 3) % 3; playSnd('sel'); }
-        if (keysDown.down) { this.labCur = (this.labCur + 1) % 3; playSnd('sel'); }
-        if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 4; playSnd('hit'); return; }
-        if (keysDown.right || keysDown.left) {
-            playSnd('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(SkillDict); 
-            let idx = keys.indexOf(this.myAI.comboRoute[this.labCur]);
-            this.myAI.comboRoute[this.labCur] = keys[(idx + dir + keys.length) % keys.length];
-        } return;
-    }
-
     // --- バトル進行 ---
     if (this.st === 'intro') { this.timer++; if (this.timer > 60) { this.st = 'battle'; playSnd('jmp'); } return; }
     if (this.st === 'result') { if (keysDown.a) { this.st = 'menu'; playSnd('sel'); } return; }
 
-    this.timer++; // バトルの経過時間
+    this.timer++; 
     let dist = Math.abs(this.p1.x - this.p2.x);
     if (dist < 15) {
         if (this.p1.x === this.p2.x) { this.p1.x -= 1; this.p2.x += 1; }
@@ -198,6 +214,18 @@ const AutoFighter = {
     this.processFighter(this.p1, this.p2);
     this.processFighter(this.p2, this.p1);
     
+    // ★ 飛び道具（弾）の処理
+    for(let i=this.bullets.length-1; i>=0; i--) {
+        let b = this.bullets[i]; b.x += b.vx; b.y += b.vy; b.life--;
+        this.addVFX('slash', b.x, b.y, b.owner.color.aura, {size: 15, angle: b.vx>0?0:Math.PI, width: 4, life:2});
+        
+        let opp = b.owner.id === 1 ? this.p2 : this.p1; let hit = false;
+        if (Math.abs(b.x - opp.x) < 20 && Math.abs(b.y - opp.y) < 50 && opp.state !== 'hurt' && opp.state !== 'stunned') {
+            this.applyHit(b.owner, b.skill, opp, b.x, b.y); hit = true;
+        }
+        if(b.life <= 0 || hit) this.bullets.splice(i, 1);
+    }
+
     [this.p1, this.p2].forEach(f => {
         if (f.comboTimer > 0) f.comboTimer--;
         if (f.comboTimer <= 0 && f.state !== 'hurt' && f.state !== 'stunned') { let opp = f.id === 1 ? this.p2 : this.p1; opp.combo = 0; }
@@ -214,21 +242,69 @@ const AutoFighter = {
     if (this.p1.hp <= 0 || this.p2.hp <= 0) { this.st = 'result'; playSnd('combo'); screenShake(10); }
   },
 
-  // ★ AIとシステムが完全に統合されたバトルロジック
+  addText(x, y, text, color) { this.texts.push({x, y, text, color, life: 40}); },
+  addVFX(type, x, y, color, extra={}) { this.vfx.push({type, x, y, color, life: extra.life||20, maxLife: extra.life||20, ...extra}); },
+
+  // ★ 共通のヒット処理関数
+  applyHit(attacker, skill, victim, hx, hy) {
+       if (victim.guarding && victim.justGuardWindow > 0) {
+           playSnd('sel'); screenShake(8); if(typeof hitStop !== 'undefined') hitStop(10);
+           this.addVFX('impact', victim.x, victim.y-20, '#0ff', {size: 50}); this.addText(victim.x, victim.y - 50, "PARRY!", "#0ff");
+           attacker.state = 'stunned'; attacker.stateFrame = 0; attacker.vx = -attacker.dir * 2; attacker.vy = -3; attacker.hitCancel = false;
+           victim.guarding = false; victim.justGuardWindow = 0; victim.state = 'idle'; victim.cd = 0; return; 
+       }
+
+       let damage = skill.dmg * attacker.base.atk; 
+       let pKeyA = attacker.isAwakened ? attacker.awakenPassive : attacker.passiveKey;
+       if (pKeyA === 'DESPERATION' && (attacker.hp / attacker.maxHp) <= 0.3) damage *= 1.5;
+       
+       let pKeyV = victim.isAwakened ? victim.awakenPassive : victim.passiveKey;
+       if (pKeyV === 'GIANT') damage *= 0.8;
+       damage = Math.max(1, damage - ((victim.physics.weight - 100) * 0.1)); // 重いほど軽減
+
+       let kbForce = skill.kb * attacker.base.atk * (100 / victim.physics.weight);
+
+       if (victim.guarding) {
+           victim.hp -= damage * 0.2; playSnd('sel'); screenShake(2); victim.vx = attacker.dir * kbForce * 0.3; 
+           this.addVFX('impact', victim.x, victim.y-15, '#888', {size: 15, life: 10}); return;
+       }
+
+       victim.hp -= damage; 
+       if (pKeyA === 'VAMPIRE') attacker.hp = Math.min(attacker.maxHp, attacker.hp + damage * 0.2);
+
+       victim.state = 'hurt'; victim.stateFrame = 0; victim.comboTimer = 60; 
+       attacker.hitCancel = true; attacker.combo++;
+
+       if (victim.y < this.groundY - 10) victim.vy = -4; 
+       if (skill.type === 'anti_air' || skill.name === 'アッパー') victim.vy = -16 * (100 / victim.physics.weight);
+       else if (skill.name === 'メテオ') { victim.vy = 20; kbForce *= 0.5; }
+       else if (skill.name === 'スライド' || skill.name === '急降下') victim.vy = -8 * (100 / victim.physics.weight);
+       else if (skill.kb > 10) victim.vy = -6 - (Math.random()*2); 
+       
+       victim.vx = attacker.dir * kbForce;
+       
+       if (skill.name === 'ジャブ') {
+          playSnd('hit'); screenShake(4); if(typeof hitStop !== 'undefined') hitStop(3); this.addVFX('impact', hx, hy, '#fff', {size: 25});
+       } else {
+          playSnd('combo'); screenShake(12); if(typeof hitStop !== 'undefined') hitStop(8); 
+          this.addVFX('impact', hx, hy, attacker.color.aura, {size: 50});
+          this.addVFX('slash', hx, hy, '#fff', {size: 40, angle: Math.random()*Math.PI*2, width: 4}); 
+       }
+  },
+
   processFighter(f, opp) {
     f.stateFrame++;
     if (f.cd > 0) f.cd -= (f.base.spd);
 
-    // ★ 覚醒システムのチェック
+    // 覚醒チェック
     if (!f.isAwakened) {
         let awaken = false;
-        if (f.awakening.condition === AwakenCondition.HP_UNDER_20 && f.hp <= f.maxHp * 0.2) awaken = true;
-        if (f.awakening.condition === AwakenCondition.TIME_60S && this.timer > 3600) awaken = true;
+        if (f.awakenCond === 'HP20' && f.hp <= f.maxHp * 0.2) awaken = true;
+        if (f.awakenCond === 'TIME' && this.timer > 1800) awaken = true; // 30秒
         
         if (awaken) {
-            f.isAwakened = true; f.color = f.awakening.color; f.passive = f.awakening.passive;
-            f.hp = Math.min(f.maxHp, f.hp + 300); // 覚醒回復
-            playSnd('combo'); screenShake(20); if(typeof hitStop !== 'undefined') hitStop(30);
+            f.isAwakened = true; f.color = { body: f.color.body, aura: f.awakenColor }; 
+            f.hp = Math.min(f.maxHp, f.hp + 300); playSnd('combo'); screenShake(20); if(typeof hitStop !== 'undefined') hitStop(30);
             this.addVFX('shockwave', f.x, f.y, f.color.aura, {size: 150, life: 40});
             this.addText(f.x, f.y - 60, "AWAKENING!!", f.color.aura);
             f.state = 'idle'; f.stateFrame = 0; f.hitCancel = false; return;
@@ -236,7 +312,7 @@ const AutoFighter = {
     }
 
     f.x += f.vx; f.y += f.vy; f.vx *= 0.85; 
-    if (f.y < this.groundY) { f.vy += 0.6 + (f.physics.weight - 100)*0.005; } else { f.y = this.groundY; f.vy = 0; } // 重量が落下速度に影響
+    if (f.y < this.groundY) { f.vy += 0.6 + (f.physics.weight - 100)*0.005; } else { f.y = this.groundY; f.vy = 0; }
     f.x = Math.max(10, Math.min(this.stageWidth - 10, f.x));
 
     if (Math.abs(f.vx) > 4 || Math.abs(f.vy) > 4 || f.state.startsWith('atk_')) {
@@ -250,19 +326,32 @@ const AutoFighter = {
     if (f.state === 'stunned') { if (f.stateFrame > 60) { f.state = 'idle'; f.stateFrame = 0; f.hitCancel = false; } return; }
 
     let isAtk = f.state.startsWith('atk_');
-    let sName = isAtk ? f.state.split('_')[1] : '';
-    let skill = isAtk ? (sName === 'counter' ? f.counterSkill : this.Skills[sName]) : null;
+    let sKey = isAtk ? f.state.split('_')[1] : '';
+    let skill = isAtk ? (sKey === 'counter' ? CounterData : Skills[sKey]) : null;
     
     if (isAtk && skill) {
-         if (f.stateFrame === Math.floor(skill.start / f.base.spd)) { // SPDが技の発生も早くする
-             this.createHitbox(f, skill, opp); 
-             if (sName === 'beam') {
-                 this.addVFX('beam', f.x + 20*f.dir, f.y - 15 * f.body.height, f.color.body, {size: skill.range, dir: f.dir, life: 15}); screenShake(6);
-             } else {
-                 let angle = f.dir === 1 ? 0 : Math.PI;
-                 if (sName === 'upper') angle -= (Math.PI/4) * f.dir;
-                 if (sName === 'meteor') angle += (Math.PI/4) * f.dir;
-                 if (sName !== 'jab') this.addVFX('slash', f.x + 20*f.dir, f.y - 20 * f.body.height, f.color.body, {size: skill.range * f.body.width, angle: angle, width: 10, vx: f.vx*0.5, vy: f.vy*0.5});
+         let sFrame = Math.floor(skill.start / f.base.spd);
+         // ★ 技の特殊処理
+         if (f.stateFrame === sFrame - 2 && skill.type === 'warp') {
+             f.x = opp.x - opp.dir * 40; f.dir = opp.dir; this.addVFX('shockwave', f.x, f.y, '#ccc', {size: 30, life: 10});
+         }
+         
+         if (f.stateFrame === sFrame) { 
+             if (skill.type === 'anti_air') { f.vy = -12; f.vx = f.dir * 4; }
+             if (skill.name === '急降下') { f.vy = 10; f.vx = f.dir * 12; }
+             if (skill.type === 'buff') { f.hp = Math.min(f.maxHp, f.hp + 200); this.addVFX('shockwave', f.x, f.y, '#0f0', {size: 50}); playSnd('combo'); }
+             
+             if (skill.type === 'shot') {
+                 playSnd('jmp'); this.bullets.push({x: f.x + 20*f.dir, y: f.y - 20, vx: f.dir * 10, vy: 0, owner: f, skill: skill, life: 60});
+             } else if (skill.type !== 'buff') {
+                 this.createHitbox(f, skill, opp); 
+                 if (skill.type === 'range') {
+                     this.addVFX('beam', f.x + 20*f.dir, f.y - 15 * f.body.height, f.color.body, {size: skill.range, dir: f.dir, life: 15}); screenShake(6);
+                 } else {
+                     let angle = f.dir === 1 ? 0 : Math.PI;
+                     if (skill.name === 'アッパー') angle -= (Math.PI/4) * f.dir; if (skill.type === 'air') angle += (Math.PI/4) * f.dir;
+                     if (skill.name !== 'ジャブ') this.addVFX('slash', f.x + 20*f.dir, f.y - 20 * f.body.height, f.color.body, {size: skill.range * f.body.width, angle: angle, width: 10});
+                 }
              }
          }
          if (f.stateFrame > ((skill.start + skill.rec) / f.base.spd)) { f.state = 'idle'; f.stateFrame = 0; f.hitCancel = false; }
@@ -270,52 +359,55 @@ const AutoFighter = {
     
     let canCancel = isAtk && f.hitCancel && f.stateFrame > (skill.start + 5) / f.base.spd;
 
-    // --- ★ ガンビット ＆ コンボツリーの評価 ---
+    // --- ★ 新生：スタイルAIロジック ---
     if ((f.state === 'idle' && f.cd <= 0) || canCancel) {
         let d = Math.abs(f.x - opp.x);
         let isAir = f.y < this.groundY - 10;
         let oppIsAir = opp.y < this.groundY - 10;
-        let hpRatio = f.hp / f.maxHp;
-
-        let chosenAct = ActType.COMBO; 
         
-        // パッシブ効果の取得
-        let ninjaSpd = f.passive === PassiveType.NINJA ? 1.5 : 1.0;
+        let st = Styles[f.styleKey];
+        let pKey = f.isAwakened ? f.awakenPassive : f.passiveKey;
+        let ninjaSpd = pKey === 'NINJA' ? 1.5 : 1.0;
 
-        if (canCancel) {
-            if (f.comboIndex < f.comboRoute.length - 1) chosenAct = ActType.COMBO;
-            else f.hitCancel = false; 
-        } else {
-            f.comboIndex = 0; 
-            for (let g of f.gambits) {
-                let match = false;
-                if (g.cond === CondType.HP_LOW && hpRatio <= 0.3) match = true;
-                else if (g.cond === CondType.FAR && d > 120) match = true;
-                else if (g.cond === CondType.AIR && oppIsAir) match = true;
-                else if (g.cond === CondType.DEFAULT) match = true;
-                if (match) { chosenAct = g.act; break; }
+        // 防御判定
+        if (opp.state.startsWith('atk_') && d < 80 && !isAir && !canCancel) {
+            if (Math.random() < st.guard + st.dodge) {
+                if (Math.random() < (st.dodge / (st.guard + st.dodge)) && d > 30) {
+                    f.state = 'move'; f.stateFrame = 0; f.vx = -f.dir * 12 * ninjaSpd; f.cd = 10;
+                    this.addVFX('shockwave', f.x, f.y, '#fff', {size: 20, life: 10}); playSnd('sel'); this.addText(f.x, f.y - 40, "DODGE", "#ccc"); return;
+                } else { f.state = 'guard'; f.stateFrame = 0; f.guarding = true; f.justGuardWindow = 10; return; }
             }
         }
 
-        // 行動の実行
-        if (f.state === 'idle' || canCancel) {
-            if (chosenAct === ActType.RETREAT && !canCancel) {
-                f.state = 'move'; f.stateFrame = 0; f.vx = -f.dir * 8 * ninjaSpd; f.cd = 15;
-            } else if (chosenAct === ActType.GUARD && !canCancel) {
-                f.state = 'guard'; f.stateFrame = 0; f.guarding = true; f.justGuardWindow = 10;
-            } else if (chosenAct === ActType.BEAM || chosenAct === ActType.SLIDE) {
-                let sn = chosenAct === ActType.BEAM ? 'beam' : 'slide'; let sData = this.Skills[sn];
-                f.state = 'atk_' + sn; f.stateFrame = 0; f.vx = f.dir * sData.vx; f.cd = sData.cd; f.hitCancel = false;
-            } else if (chosenAct === ActType.COMBO) {
-                let sn = f.comboRoute[f.comboIndex]; let sData = this.Skills[sn];
-                // コンボが届かない距離なら自動で近づく
-                if (!canCancel && d > (sData.range * f.body.width) + 20 && !isAir) {
-                    f.state = 'move'; f.stateFrame = 0; f.vx = f.dir * 6 * ninjaSpd; f.cd = 0;
-                } else {
-                    f.state = 'atk_' + sn; f.stateFrame = 0; f.vx = f.dir * sData.vx; f.cd = sData.cd; f.hitCancel = false;
-                    if (canCancel) f.comboIndex++;
-                }
+        // 攻撃の意思決定
+        let shouldAttack = false; let moveDir = 0;
+        if (opp.state === 'hurt' || opp.state === 'stunned') {
+            shouldAttack = true; // チャンスは逃さない
+            if (oppIsAir && !isAir && d < 60 && f.state !== 'move') { f.state = 'move'; f.stateFrame = 0; f.vy = -16; f.vx = f.dir * 5; f.cd = 0; f.hitCancel = false; return; }
+        } else {
+            if (d < st.range) { if (Math.random() < st.aggro) shouldAttack = true; else moveDir = -f.dir; } 
+            else { moveDir = f.dir; }
+        }
+
+        if (shouldAttack) {
+            // スロットの技をスコアリングして最適なものを振る（コンボも自動構築）
+            let bestSkillKey = null; let bestScore = -100;
+            for (let skey of f.skillKeys) {
+                let s = Skills[skey]; let score = 0;
+                if (d <= s.range * f.body.width) score += 10; else score -= (d - s.range) * 0.2;
+                if (isAir) { if (s.type === 'air') score += 30; else score -= 20; } else { if (s.type === 'air') score -= 20; }
+                if (oppIsAir && !isAir) { if (s.type === 'anti_air' || s.name === 'アッパー') score += 20; }
+                if (s.type === 'buff' && f.hp < f.maxHp * 0.5 && d > 150) score += 40;
+                if (canCancel) { if (s.start < 10) score += 15; if (s.type === 'shot' || s.type === 'buff') score -= 20; }
+                score += Math.random() * 10;
+                if (score > bestScore) { bestScore = score; bestSkillKey = skey; }
             }
+            if (bestSkillKey) {
+                let sData = Skills[bestSkillKey];
+                f.state = 'atk_' + bestSkillKey; f.stateFrame = 0; f.vx = f.dir * sData.vx; f.cd = sData.cd; f.hitCancel = false;
+            }
+        } else if (moveDir !== 0 && Math.random() < (f.base.spd * 0.3) && !canCancel) { 
+            f.state = 'move'; f.stateFrame = 0; f.vx = moveDir * 6 * ninjaSpd; 
         }
     }
     if (f.state === 'move' && Math.abs(f.vx) < 0.5 && f.y >= this.groundY) { f.state = 'idle'; f.stateFrame = 0; }
@@ -324,68 +416,14 @@ const AutoFighter = {
   createHitbox(attacker, skill, victim) {
     let vDist = Math.abs(victim.x - attacker.x); 
     let inFront = (victim.x - attacker.x) * attacker.dir >= -15; 
-    let yDist = Math.abs(victim.y - attacker.y); 
-
-    // 体型スケールによるリーチ拡張
     let actualRange = skill.range * attacker.body.width;
-
-    if (inFront && vDist <= actualRange + 15 && yDist < 60) {
-       
-       if (victim.guarding && victim.justGuardWindow > 0) {
-           playSnd('sel'); screenShake(8); if(typeof hitStop !== 'undefined') hitStop(10);
-           this.addVFX('impact', victim.x, victim.y-20, '#0ff', {size: 50}); this.addText(victim.x, victim.y - 50, "PARRY!", "#0ff");
-           attacker.state = 'stunned'; attacker.stateFrame = 0; attacker.vx = -attacker.dir * 2; attacker.vy = -3; attacker.hitCancel = false;
-           victim.guarding = false; victim.justGuardWindow = 0; victim.state = 'idle'; victim.cd = 0; return; 
-       }
-
-       if (victim.state === 'hurt' || victim.state === 'stunned' || victim.state === 'idle' || victim.state.startsWith('atk_') || victim.state === 'move') {
-           
-           // ★ ATKとパッシブスキルによるダメージ計算
-           let damage = skill.dmg * attacker.base.atk;
-           if (attacker.passive === PassiveType.DESPERATION && (attacker.hp / attacker.maxHp) <= 0.3) damage *= 1.5;
-           if (victim.passive === PassiveType.GIANT) damage *= 0.8;
-           // 重いほどダメージ軽減
-           damage = Math.max(1, damage - ((victim.physics.weight - 100) * 0.1));
-
-           // ★ 重量とATKによるノックバック計算
-           let kbForce = skill.kb * attacker.base.atk * (100 / victim.physics.weight);
-
-           if (victim.guarding) {
-               victim.hp -= damage * 0.2; playSnd('sel'); screenShake(2); victim.vx = attacker.dir * kbForce * 0.3; 
-               this.addVFX('impact', victim.x, victim.y-15, '#888', {size: 15, life: 10}); return;
-           }
-
-           victim.hp -= damage; 
-           
-           // ★ 吸血鬼パッシブの回復
-           if (attacker.passive === PassiveType.VAMPIRE) attacker.hp = Math.min(attacker.maxHp, attacker.hp + damage * 0.2);
-
-           victim.state = 'hurt'; victim.stateFrame = 0; victim.comboTimer = 60; 
-           attacker.hitCancel = true; attacker.combo++;
-
-           if (victim.y < this.groundY - 10) victim.vy = -4; 
-           if (skill.hitType === 'upper' || skill.hitType === 'counter') victim.vy = -16 * (100 / victim.physics.weight);
-           else if (skill.hitType === 'meteor') { victim.vy = 20; kbForce *= 0.5; }
-           else if (skill.hitType === 'slide') victim.vy = -8 * (100 / victim.physics.weight);
-           else if (skill.kb > 10) victim.vy = -6 - (Math.random()*2); 
-           
-           victim.vx = attacker.dir * kbForce;
-           let hx = attacker.x + (vDist/2)*attacker.dir; let hy = victim.y - 15;
-           
-           if (skill.hitType === 'jab') {
-              playSnd('hit'); screenShake(4); if(typeof hitStop !== 'undefined') hitStop(3); this.addVFX('impact', hx, hy, '#fff', {size: 25});
-           } else {
-              playSnd('combo'); screenShake(12); if(typeof hitStop !== 'undefined') hitStop(8); 
-              this.addVFX('impact', hx, hy, attacker.color.aura, {size: 50});
-              this.addVFX('slash', hx, hy, '#fff', {size: 40, angle: Math.random()*Math.PI*2, width: 4}); 
-           }
-       }
+    if (inFront && vDist <= actualRange + 15 && Math.abs(victim.y - attacker.y) < 60) {
+        this.applyHit(attacker, skill, victim, attacker.x + (vDist/2)*attacker.dir, victim.y - 15);
     }
   },
 
-  // 描画処理（体型スケール適用）
   drawStickman(f, alpha = 1, isTrail = false) {
-    let c = f.isAwakened ? f.awakening.color : f.color;
+    let c = f.isAwakened ? f.color : {body: f.color.body, aura: f.color.aura};
     ctx.strokeStyle = isTrail ? c.aura : '#fff'; ctx.lineWidth = (isTrail ? 2 : 2.5) / Math.max(f.body.width, f.body.height); 
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = alpha;
     
@@ -398,12 +436,13 @@ const AutoFighter = {
         else { let run = Math.sin(sf * 0.6) * 15; p.hL.x=-run; p.hR.x=run; p.eL.x=-run/2; p.eR.x=run/2; p.fL.x=run; p.fR.x=-run; p.kL.x=run/2; p.kR.x=-run/2; p.h.x+=5; p.n.x+=5; p.hip.x+=3; }
     }
     else if (f.state === 'atk_jab') { if (sf < 4) { p.hR={x:-5,y:10}; p.eR={x:0,y:15}; p.h.x-=2; } else if (sf < 12) { p.hR={x:35,y:0}; p.eR={x:15,y:5}; p.sR.x+=5; p.h.x+=5; p.fR.x+=10; } }
-    else if (f.state === 'atk_smash') { if (sf < 14) { p.hR={x:-15,y:-20}; p.eR={x:-5,y:-10}; p.h.x-=5; p.hip.x-=5; p.kL.x-=5; } else { p.hR={x:40,y:15}; p.eR={x:20,y:10}; p.h.x+=12; p.hip.x+=8; p.fL.x-=15; p.fR.x+=15; p.kR.x+=10; p.kR.y+=5; } }
-    else if (f.state === 'atk_upper') { if (sf < 7) { p.hR={x:-5,y:25}; p.eR={x:5,y:20}; p.hip.y+=5; p.h.y+=5; p.kL.x-=5; p.kR.x+=5; } else { p.hR={x:20,y:-35}; p.eR={x:10,y:-15}; p.h.y-=8; p.h.x+=5; p.fL.y-=5; p.fR.y-=5; } }
-    else if (f.state === 'atk_meteor') { if (sf < 10) { p.hL={x:0,y:-25}; p.hR={x:0,y:-25}; p.eL={x:-10,y:-15}; p.eR={x:10,y:-15}; p.fL.y-=10; p.fR.y-=10; p.kL.y-=10; p.kR.y-=10; } else { p.hL={x:30,y:30}; p.hR={x:30,y:30}; p.eL={x:15,y:15}; p.eR={x:15,y:15}; p.h.x+=10; p.h.y+=5; p.hip.y+=5; p.kL.x-=5; } }
-    else if (f.state === 'atk_counter') { if (sf < 4) { p.hR={x:-20,y:15}; p.h.y+=5; p.hip.y+=5; p.kL.x-=8; p.kR.x+=8; } else { p.hR={x:25,y:-30}; p.h.x+=10; p.fR.x+=15; p.fR.y-=5; p.fL.x-=5; } }
+    else if (f.state === 'atk_upper' || f.state === 'atk_shoryu') { if (sf < 7) { p.hR={x:-5,y:25}; p.eR={x:5,y:20}; p.hip.y+=5; p.h.y+=5; p.kL.x-=5; p.kR.x+=5; } else { p.hR={x:20,y:-35}; p.eR={x:10,y:-15}; p.h.y-=8; p.h.x+=5; p.fL.y-=5; p.fR.y-=5; } }
+    else if (f.state === 'atk_smash' || f.state === 'atk_tackle') { if (sf < 14) { p.hR={x:-15,y:-20}; p.eR={x:-5,y:-10}; p.h.x-=5; p.hip.x-=5; p.kL.x-=5; } else { p.hR={x:40,y:15}; p.eR={x:20,y:10}; p.h.x+=12; p.hip.x+=8; p.fL.x-=15; p.fR.x+=15; p.kR.x+=10; p.kR.y+=5; } }
+    else if (f.state === 'atk_meteor' || f.state === 'atk_dive') { if (sf < 10) { p.hL={x:0,y:-25}; p.hR={x:0,y:-25}; p.eL={x:-10,y:-15}; p.eR={x:10,y:-15}; p.fL.y-=10; p.fR.y-=10; p.kL.y-=10; p.kR.y-=10; } else { p.hL={x:30,y:30}; p.hR={x:30,y:30}; p.eL={x:15,y:15}; p.eR={x:15,y:15}; p.h.x+=10; p.h.y+=5; p.hip.y+=5; p.kL.x-=5; } }
     else if (f.state === 'atk_slide') { if (sf < 6) { p.h={x:-5,y:5}; p.hip={x:0,y:15}; p.kL.x-=10; p.kL.y+=5; p.kR.x+=10; p.kR.y+=5; } else { p.h={x:15,y:10}; p.n={x:10,y:15}; p.hip={x:-5,y:25}; p.hR={x:20,y:25}; p.hL={x:5,y:25}; p.eR={x:15,y:20}; p.eL={x:0,y:20}; p.fR={x:35,y:35}; p.kR={x:15,y:30}; p.fL={x:-25,y:35}; p.kL={x:-15,y:30}; } }
-    else if (f.state === 'atk_beam') { if (sf < 20) { p.hR={x:-15,y:10}; p.hL={x:-15,y:10}; p.eR={x:-5,y:15}; p.eL={x:-5,y:15}; p.h={x:-5,y:0}; p.hip={x:5,y:15}; p.kL.x+=5; p.kR.x-=5; let t = Date.now()/50; p.h.x+=Math.sin(t); p.h.y+=Math.cos(t); } else { p.hR={x:30,y:0}; p.hL={x:30,y:0}; p.eR={x:15,y:5}; p.eL={x:15,y:5}; p.h={x:10,y:-5}; p.hip={x:-5,y:15}; p.fR.x+=10; p.fL.x-=10; } }
+    else if (f.state === 'atk_beam' || f.state === 'atk_sonic') { if (sf < 12) { p.hR={x:-15,y:10}; p.hL={x:-15,y:10}; p.h={x:-5,y:0}; p.hip={x:5,y:15}; p.kL.x+=5; p.kR.x-=5; } else { p.hR={x:30,y:0}; p.hL={x:30,y:0}; p.eR={x:15,y:5}; p.eL={x:15,y:5}; p.h={x:10,y:-5}; p.hip={x:-5,y:15}; p.fR.x+=10; p.fL.x-=10; } }
+    else if (f.state === 'atk_heal') { p.hL={x:0,y:-20}; p.hR={x:0,y:-20}; p.h={x:0,y:-5}; p.hip={x:0,y:20}; p.kL={x:-10,y:30}; p.kR={x:10,y:30}; p.fL={x:-15,y:40}; p.fR={x:15,y:40}; }
+    else if (f.state === 'atk_warpAtk' || f.state === 'atk_counter') { if (sf < 4) { p.hR={x:-20,y:15}; p.h.y+=5; p.hip.y+=5; p.kL.x-=8; p.kR.x+=8; } else { p.hR={x:25,y:-30}; p.h.x+=10; p.fR.x+=15; p.fR.y-=5; p.fL.x-=5; } }
     else if (f.state === 'hurt') { p.h={x:-15,y:-5}; p.hip={x:5,y:10}; p.sL={x:-10,y:5}; p.sR={x:-5,y:5}; p.eL={x:-15,y:15}; p.eR={x:-5,y:15}; p.hL={x:-20,y:25}; p.hR={x:-10,y:25}; p.fL={x:15,y:30}; p.fR={x:-5,y:35}; p.kL={x:20,y:20}; }
     else if (f.state === 'stunned') { p.h={x:-10,y:5}; p.hip={x:0,y:15}; p.hL={x:-5,y:30}; p.hR={x:5,y:30}; p.kL={x:10,y:30}; p.fL={x:15,y:40}; } 
     else if (f.state === 'guard') { p.hL={x:10,y:-5}; p.hR={x:10,y:5}; p.eL={x:5,y:5}; p.eR={x:5,y:10}; p.h.y+=3; p.hip.y+=5; p.kL.x-=5; p.kR.x+=5; if(!isTrail && f.justGuardWindow > 0) { ctx.shadowBlur = 15; ctx.shadowColor = '#0ff'; ctx.strokeStyle = '#0ff'; } }
@@ -411,13 +450,10 @@ const AutoFighter = {
     let dx = f.x; let dy = f.y - 20 * f.body.height;
     if (f.state === 'stunned' && !isTrail) { dx += (Math.random()-0.5)*6; dy += (Math.random()-0.5)*6; ctx.strokeStyle = '#888'; }
 
-    ctx.save(); ctx.translate(dx, dy); 
-    ctx.scale(f.body.width, f.body.height); // ★ 骨格スケール適用
-    if (f.dir === -1) ctx.scale(-1, 1);
+    ctx.save(); ctx.translate(dx, dy); ctx.scale(f.body.width, f.body.height); if (f.dir === -1) ctx.scale(-1, 1);
     if (!isTrail && (f.state.startsWith('atk_') || f.state === 'move' || f.isAwakened)) { ctx.shadowBlur = f.isAwakened ? 20 : 12; ctx.shadowColor = c.aura; }
 
     ctx.beginPath(); ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.hip.x, p.hip.y); ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.sL.x, p.sL.y); ctx.lineTo(p.eL.x, p.eL.y); ctx.lineTo(p.hL.x, p.hL.y); ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.sR.x, p.sR.y); ctx.lineTo(p.eR.x, p.eR.y); ctx.lineTo(p.hR.x, p.hR.y); ctx.moveTo(p.hip.x, p.hip.y); ctx.lineTo(p.kL.x, p.kL.y); ctx.lineTo(p.fL.x, p.fL.y); ctx.moveTo(p.hip.x, p.hip.y); ctx.lineTo(p.kR.x, p.kR.y); ctx.lineTo(p.fR.x, p.fR.y); ctx.stroke();
-    
     ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(p.h.x, p.h.y, 6 * f.body.head, 0, Math.PI * 2); ctx.fillStyle = isTrail ? c.aura : c.body; ctx.fill();
     ctx.restore(); ctx.globalAlpha = 1;
   },
@@ -431,58 +467,65 @@ const AutoFighter = {
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 16px monospace'; ctx.fillText('ULTIMATE AI LAB', 25, 50);
             ctx.fillStyle = this.menuCur === 0 ? '#ff0' : '#fff'; ctx.font = '12px monospace'; ctx.fillText((this.menuCur === 0 ? '> ' : '  ') + 'BATTLE START', 40, 150);
             ctx.fillStyle = this.menuCur === 1 ? '#ff0' : '#fff'; ctx.fillText((this.menuCur === 1 ? '> ' : '  ') + 'AI CUSTOMIZE', 40, 180);
+            ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('最高に自由なAI育成', 45, 280);
         }
         else {
-            ctx.fillStyle = '#112'; ctx.fillRect(10, 10, 180, 110); ctx.strokeStyle = '#335'; ctx.strokeRect(10, 10, 180, 110);
+            ctx.fillStyle = '#112'; ctx.fillRect(10, 10, 180, 90); ctx.strokeStyle = '#335'; ctx.strokeRect(10, 10, 180, 90);
             ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('NORMAL', 40, 25); ctx.fillText('AWAKENED', 130, 25);
-            // プレビュー用に描画
-            let prevF = { x: 0, y: 0, dir: 1, state: 'idle', stateFrame: 0, body: this.myAI.body, color: this.myAI.color, awakening: this.myAI.awakening, isAwakened: false };
-            ctx.save(); ctx.translate(50, 90); this.drawStickman(prevF); ctx.restore();
-            prevF.isAwakened = true; ctx.save(); ctx.translate(145, 90); this.drawStickman(prevF); ctx.restore();
+            
+            let prevF = { x: 0, y: 0, dir: 1, state: 'idle', stateFrame: 0, body: this.myAI.body, color: this.myAI.color, isAwakened: false };
+            ctx.save(); ctx.translate(50, 75); this.drawStickman(prevF); ctx.restore();
+            prevF.isAwakened = true; prevF.color = {body: this.myAI.color.body, aura: this.myAI.awakenColor}; ctx.save(); ctx.translate(145, 75); this.drawStickman(prevF); ctx.restore();
 
             ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace';
             
             if (this.st === 'lab_main') {
-                ctx.fillText('【CUSTOMIZE MENU】', 30, 140); ctx.font = '10px monospace';
-                const items = ['体型＆カラー設定', 'ステータス配分', 'パッシブ＆覚醒', 'ガンビット(思考AI)', 'コンボルート', '戻る'];
-                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 155 + i * 20); }
+                ctx.fillText('【CUSTOMIZE MENU】', 30, 120); ctx.font = '10px monospace';
+                const items = ['戦闘スタイル設定', 'スキルセット(技)', 'パッシブ＆覚醒', 'ステータス配分', '体型＆カラー', '戻る'];
+                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 140 + i * 18); }
             }
-            else if (this.st === 'lab_stats') { // ★ ステータス配分UI
-                ctx.fillText('【STATUS POINT】', 40, 140); ctx.font = '10px monospace';
-                let pts = (3.0 - (this.myAI.base.atk + this.myAI.base.res + this.myAI.base.spd)).toFixed(1);
-                ctx.fillStyle = '#88f'; ctx.fillText(`残りポイント: ${pts}`, 40, 155);
-                const items = [ `攻撃力(ATK) : ${this.myAI.base.atk.toFixed(1)}`, `耐久力(RES) : ${this.myAI.base.res.toFixed(1)}`, `素早さ(SPD) : ${this.myAI.base.spd.toFixed(1)}` ];
-                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 180 + i * 25); }
-                ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右で増減 (上限あり) ▶', 30, 280);
+            else if (this.st === 'lab_style') {
+                ctx.fillText('【BATTLE STYLE】', 40, 120); ctx.font = '11px monospace';
+                let sName = Styles[this.myAI.styleKey].name;
+                ctx.fillStyle = '#ff0'; ctx.fillText(`◀ ${sName.padEnd(8,' ')} ▶`, 35, 160);
+                this.drawDescBox(`[ ${sName} ]`, Styles[this.myAI.styleKey].desc);
             }
-            else if (this.st === 'lab_body') {
-                ctx.fillText('【BODY & PHYSICS】', 30, 140); ctx.font = '10px monospace';
-                const items = [ `横幅(W) : ${this.myAI.body.width.toFixed(2)}`, `縦幅(H) : ${this.myAI.body.height.toFixed(2)}`, `重量(WT): ${Math.floor(this.myAI.physics.weight)}kg`, `ボディ色: [CHANGE]` ];
-                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 165 + i * 25); }
-                ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右キーで調整 ▶', 45, 280);
+            else if (this.st === 'lab_skills') {
+                ctx.fillText('【SKILL SETTING】', 40, 115); ctx.font = '10px monospace';
+                for(let i=0; i<4; i++) {
+                    ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff';
+                    let skName = Skills[this.myAI.skillKeys[i]].name;
+                    ctx.fillText(`SLOT ${i+1}: ◀ ${skName.padEnd(5,' ')} ▶`, 20, 135 + i * 18);
+                }
+                let curSkill = Skills[this.myAI.skillKeys[this.labCur]];
+                this.drawDescBox(`[ ${curSkill.name} ] 威力:${curSkill.dmg} CD:${curSkill.cd}`, curSkill.desc);
             }
             else if (this.st === 'lab_awaken') {
-                ctx.fillText('【SKILL & AWAKEN】', 30, 140); ctx.font = '10px monospace';
-                const items = [ `常時 : ${this.myAI.passive}`, `条件 : ${this.myAI.awakening.condition}`, `登場 : ${this.myAI.intro}` ];
-                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 10, 170 + i * 30); }
-                ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右キーで変更 ▶', 45, 280);
+                ctx.fillText('【PASSIVE & AWAKEN】', 25, 120); ctx.font = '10px monospace';
+                const items = [ `常時パッシブ : ${Passives[this.myAI.passiveKey].name}`, `覚醒の条件　 : ${AwakenConds[this.myAI.awakenCond].name}`, `覚醒パッシブ : ${Passives[this.myAI.awakenPassive].name}`, `覚醒オーラ色 : [CHANGE]` ];
+                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 5, 140 + i * 18); }
+                let desc = ''; let title = '';
+                if(this.labCur===0){ title=`[ ${Passives[this.myAI.passiveKey].name} ]`; desc=Passives[this.myAI.passiveKey].desc; }
+                else if(this.labCur===1){ title=`[ ${AwakenConds[this.myAI.awakenCond].name} ]`; desc=AwakenConds[this.myAI.awakenCond].desc; }
+                else if(this.labCur===2){ title=`[ ${Passives[this.myAI.awakenPassive].name} ]`; desc=Passives[this.myAI.awakenPassive].desc; }
+                else { title=`[ オーラ色変更 ]`; desc='覚醒（変身）した時に纏う激しいオーラの色を変更します。'; }
+                this.drawDescBox(title, desc);
             }
-            else if (this.st === 'lab_gambit') {
-                ctx.fillText('【GAMBIT AI SETTING】', 20, 140); ctx.font = '9px monospace';
-                for(let i=0; i<4; i++) {
-                    ctx.fillStyle = this.labCur === i ? '#ff0' : '#888'; ctx.fillText(`優先度${i+1}: ${this.myAI.gambits[i].cond}`, 10, 160 + i * 30);
-                    ctx.fillStyle = this.labCur === i ? '#fff' : '#aaa'; ctx.fillText(` └ 行動: ◀ ${this.myAI.gambits[i].act.padEnd(8, ' ')} ▶`, 10, 172 + i * 30);
-                }
-                ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右で行動を変更 ▶', 45, 285);
+            else if (this.st === 'lab_stats') { 
+                ctx.fillText('【STATUS POINT】', 40, 120); ctx.font = '10px monospace';
+                let pts = (3.0 - (this.myAI.base.atk + this.myAI.base.res + this.myAI.base.spd)).toFixed(1);
+                ctx.fillStyle = '#88f'; ctx.fillText(`残りポイント: ${pts}`, 40, 140);
+                const items = [ `攻撃力(ATK) : ${this.myAI.base.atk.toFixed(1)}`, `耐久力(RES) : ${this.myAI.base.res.toFixed(1)}`, `素早さ(SPD) : ${this.myAI.base.spd.toFixed(1)}` ];
+                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 160 + i * 20); }
+                let desc = this.labCur===0?'与えるダメージとノックバック力が上昇。':this.labCur===1?'受けるノックバックが減り、重い一撃にも耐える。':'技の発生、硬直、移動速度など全ての行動が速くなる。';
+                this.drawDescBox(`[ ステータス配分 ]`, desc);
             }
-            else if (this.st === 'lab_combo') {
-                ctx.fillText('【COMBO ROUTE】', 40, 140); ctx.font = '10px monospace'; ctx.fillStyle = '#88f'; ctx.fillText('「コンボ始動」時の連携', 25, 155);
-                for(let i=0; i<3; i++) {
-                    ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; let skillName = SkillDict[this.myAI.comboRoute[i]];
-                    ctx.fillText(`HIT ${i+1}: ◀ ${skillName.padEnd(6,' ')} ▶`, 30, 185 + i * 35);
-                    if (i < 2) { ctx.fillStyle = '#666'; ctx.fillText('  ↓ Cancel', 60, 205 + i * 35); }
-                }
-                ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('◀ 左右で技を変更 ▶', 45, 285);
+            else if (this.st === 'lab_body') {
+                ctx.fillText('【BODY & PHYSICS】', 30, 120); ctx.font = '10px monospace';
+                const items = [ `横幅(W) : ${this.myAI.body.width.toFixed(2)}`, `縦幅(H) : ${this.myAI.body.height.toFixed(2)}`, `重量(WT): ${Math.floor(this.myAI.physics.weight)}kg`, `ボディ色: [CHANGE]` ];
+                for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 140 + i * 18); }
+                let desc = this.labCur===0?'当たり判定が横に広がるが、攻撃のリーチも伸びる。':this.labCur===1?'縦に大きくなる。ジャンプ力にも影響？':this.labCur===2?'重いほどダメージとノックバックを少し軽減する。':'ボディカラーをランダムに変更します。';
+                this.drawDescBox(`[ 体型＆物理設定 ]`, desc);
             }
         }
         return;
@@ -494,8 +537,7 @@ const AutoFighter = {
     if (isHitStop) { grad.addColorStop(0, '#fff'); grad.addColorStop(1, '#ccc'); } else { grad.addColorStop(0, '#050510'); grad.addColorStop(1, '#202030'); }
     ctx.fillStyle = grad; ctx.fillRect(0, 0, 200, 300);
     
-    applyShake();
-    ctx.save(); ctx.scale(this.scale, this.scale); ctx.translate(-this.camX, -this.camY);
+    applyShake(); ctx.save(); ctx.scale(this.scale, this.scale); ctx.translate(-this.camX, -this.camY);
 
     ctx.strokeStyle = isHitStop ? '#000' : '#445'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, this.groundY); ctx.lineTo(this.stageWidth, this.groundY); ctx.stroke();
     for(let i=0; i<this.stageWidth; i+=40) { ctx.beginPath(); ctx.moveTo(i, this.groundY); ctx.lineTo(i - 30, this.stageHeight); ctx.stroke(); }
@@ -525,8 +567,8 @@ const AutoFighter = {
 
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 32); 
     ctx.fillStyle = '#222'; ctx.fillRect(10, 5, 80, 8); ctx.fillRect(110, 5, 80, 8);
-    ctx.fillStyle = this.p1.isAwakened ? this.p1.color.aura : this.p1.color.body; ctx.fillRect(10, 5, Math.max(0, this.p1.hp/this.p1.maxHp)*80, 8);
-    ctx.fillStyle = this.p2.isAwakened ? this.p2.color.aura : this.p2.color.body; let p2HpW = Math.max(0, this.p2.hp/this.p2.maxHp)*80; ctx.fillRect(190 - p2HpW, 5, p2HpW, 8);
+    ctx.fillStyle = this.p1.isAwakened ? this.p1.awakenColor : this.p1.color.body; ctx.fillRect(10, 5, Math.max(0, this.p1.hp/this.p1.maxHp)*80, 8);
+    ctx.fillStyle = this.p2.isAwakened ? this.p2.awakenColor : this.p2.color.body; let p2HpW = Math.max(0, this.p2.hp/this.p2.maxHp)*80; ctx.fillRect(190 - p2HpW, 5, p2HpW, 8);
 
     ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
     ctx.fillText(this.p1.name, 10, 25); ctx.fillText(this.p2.name, 190 - (this.p2.name.length*5.5), 25);
