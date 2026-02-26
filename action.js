@@ -1,21 +1,20 @@
-// === UNREASONABLE BROS - STAGE SELECT EDITION ===
+// === UNREASONABLE BROS - STAGE SELECT & BUG FIX EDITION ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   fallingSpikes: [], fireballs: [], sun: null, blackHole: null,
   p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1, trail: []}, 
   score: 0, camX: 0, coyoteTime: 0, stageTheme: 'grass',
   mIdx: 1, deathReason: '', checkpointX: 20, bgTimer: 0,
-  titleCur: 0, // ★ タイトル画面のカーソル (0: はじめる, 1: リセット)
-  stageSelect: 1, // ★ ステージ選択用
+  titleCur: 0, stageSelect: 1,
   
   init() { 
     this.st = 'title'; BGM.play('action'); 
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
-    if (isNaN(SaveSys.data.actMaxStage)) SaveSys.data.actMaxStage = SaveSys.data.actStage; // ★ 最高到達ステージの記録
+    if (isNaN(SaveSys.data.actMaxStage)) SaveSys.data.actMaxStage = SaveSys.data.actStage;
     if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
     if (SaveSys.data.actLives === undefined) { SaveSys.data.actLives = 5; SaveSys.save(); }
     this.checkpointX = 20; this.bgTimer = 0; this.titleCur = 0;
-    this.stageSelect = SaveSys.data.actStage; // 最初は現在のステージに合わせておく
+    this.stageSelect = SaveSys.data.actStage;
   },
   
   load() {
@@ -24,7 +23,6 @@ const Action = {
     this.invisibleBlocks = []; this.fakeCoins = []; this.fallingSpikes = []; this.fireballs = []; 
     this.sun = null; this.blackHole = null; this.camX = 0; this.coyoteTime = 0; this.deathReason = '';
     
-    // ★ 選択したステージから始める
     SaveSys.data.actStage = this.stageSelect;
     SaveSys.save();
 
@@ -125,12 +123,10 @@ const Action = {
     this.bgTimer++;
     if (keysDown.select) { switchApp(Menu); return; }
     
-    // ★ タイトル画面の操作（ステージ選択対応）
     if (this.st === 'title') {
       if (keysDown.up || keysDown.down) { this.titleCur = this.titleCur === 0 ? 1 : 0; playSnd('sel'); }
       
       if (this.titleCur === 0) {
-          // ステージ選択 (左右キー)
           let maxSt = SaveSys.data.actMaxStage || SaveSys.data.actStage;
           if (keysDown.left && this.stageSelect > 1) { this.stageSelect--; playSnd('sel'); }
           if (keysDown.right && this.stageSelect < maxSt) { this.stageSelect++; playSnd('sel'); }
@@ -150,7 +146,6 @@ const Action = {
       if (keysDown.up || keysDown.down) { this.mIdx = this.mIdx === 0 ? 1 : 0; playSnd('sel'); }
       if (keysDown.a) {
         if (this.mIdx === 0) { 
-            // データリセット
             SaveSys.data.actStage = 1; SaveSys.data.actMaxStage = 1; SaveSys.data.actLives = 5; 
             SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save(); 
             this.stageSelect = 1; playSnd('hit'); this.st = 'title'; 
@@ -202,7 +197,7 @@ const Action = {
         } else if (m.type === 'goal') {
            SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}クリア`);
            SaveSys.data.actStage++; 
-           if(SaveSys.data.actStage > (SaveSys.data.actMaxStage || 1)) SaveSys.data.actMaxStage = SaveSys.data.actStage; // 最高到達点を更新
+           if(SaveSys.data.actStage > (SaveSys.data.actMaxStage || 1)) SaveSys.data.actMaxStage = SaveSys.data.actStage;
            this.checkpointX = 20; SaveSys.save(); playSnd('combo');
            if (SaveSys.data.actStage > 6) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
         } else {
@@ -236,7 +231,9 @@ const Action = {
 
     for (let spike of this.spikes) { if (nx + 20 > spike.x && nx < spike.x + spike.w && ny + 20 > spike.y) { this.die("トゲに刺さった"); return; } }
     
-    for (let e of this.enemies) {
+    // ★ 敵の処理（不死身バグ修正）
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      let e = this.enemies[i];
       e.vy = (e.vy || 0) + gravity; e.y += e.vy; 
       if (e.y > 250) { e.y = 250; e.vy = 0; }
       
@@ -248,8 +245,13 @@ const Action = {
       else { e.x += e.vx; }
 
       e.anim = (e.anim || 0) + Math.abs(e.vx) * 2;
+      
       if (Math.abs(nx + 10 - e.x) < 18 && Math.abs(ny + 10 - e.y) < 18) {
-        if (this.p.vy > 0 && ny < e.y) { e.y = 9999; this.p.vy = -6; this.score += 50; playSnd('hit'); addParticle(e.x, e.y, '#a00', 'explosion'); screenShake(4); } 
+        if (this.p.vy > 0 && ny < e.y) { 
+           // ★ 配列から完全に削除することで復活を阻止
+           this.enemies.splice(i, 1);
+           this.p.vy = -6; this.score += 50; playSnd('hit'); addParticle(e.x, e.y, '#a00', 'explosion'); screenShake(4); 
+        } 
         else { this.die("魔物に触れた"); return; }
       }
     }
@@ -302,7 +304,6 @@ const Action = {
   draw() {
     applyShake();
     
-    // ★ タイトル画面の描画（ステージ選択UI追加）
     if (this.st === 'title' || this.st === 'confirmDelete') {
       const gradient = ctx.createLinearGradient(0, 0, 0, 300); gradient.addColorStop(0, '#f40'); gradient.addColorStop(1, '#820'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 200, 300);
       ctx.shadowBlur = 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText('UNREASONABLE', 30, 80); ctx.fillText('BROTHERS', 45, 105); ctx.shadowBlur = 0;
@@ -315,7 +316,6 @@ const Action = {
         ctx.fillStyle = this.titleCur === 0 ? '#ff0' : '#fff'; ctx.font = 'bold 12px monospace'; 
         ctx.fillText((this.titleCur === 0 ? '> ' : '  ') + 'はじめる', 50, 220);
         
-        // ステージ選択UI
         if (this.titleCur === 0) {
             ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
             ctx.fillText(`[STAGE ${this.stageSelect}]`, 60, 235);
@@ -414,6 +414,8 @@ const Action = {
         } 
     }
     for (let spike of this.spikes) { if (spike.x - this.camX > -50 && spike.x - this.camX < 250) drawSprite(spike.x, spike.y, '#aaa', sprs.spike, 2.5); }
+    
+    // ★ 敵の描画
     for (let e of this.enemies) {
       if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;
@@ -421,6 +423,7 @@ const Action = {
         drawSprite(e.x - 4, e.y + offsetY - 4, color, sprs.enemyNew, 2.5);
       }
     }
+    
     if (this.st !== 'dead' && this.st !== 'gameover') {
       ctx.save(); 
       for(let i=0; i<this.p.trail.length; i++) {
