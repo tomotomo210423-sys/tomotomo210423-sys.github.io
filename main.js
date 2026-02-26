@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.7: Added AutoFighter) ===
+// === CORE SYSTEM (Phase 5.8: Safe App Loading & Reordered Menu) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -79,7 +79,6 @@ const SaveSys = {
 };
 
 // ★============================================★
-// 【重要】うまく作動したAPIキーを分割して貼り付けてください！
 const GEMINI_API_KEY = [
   "AIza",
   "SyDa7Ku8RWSO",
@@ -92,51 +91,29 @@ const AISys = {
   status: 'ready',
   async chat(sysPrompt, userPrompt) {
     const key = GEMINI_API_KEY.trim();
-    
     if (key.includes("ここに") || key.length < 30) {
       return "わしの 頭脳（APIキー）が まだ 設定されておらぬようじゃ！ main.js を確認せい！";
     }
-
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-    
     const payload = {
       contents: [{ parts: [{ text: userPrompt }] }],
       systemInstruction: { parts: [{ text: sysPrompt }] },
       generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
     };
-
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) {
-        const errorDetail = await response.json();
-        const errMsg = errorDetail.error?.message || "";
-        
-        // ★ 429エラー（使いすぎ制限）の場合の世界観処理
+        const errorDetail = await response.json(); const errMsg = errorDetail.error?.message || "";
         if (response.status === 429) {
-          const match = errMsg.match(/retry in ([\d\.]+)s/);
-          let waitSec = 60; 
-          if (match && match[1]) {
-            waitSec = Math.ceil(parseFloat(match[1])); 
-          }
+          const match = errMsg.match(/retry in ([\d\.]+)s/); let waitSec = 60; 
+          if (match && match[1]) waitSec = Math.ceil(parseFloat(match[1])); 
           return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！\nすまぬが【あと ${waitSec}秒 】ほど休ませてから 話しかけてくれい！`;
         }
-        
         return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！ 電波の良いところで 頼むぞ！`;
       }
-
       const data = await response.json();
-      
-      if (!data.candidates || data.candidates.length === 0) {
-          return "かみさまが 沈黙しておる…… もういちど 話しかけてみてくれい。";
-      }
-      
+      if (!data.candidates || data.candidates.length === 0) return "かみさまが 沈黙しておる…… もういちど 話しかけてみてくれい。";
       return data.candidates[0].content.parts[0].text.trim();
-      
     } catch (e) {
       return `むむっ… 世界の繋がり（ネットワーク）が 切れておるようじゃ！`;
     }
@@ -168,26 +145,47 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// 【変更点】メニューの配列に「AI闘技場」を追加しました！
+// メニューの順番変更 ＆ クラッシュ防止機能追加
 // ★============================================★
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'ローカルランキング', '設定', '王様の間', 'AI闘技場'], 
+  // 「AI闘技場」を「レトロ・スロット」の下に配置しました
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'AI闘技場', 'ローカルランキング', '設定', '王様の間'], 
   holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
   update() {
     if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
     if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
+    
     if (keysDown.a) { 
-        const appObjs = [Guide, Tetri, Action, Online, Rhythm, Slot, Ranking, Settings, KingRoom, AutoFighter]; 
-        switchApp(appObjs[this.cur]); 
+        // ★ 安全装置：ファイルが読み込まれていなければ null にする
+        const appObjs = [
+            typeof Guide !== 'undefined' ? Guide : null, 
+            typeof Tetri !== 'undefined' ? Tetri : null, 
+            typeof Action !== 'undefined' ? Action : null, 
+            typeof Online !== 'undefined' ? Online : null, 
+            typeof Rhythm !== 'undefined' ? Rhythm : null, 
+            typeof Slot !== 'undefined' ? Slot : null, 
+            typeof AutoFighter !== 'undefined' ? AutoFighter : null, // AI闘技場
+            typeof Ranking !== 'undefined' ? Ranking : null, 
+            typeof Settings !== 'undefined' ? Settings : null, 
+            typeof KingRoom !== 'undefined' ? KingRoom : null
+        ]; 
+        
+        // 選んだアプリがちゃんと存在すれば開く。無ければエラー音だけ鳴らす。
+        if (appObjs[this.cur]) {
+            switchApp(appObjs[this.cur]); 
+        } else {
+            playSnd('hit');
+            console.warn("そのゲーム（jsファイル）はまだ読み込まれていません！ index.html を確認してください！");
+        }
     }
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v8.0', 60, 40);
-    // メニュー項目が多いため、縦の行間を少し詰める（20px -> 18px）
-    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 65 + i * 18); }
+    // メニュー項目が10個になったので、画面からはみ出さないように行間を19pxに調整しました
+    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 63 + i * 19); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };
