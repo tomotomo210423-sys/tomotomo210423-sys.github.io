@@ -1,4 +1,4 @@
-// === AUTO FIGHTER (Phase 12: MAHORAGA TRUE ADAPTATION) ===
+// === AUTO FIGHTER (Phase 13: TRUE COMBAT & MAHORAGA ADAPTATION) ===
 
 const Styles = {
     RUSH: { name: 'インファイター', desc: '常に前進し、接近戦でのコンボを狙う。手数が多く攻撃的。', aggro: 0.8, guard: 0.1, dodge: 0.1, range: 35 },
@@ -14,8 +14,7 @@ const Passives = {
     GIANT: { name: '巨人の体', desc: '常に受けるダメージを20%カットする。重量級向け。' },
     NINJA: { name: '忍', desc: '移動スピードと回避距離がアップする。軽量級向け。' },
     LEARNING: { name: '成長AI (学習)', desc: '戦闘中、相手の行動をリアルタイムに学習し、ガード率や回避率を最適化していく。' },
-    // ★ 摩虎羅の仕様変更
-    MAHORAGA: { name: '摩虎羅 (適応)', desc: '同じ技を5回受けると解析を開始し、一定時間後に完全適応(ダメージ・怯み無効)する。' }
+    MAHORAGA: { name: '摩虎羅 (適応)', desc: '同じ技を5回受けると解析を開始し、3秒後に完全適応(ダメージ・怯み無効)する。' }
 };
 
 const AwakenConds = {
@@ -31,14 +30,14 @@ const Skills = {
     meteor: {name:'メテオ', dmg: 50, kb: 15, range: 45, start: 10, act: 15, rec: 30, cd: 40, vx: 6, type: 'air', desc: '【空中専用】空中の敵を地面に叩き落とす。'},
     slide: {name:'スライド', dmg: 20, kb: 4, range: 45, start: 6, act: 20, rec: 20, cd: 25, vx: 12, type: 'melee', desc: '姿勢を低くして高速で突進する奇襲技。'},
     beam: {name:'ビーム', dmg: 40, kb: 10, range: 250, start: 25, act: 15, rec: 40, cd: 60, vx: -2, type: 'range', desc: '長距離レーザー。発生は遅いが画面端まで届く。'},
-    sonic: {name:'ソニック', dmg: 25, kb: 4, range: 200, start: 12, act: 1, rec: 25, cd: 30, vx: 0, type: 'shot', desc: '前方に高速で飛んでいく衝撃波（飛び道具）を放つ。'},
+    sonic: {name:'ソニック', dmg: 25, kb: 4, range: 200, start: 12, act: 1, rec: 25, cd: 30, vx: 0, type: 'shot', desc: '前方に飛んでいく衝撃波（飛び道具）を放つ。'},
     dive: {name:'急降下', dmg: 35, kb: 8, range: 60, start: 8, act: 15, rec: 25, cd: 30, vx: 10, type: 'air', desc: '【空中専用】空中から斜め下へ鋭く突進蹴りを行う。'},
     shoryu: {name:'昇龍拳', dmg: 30, kb: 10, range: 40, start: 5, act: 15, rec: 35, cd: 35, vx: 4, type: 'anti_air', desc: '飛び上がりながら攻撃。対空や打ち上げに優れる。'},
     heal: {name:'ヒール', dmg: 0, kb: 0, range: 0, start: 30, act: 5, rec: 30, cd: 120, vx: 0, type: 'buff', desc: '無防備な構えを取るが、自身のHPを200回復する。'},
     warpAtk: {name:'幻影斬', dmg: 25, kb: 5, range: 150, start: 15, act: 10, rec: 25, cd: 50, vx: 0, type: 'warp', desc: '相手の背後に一瞬でワープして斬りつける。'},
     throw: {name:'投げ技', dmg: 35, kb: 8, range: 30, start: 8, act: 10, rec: 20, cd: 25, vx: 5, type: 'throw', desc: 'ガードを完全に無視して相手を投げ飛ばす近距離技。'},
-    physCounter: {name:'物理当て身', dmg: 0, kb: 0, range: 0, start: 2, act: 30, rec: 20, cd: 30, vx: 0, type: 'stance_phys', desc: '構え中に直接攻撃を受けると、無効化して超絶反撃を行う。'},
-    magReflect: {name:'魔法反射', dmg: 0, kb: 0, range: 0, start: 2, act: 40, rec: 20, cd: 30, vx: 0, type: 'stance_mag', desc: '構え中に飛び道具(ソニック等)を受けると、相手に跳ね返す。'}
+    physCounter: {name:'物理当て身', dmg: 0, kb: 0, range: 0, start: 2, act: 30, rec: 20, cd: 30, vx: 0, type: 'stance_phys', desc: '構え中に直接攻撃を受けると無効化し超絶反撃。'},
+    magReflect: {name:'魔法反射', dmg: 0, kb: 0, range: 0, start: 2, act: 40, rec: 20, cd: 30, vx: 0, type: 'stance_mag', desc: '構え中に飛び道具を受けると相手に跳ね返す。'}
 };
 
 const SkillKeys = Object.keys(Skills);
@@ -77,15 +76,15 @@ const AutoFighter = {
       hp: 1000, maxHp: 1000, base: data.base, body: data.body, color: data.color, physics: data.physics,
       styleKey: data.styleKey, skillKeys: data.skillKeys,
       passiveKey: data.passiveKey, awakenCond: data.awakenCond, awakenPassive: data.awakenPassive, awakenColor: data.awakenColor,
-      
       dynGuard: Styles[data.styleKey].guard, dynDodge: Styles[data.styleKey].dodge,
       
-      // ★ 摩虎羅の完全適応用プロパティ
+      // 摩虎羅プロパティ
       hitHistory: {}, adapting: {}, adapted: {}, 
       
       state: 'idle', stateFrame: 0, cd: 0, name: data.name,
       vx: 0, vy: 0, guarding: false, justGuardWindow: 0, trail: [],
-      hitCancel: false, combo: 0, comboTimer: 0, comboDmg: 0, isAwakened: false
+      hitCancel: false, hasHit: false, // ★ 当たり判定持続・多段ヒット防止フラグ
+      combo: 0, comboTimer: 0, comboDmg: 0, isAwakened: false
     });
     
     this.p1 = createFighter(false, this.myAI);
@@ -206,6 +205,7 @@ const AutoFighter = {
     this.processFighter(this.p1, this.p2);
     this.processFighter(this.p2, this.p1);
     
+    // 弾（飛び道具）の処理と魔法反射
     for(let i=this.bullets.length-1; i>=0; i--) {
         let b = this.bullets[i]; b.x += b.vx; b.y += b.vy; b.life--;
         this.addVFX('slash', b.x, b.y, b.owner.color.aura, {size: 15, angle: b.vx>0?0:Math.PI, width: 4, life:2});
@@ -241,23 +241,18 @@ const AutoFighter = {
   addText(x, y, text, color) { this.texts.push({x, y, text, color, life: 40}); },
   addVFX(type, x, y, color, extra={}) { this.vfx.push({type, x, y, color, life: extra.life||20, maxLife: extra.life||20, ...extra}); },
 
+  // ★ 汎用ヒット処理（持続判定対応・投げ処理・摩虎羅対応）
   applyHit(attacker, skill, victim, hx, hy) {
        let pKeyV = victim.isAwakened ? victim.awakenPassive : victim.passiveKey;
        let pKeyA = attacker.isAwakened ? attacker.awakenPassive : attacker.passiveKey;
 
-       // ★ 摩虎羅の完全適応チェック（適応済みならダメージ・ノックバック・怯みを完全無効化）
+       // 摩虎羅の完全適応チェック
        if (pKeyV === 'MAHORAGA' && victim.adapted[skill.name]) {
            this.addVFX('impact', victim.x, victim.y-15, '#fff', {size: 30, life: 10});
-           this.addText(victim.x, victim.y - 40, "完全適応", "#fff");
-           playSnd('sel'); 
-           return; 
+           this.addText(victim.x, victim.y - 40, "完全適応", "#fff"); playSnd('sel'); return; 
        }
 
-       if (victim.comboDmg > 100 || attacker.combo >= 5) {
-           victim.vy = -8; victim.vx = attacker.dir * 15; victim.state = 'knockdown'; victim.stateFrame = 0;
-           attacker.combo = 0; victim.comboDmg = 0; attacker.hitCancel = false; this.addText(victim.x, victim.y-30, "COMBO LIMIT", "#888"); return;
-       }
-
+       // 物理カウンター
        if (victim.state === 'atk_physCounter' && skill.type !== 'shot' && skill.type !== 'range') {
            playSnd('combo'); screenShake(15); if(typeof hitStop !== 'undefined') hitStop(15);
            this.addVFX('impact', victim.x, victim.y, '#f00', {size: 70}); this.addText(victim.x, victim.y-50, "COUNTER!!", "#f00");
@@ -265,6 +260,7 @@ const AutoFighter = {
            victim.state = 'atk_counter'; victim.stateFrame = 0; victim.vx = victim.dir * 8; return;
        }
 
+       // パリィ
        if (victim.guarding && victim.justGuardWindow > 0 && skill.type !== 'throw') {
            playSnd('sel'); screenShake(8); if(typeof hitStop !== 'undefined') hitStop(10);
            this.addVFX('impact', victim.x, victim.y-20, '#0ff', {size: 50}); this.addText(victim.x, victim.y - 50, "PARRY!", "#0ff");
@@ -277,7 +273,7 @@ const AutoFighter = {
        if (pKeyV === 'GIANT') damage *= 0.8;
        damage = Math.max(1, damage - ((victim.physics.weight - 100) * 0.1)); 
 
-       // ★ 摩虎羅の解析カウント開始（5回目で解析スタート）
+       // ★ 摩虎羅の解析カウント（5回目で3秒タイマー開始）
        if (pKeyV === 'MAHORAGA') {
            victim.hitHistory[skill.name] = (victim.hitHistory[skill.name] || 0) + 1;
            if (victim.hitHistory[skill.name] === 5 && !victim.adapting[skill.name] && !victim.adapted[skill.name]) {
@@ -291,26 +287,47 @@ const AutoFighter = {
 
        if (isGuarding) {
            victim.hp -= damage * 0.2; playSnd('sel'); screenShake(2); victim.vx = attacker.dir * kbForce * 0.3; 
-           this.addVFX('impact', victim.x, victim.y-15, '#888', {size: 15, life: 10}); return;
+           this.addVFX('impact', victim.x, victim.y-15, '#888', {size: 15, life: 10});
+           attacker.hasHit = true; return;
+       }
+
+       // ★ ハメ防止（コンボリミット）
+       if (victim.comboDmg > 120 || attacker.combo >= 6) {
+           victim.vy = -10; victim.vx = attacker.dir * 18; victim.state = 'knockdown'; victim.stateFrame = 0;
+           attacker.combo = 0; victim.comboDmg = 0; attacker.hitCancel = false; attacker.hasHit = true;
+           this.addText(victim.x, victim.y-30, "COMBO LIMIT", "#888"); return;
        }
 
        victim.hp -= damage; 
        if (pKeyA === 'VAMPIRE') attacker.hp = Math.min(attacker.maxHp, attacker.hp + damage * 0.2);
 
        victim.state = 'hurt'; victim.stateFrame = 0; victim.comboTimer = 60; 
-       victim.comboDmg += damage; attacker.hitCancel = true; attacker.combo++;
+       victim.comboDmg += damage; attacker.hitCancel = true; attacker.combo++; attacker.hasHit = true;
 
-       if (victim.y < this.groundY - 10) victim.vy = -4; 
-       if (skill.type === 'anti_air') { victim.vy = -16 * (100 / victim.physics.weight); victim.y -= 5; } 
-       else if (skill.name === 'メテオ') { victim.vy = 20; kbForce *= 0.5; }
-       else if (skill.type === 'throw') { victim.vy = -10; kbForce *= 1.5; } 
-       else if (skill.name === 'スライド' || skill.name === '急降下') victim.vy = -8 * (100 / victim.physics.weight);
-       else if (skill.kb > 10) victim.vy = -6 - (Math.random()*2); 
-       
-       victim.vx = attacker.dir * kbForce;
+       // ★ 投げ技の専用拘束＆吹き飛ばし処理
+       if (skill.type === 'throw') {
+           victim.x = attacker.x + attacker.dir * 25; victim.y = attacker.y; // 目の前に拘束
+           victim.vx = 0; victim.vy = -15; // 真上に放り投げる
+           this.addText(victim.x, victim.y - 40, "THROW!", "#f00");
+       } else {
+           if (victim.y < this.groundY - 10) victim.vy = -4; 
+           if (skill.type === 'anti_air') { victim.vy = -18 * (100 / victim.physics.weight); victim.y -= 5; } // 確実に浮かせる
+           else if (skill.name === 'メテオ') { victim.vy = 20; kbForce *= 0.5; }
+           else if (skill.name === 'スライド' || skill.name === '急降下') victim.vy = -8 * (100 / victim.physics.weight);
+           else if (skill.kb > 10) victim.vy = -6 - (Math.random()*2); 
+           victim.vx = attacker.dir * kbForce;
+       }
        
        if (skill.name === 'ジャブ') { playSnd('hit'); screenShake(4); if(typeof hitStop !== 'undefined') hitStop(3); this.addVFX('impact', hx, hy, '#fff', {size: 25}); } 
        else { playSnd('combo'); screenShake(12); if(typeof hitStop !== 'undefined') hitStop(8); this.addVFX('impact', hx, hy, attacker.color.aura, {size: 50}); this.addVFX('slash', hx, hy, '#fff', {size: 40, angle: Math.random()*Math.PI*2, width: 4}); }
+  },
+
+  createHitbox(attacker, skill, victim) {
+    let vDist = Math.abs(victim.x - attacker.x); let inFront = (victim.x - attacker.x) * attacker.dir >= -15; 
+    let actualRange = skill.range * attacker.body.width;
+    if (inFront && vDist <= actualRange + 15 && Math.abs(victim.y - attacker.y) < 60) {
+        this.applyHit(attacker, skill, victim, attacker.x + (vDist/2)*attacker.dir, victim.y - 15);
+    }
   },
 
   processFighter(f, opp) {
@@ -331,6 +348,7 @@ const AutoFighter = {
 
     let pKey = f.isAwakened ? f.awakenPassive : f.passiveKey;
     
+    // 成長AIの学習
     if (pKey === 'LEARNING' && f.stateFrame % 60 === 0) {
         if (opp.state.startsWith('atk_')) {
             let oppSkillType = opp.state.split('_')[1];
@@ -342,15 +360,14 @@ const AutoFighter = {
         }
     }
 
-    // ★ 摩虎羅の解析タイマー処理
+    // ★ 摩虎羅の完全適応タイマー処理
     if (pKey === 'MAHORAGA') {
         for (let sk in f.adapting) {
             if (f.adapting[sk] > 0) {
                 f.adapting[sk]--;
                 if (f.adapting[sk] === 0) {
-                    f.adapted[sk] = true; // 完全適応！
-                    this.addText(f.x, f.y - 70, "適応完了!!", "#fff");
-                    playSnd('combo'); screenShake(5);
+                    f.adapted[sk] = true; 
+                    this.addText(f.x, f.y - 70, "適応完了!!", "#fff"); playSnd('combo'); screenShake(5);
                     this.addVFX('shockwave', f.x, f.y, '#fff', {size: 80, life: 20});
                 }
             }
@@ -371,22 +388,35 @@ const AutoFighter = {
 
     let isAtk = f.state.startsWith('atk_'); let sKey = isAtk ? f.state.split('_')[1] : ''; let skill = isAtk ? (sKey === 'counter' ? CounterData : Skills[sKey]) : null;
     
+    // ★ 攻撃の持続判定システム（すっぽ抜け防止）
     if (isAtk && skill) {
-         let sFrame = Math.floor(skill.start / f.base.spd);
-         if (f.stateFrame === sFrame - 2 && skill.type === 'warp') { f.x = opp.x - opp.dir * 40; f.dir = opp.dir; this.addVFX('shockwave', f.x, f.y, '#ccc', {size: 30, life: 10}); }
+         let startF = Math.floor(skill.start / f.base.spd);
+         let actF = Math.floor(skill.act / f.base.spd);
+         let recF = Math.floor(skill.rec / f.base.spd);
+
+         if (f.stateFrame === startF - 2 && skill.type === 'warp') { f.x = opp.x - opp.dir * 40; f.dir = opp.dir; this.addVFX('shockwave', f.x, f.y, '#ccc', {size: 30, life: 10}); }
          
-         if (f.stateFrame === sFrame) { 
+         // 発生瞬間
+         if (f.stateFrame === startF) { 
+             f.hasHit = false; // ヒットフラグ初期化
              if (skill.type === 'anti_air') { f.vy = -12; f.vx = f.dir * 4; }
              if (skill.name === '急降下') { f.vy = 10; f.vx = f.dir * 12; }
              if (skill.type === 'buff') { f.hp = Math.min(f.maxHp, f.hp + 200); this.addVFX('shockwave', f.x, f.y, '#0f0', {size: 50}); playSnd('combo'); }
              if (skill.type === 'shot') { playSnd('jmp'); this.bullets.push({x: f.x + 20*f.dir, y: f.y - 20, vx: f.dir * 10, vy: 0, owner: f, skill: skill, life: 60}); } 
-             else if (skill.type !== 'buff' && !skill.type.startsWith('stance')) {
-                 this.createHitbox(f, skill, opp); 
+             if (skill.type !== 'buff' && skill.type !== 'shot' && !skill.type.startsWith('stance')) {
                  if (skill.type === 'range') { this.addVFX('beam', f.x + 20*f.dir, f.y - 15 * f.body.height, f.color.body, {size: skill.range, dir: f.dir, life: 15}); screenShake(6); } 
-                 else { let angle = f.dir === 1 ? 0 : Math.PI; if (skill.type === 'anti_air') angle -= (Math.PI/4) * f.dir; if (skill.type === 'air') angle += (Math.PI/4) * f.dir; if (skill.name !== 'ジャブ') this.addVFX('slash', f.x + 20*f.dir, f.y - 20 * f.body.height, f.color.body, {size: skill.range * f.body.width, angle: angle, width: 10}); }
+                 else { let angle = f.dir === 1 ? 0 : Math.PI; if (skill.type === 'anti_air') angle -= (Math.PI/4) * f.dir; if (skill.type === 'air') angle += (Math.PI/4) * f.dir; if (skill.name !== 'ジャブ' && skill.name !== '投げ技') this.addVFX('slash', f.x + 20*f.dir, f.y - 20 * f.body.height, f.color.body, {size: skill.range * f.body.width, angle: angle, width: 10}); }
              }
          }
-         if (f.stateFrame > ((skill.start + skill.rec) / f.base.spd)) { f.state = 'idle'; f.stateFrame = 0; f.hitCancel = false; }
+         
+         // 持続中ずっと当たり判定を出す（1度当たったらhasHitがtrueになり当たらない）
+         if (f.stateFrame >= startF && f.stateFrame <= startF + actF) {
+             if (!f.hasHit && skill.type !== 'buff' && skill.type !== 'shot' && !skill.type.startsWith('stance')) {
+                 this.createHitbox(f, skill, opp);
+             }
+         }
+
+         if (f.stateFrame > startF + actF + recF) { f.state = 'idle'; f.stateFrame = 0; f.hitCancel = false; f.hasHit = false; }
     }
     
     let canCancel = isAtk && f.hitCancel && f.stateFrame > (skill.start + 5) / f.base.spd;
@@ -466,14 +496,20 @@ const AutoFighter = {
     if (!isTrail && (f.state.startsWith('atk_') || f.state === 'move' || f.isAwakened)) { ctx.shadowBlur = f.isAwakened ? 20 : 12; ctx.shadowColor = c.aura; }
 
     ctx.beginPath(); ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.hip.x, p.hip.y); ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.sL.x, p.sL.y); ctx.lineTo(p.eL.x, p.eL.y); ctx.lineTo(p.hL.x, p.hL.y); ctx.moveTo(p.n.x, p.n.y); ctx.lineTo(p.sR.x, p.sR.y); ctx.lineTo(p.eR.x, p.eR.y); ctx.lineTo(p.hR.x, p.hR.y); ctx.moveTo(p.hip.x, p.hip.y); ctx.lineTo(p.kL.x, p.kL.y); ctx.lineTo(p.fL.x, p.fL.y); ctx.moveTo(p.hip.x, p.hip.y); ctx.lineTo(p.kR.x, p.kR.y); ctx.lineTo(p.fR.x, p.fR.y); ctx.stroke();
+    
+    // 摩虎羅の法陣（背後に浮かぶ輪）
+    if (!isTrail && f.isAwakened ? f.awakenPassive === 'MAHORAGA' : f.passiveKey === 'MAHORAGA') {
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, -30, 15, 0, Math.PI*2); ctx.stroke();
+        let rot = (Date.now()/500) % (Math.PI*2); ctx.beginPath(); ctx.moveTo(Math.cos(rot)*15, -30+Math.sin(rot)*15); ctx.lineTo(Math.cos(rot+Math.PI)*15, -30+Math.sin(rot+Math.PI)*15); ctx.stroke();
+    }
+
     ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(p.h.x, p.h.y, 6 * f.body.head, 0, Math.PI * 2); ctx.fillStyle = isTrail ? c.aura : c.body; ctx.fill();
     ctx.restore(); ctx.globalAlpha = 1;
   },
 
   draw() {
     if (this.st === 'menu' || this.st.startsWith('lab_')) {
-        const grad = ctx.createLinearGradient(0, 0, 0, 300); grad.addColorStop(0, '#001'); grad.addColorStop(1, '#003');
-        ctx.fillStyle = grad; ctx.fillRect(0, 0, 200, 300);
+        const grad = ctx.createLinearGradient(0, 0, 0, 300); grad.addColorStop(0, '#001'); grad.addColorStop(1, '#003'); ctx.fillStyle = grad; ctx.fillRect(0, 0, 200, 300);
 
         if (this.st === 'menu') {
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 16px monospace'; ctx.fillText('ULTIMATE AI LAB', 25, 50);
@@ -484,9 +520,9 @@ const AutoFighter = {
         else {
             ctx.fillStyle = '#112'; ctx.fillRect(10, 10, 180, 90); ctx.strokeStyle = '#335'; ctx.strokeRect(10, 10, 180, 90);
             ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('NORMAL', 40, 25); ctx.fillText('AWAKENED', 130, 25);
-            let prevF = { x: 0, y: 0, dir: 1, state: 'idle', stateFrame: 0, body: this.myAI.body, color: this.myAI.color, isAwakened: false };
+            let prevF = { x: 0, y: 0, dir: 1, state: 'idle', stateFrame: 0, body: this.myAI.body, color: this.myAI.color, passiveKey: this.myAI.passiveKey, isAwakened: false };
             ctx.save(); ctx.translate(50, 75); this.drawStickman(prevF); ctx.restore();
-            prevF.isAwakened = true; prevF.color = {body: this.myAI.color.body, aura: this.myAI.awakenColor}; ctx.save(); ctx.translate(145, 75); this.drawStickman(prevF); ctx.restore();
+            prevF.isAwakened = true; prevF.awakenPassive = this.myAI.awakenPassive; prevF.color = {body: this.myAI.color.body, aura: this.myAI.awakenColor}; ctx.save(); ctx.translate(145, 75); this.drawStickman(prevF); ctx.restore();
 
             ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace';
             
