@@ -1,4 +1,4 @@
-// === AUTO FIGHTER (Phase 18: BUG-FREE & TRUE HOVER EDITION) ===
+// === AUTO FIGHTER (Phase 19: THE ULTIMATE ENGINE) ===
 
 const Styles = {
     RUSH: { name: 'インファイター', desc: '常に前進し、接近戦でのコンボを狙う。手数が多く攻撃的。', aggro: 0.8, guard: 0.1, dodge: 0.1, range: 35 },
@@ -57,7 +57,6 @@ const getAwaken = (key) => AwakenConds[key] || AwakenConds['NONE'];
 const getAwakenPassive = (key) => AwakenPassives[key] || AwakenPassives['NONE'];
 const getSkill = (key) => Skills[key] || Skills['jab'];
 
-// ★ NaNやInfinityを絶対に防ぐ最強の安全関数
 const safeNum = (val, def) => { let n = Number(val); return (isNaN(n) || !isFinite(n)) ? def : n; };
 
 const AutoFighter = {
@@ -68,16 +67,20 @@ const AutoFighter = {
   
   myAI: {}, savedSlots: [null, null, null], labSt: 'main', labCur: 0, trainingMsg: '',
 
-  // ★ 究極のデータサニタイズ（セーブデータが壊れていても一瞬で直す）
-  sanitizeAI(ai) {
+  sanitizeAI(ai, isDummy = false) {
       if (!ai || typeof ai !== 'object') ai = {};
       ai.body = ai.body || {}; 
       ai.body.width = Math.max(0.1, safeNum(ai.body.width, 1.0)); 
       ai.body.height = Math.max(0.1, safeNum(ai.body.height, 1.0)); 
       ai.body.head = Math.max(0.1, safeNum(ai.body.head, 1.0));
       ai.color = ai.color || {}; 
-      ai.color.body = typeof ai.color.body === 'string' ? ai.color.body : '#0ff'; 
-      ai.color.aura = typeof ai.color.aura === 'string' ? ai.color.aura : '#ff0';
+      
+      // ダミーの場合は色を上書きしないように配慮
+      if (!isDummy) {
+          ai.color.body = typeof ai.color.body === 'string' ? ai.color.body : '#0ff'; 
+          ai.color.aura = typeof ai.color.aura === 'string' ? ai.color.aura : '#ff0';
+      }
+      
       ai.physics = ai.physics || {}; 
       ai.physics.weight = Math.max(10, safeNum(ai.physics.weight, 100));
       ai.base = ai.base || {}; 
@@ -103,16 +106,8 @@ const AutoFighter = {
   play(snd) { if(!this.isSim && typeof playSnd !== 'undefined') playSnd(snd); },
   shake(val) { if(!this.isSim && typeof screenShake !== 'undefined') screenShake(safeNum(val, 0)); },
   stop(val) { if(!this.isSim && typeof hitStop !== 'undefined') hitStop(safeNum(val, 0)); },
-  
-  // ★ 描画周りもNaNで落ちないように絶対保護
-  addText(x, y, text, color) { 
-      if(this.isSim || !text) return; 
-      this.texts.push({x: safeNum(x,0), y: safeNum(y,0), text: String(text), color: color||'#fff', life: 40}); 
-  },
-  addVFX(type, x, y, color, extra={}) { 
-      if(this.isSim) return; 
-      this.vfx.push({type, x: safeNum(x,0), y: safeNum(y,0), color: color||'#fff', life: safeNum(extra.life,20), maxLife: safeNum(extra.maxLife,20), ...extra}); 
-  },
+  addText(x, y, text, color) { if(this.isSim || !text) return; this.texts.push({x: safeNum(x,0), y: safeNum(y,0), text: String(text), color: color||'#fff', life: 40}); },
+  addVFX(type, x, y, color, extra={}) { if(this.isSim) return; this.vfx.push({type, x: safeNum(x,0), y: safeNum(y,0), color: color||'#fff', life: safeNum(extra.life,20), maxLife: safeNum(extra.maxLife,20), ...extra}); },
   
   drawDescBox(title, descStr) {
       ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(5, 205, 190, 90); ctx.strokeStyle = '#555'; ctx.strokeRect(5, 205, 190, 90);
@@ -152,10 +147,17 @@ const AutoFighter = {
       this.checkHealth(); this.timer = 0; this.texts = []; this.vfx = []; this.bullets = [];
       this.p1 = this.createFighter(false, this.myAI);
       let isMirror = Math.random() < 0.25; 
-      if (isMirror) { this.p2 = this.createFighter(true, this.myAI); this.p2.name = 'MIRROR'; this.p2.color = { body: '#555', aura: '#888' }; } 
-      else {
+      if (isMirror) { 
+          this.p2 = this.createFighter(true, this.myAI); this.p2.name = 'MIRROR'; this.p2.color = { body: '#555', aura: '#888' }; 
+      } else {
           let eStyle = Object.keys(Styles)[Math.floor(Math.random()*Object.keys(Styles).length)];
-          let dummyData = this.sanitizeAI({ name: 'DUMMY-' + eStyle, styleKey: eStyle, skillKeys: [...SkillKeys].sort(()=>Math.random()-0.5).slice(0,4), passiveKey: ['NONE','MAHORAGA','GIANT','HOVER'][Math.floor(Math.random()*4)] });
+          // ★ ダミー用の色を強制適用（sanitizeAIのisDummyフラグで保護）
+          let dummyData = this.sanitizeAI({ 
+              name: 'DUMMY-' + eStyle, styleKey: eStyle, 
+              color: { body: '#f0f', aura: '#f00' }, // ピンク色のダミー
+              skillKeys: [...SkillKeys].sort(()=>Math.random()-0.5).slice(0,4), 
+              passiveKey: ['NONE','MAHORAGA','GIANT','HOVER'][Math.floor(Math.random()*4)] 
+          }, true);
           this.p2 = this.createFighter(true, dummyData);
       }
       this.camX = (this.p1.x + this.p2.x) / 2 - (200 / this.scale) / 2; this.camY = this.groundY - (300 / this.scale) / 2;
@@ -284,6 +286,17 @@ const AutoFighter = {
     if (this.st === 'result') { if (keysDown.a) { this.st = 'menu'; this.play('sel'); } return; }
   },
 
+  // ★ 影分身の判定を安全に処理するための座標上書きパラメータ(overrideX)を追加
+  createHitbox(attacker, skill, victim, overrideX = null) {
+      let ax = overrideX !== null ? overrideX : attacker.x;
+      let vDist = Math.abs(victim.x - ax); let inFront = (victim.x - ax) * attacker.dir >= -15; 
+      let actualRange = safeNum(skill.range, 30) * Math.max(0.1, safeNum(attacker.body&&attacker.body.width, 1.0));
+      if (inFront && vDist <= actualRange + 15 && Math.abs(victim.y - attacker.y) < 60) {
+          return this.applyHit(attacker, skill, victim, ax + (vDist/2)*attacker.dir, victim.y - 15);
+      }
+      return false;
+  },
+
   applyHit(attacker, skill, victim, hx, hy) {
        if (!skill || !victim || !attacker) return false; 
        
@@ -301,9 +314,21 @@ const AutoFighter = {
            this.addText(victim.x, victim.y - 40, "完全適応", "#fff"); this.play('sel'); return true; 
        }
 
-       if (safeNum(victim.comboDmg,0) > 100 || safeNum(attacker.combo,0) >= 6) {
-           victim.vy = -8; victim.vx = attacker.dir * 15; victim.state = 'knockdown'; victim.stateFrame = 0;
-           attacker.combo = 0; victim.comboDmg = 0; attacker.hitCancel = false; this.addText(victim.x, victim.y-30, "COMBO LIMIT", "#888"); return true;
+       let safeAtk = Math.max(0.1, safeNum(attacker.base && attacker.base.atk, 1.0));
+       let damage = safeNum(skill.dmg, 10) * safeAtk; 
+       if (pKeyA === 'DESPERATION' && (attacker.hp / attacker.maxHp) <= 0.3) damage *= 1.5;
+       if (pKeyV === 'GIANT') damage *= 0.8;
+       let safeWeight = Math.max(10, safeNum(victim.physics && victim.physics.weight, 100)); 
+       damage = Math.max(1, damage - ((safeWeight - 100) * 0.1)); 
+
+       // ★ コンボリミットの「ダメージ無効化」バグを修正（大ダメージを与えつつ仕切り直す）
+       if (safeNum(victim.comboDmg,0) + damage > 100 || safeNum(attacker.combo,0) >= 6) {
+           victim.hp -= damage; // 最後のダメージはしっかり与える
+           victim.vy = -12; victim.vx = attacker.dir * 18; victim.state = 'knockdown'; victim.stateFrame = 0;
+           attacker.combo = 0; victim.comboDmg = 0; attacker.hitCancel = false; 
+           this.addText(victim.x, victim.y-40, "COMBO LIMIT!", "#f00"); 
+           this.play('combo'); this.shake(10); this.addVFX('impact', hx, hy, '#fff', {size: 60});
+           return true;
        }
 
        if (victim.state === 'atk_physCounter' && skill.type !== 'shot' && skill.type !== 'range') {
@@ -319,13 +344,6 @@ const AutoFighter = {
            attacker.state = 'stunned'; attacker.stateFrame = 0; attacker.vx = -attacker.dir * 2; attacker.vy = -3; attacker.hitCancel = false;
            victim.guarding = false; victim.justGuardWindow = 0; victim.state = 'idle'; victim.cd = 0; return true; 
        }
-
-       let safeAtk = safeNum(attacker.base && attacker.base.atk, 1.0);
-       let damage = safeNum(skill.dmg, 10) * safeAtk; 
-       if (pKeyA === 'DESPERATION' && (attacker.hp / attacker.maxHp) <= 0.3) damage *= 1.5;
-       if (pKeyV === 'GIANT') damage *= 0.8;
-       let safeWeight = Math.max(10, safeNum(victim.physics && victim.physics.weight, 100)); 
-       damage = Math.max(1, damage - ((safeWeight - 100) * 0.1)); 
 
        if (pKeyV === 'MAHORAGA') {
            if (!victim.hitHistory) victim.hitHistory = {}; if (!victim.adapting) victim.adapting = {};
@@ -348,7 +366,8 @@ const AutoFighter = {
 
        victim.state = 'hurt'; victim.stateFrame = 0; victim.comboTimer = 60; 
        victim.comboDmg = safeNum(victim.comboDmg,0) + damage; 
-       // ★ 影分身が当てた場合でも、必ず「本体（f）」のコンボを繋ぐように修正
+       
+       // ★ 影分身が当てた場合でも、必ず「本体」のコンボを繋ぐように修正
        attacker.hitCancel = true; attacker.combo = safeNum(attacker.combo,0) + 1;
 
        if (victim.y < this.groundY - 10) victim.vy = -4; 
@@ -381,10 +400,8 @@ const AutoFighter = {
         }
     }
 
-    if (f.state !== f.prevState) { f.hasHit = false; f.prevState = f.state; }
-
     f.stateFrame++; 
-    let safeSpd = safeNum(f.base && f.base.spd, 1.0);
+    let safeSpd = Math.max(0.1, safeNum(f.base && f.base.spd, 1.0));
     if (f.cd > 0) f.cd -= safeSpd;
 
     if (!f.isAwakened) {
@@ -420,7 +437,7 @@ const AutoFighter = {
                     if (!f.adapted) f.adapted = {};
                     f.adapted[sk] = true; this.addText(f.x, f.y - 70, "適応完了!!", "#fff");
                     this.play('combo'); this.shake(5); this.addVFX('shockwave', f.x, f.y, '#fff', {size: 80, life: 20});
-                    f.adapting[sk] = -1; 
+                    delete f.adapting[sk]; // 無限適応バグ修正
                 }
             }
         }
@@ -439,7 +456,7 @@ const AutoFighter = {
     }
 
     f.x = Math.max(10, Math.min(this.stageWidth - 10, f.x));
-    f.y = Math.max(30, Math.min(this.groundY, f.y)); 
+    f.y = Math.max(80, Math.min(this.groundY, f.y)); // 天井制限を80に緩和
 
     if (Math.abs(f.vx) > 4 || Math.abs(f.vy) > 4 || f.state.startsWith('atk_')) { f.trail.unshift({x: f.x, y: f.y, dir: f.dir, state: f.state, frame: f.stateFrame}); if(f.trail.length > 5) f.trail.pop(); } else if (f.trail.length > 0) { f.trail.pop(); }
     if (f.state === 'idle' || f.state === 'move') { f.dir = (opp.x > f.x) ? 1 : -1; }
@@ -457,7 +474,12 @@ const AutoFighter = {
          let actFrame = Math.max(1, Math.floor(safeNum(skill.act, 10) / safeSpd));
          let recFrame = Math.max(1, Math.floor(safeNum(skill.rec, 15) / safeSpd));
          let sName = skill.name || '';
-         let sType = skill.type || '';
+         let sType = String(skill.type || '');
+         
+         // ★ 状態変化時のヒット判定リセット（同技キャンセルすり抜け防止）
+         if (f.stateFrame === 1 || f.state !== f.prevState) { 
+             f.hasHit = false; f.prevState = f.state; 
+         }
          
          if (f.stateFrame === sFrame - 2 && sType === 'warp') { f.x = opp.x - opp.dir * 40; f.dir = opp.dir; this.addVFX('shockwave', f.x, f.y, '#ccc', {size: 30, life: 10}); }
          
@@ -471,12 +493,13 @@ const AutoFighter = {
                  else if (sType === 'range') { this.addVFX('beam', f.x + 20*f.dir, f.y - 15 * safeNum(f.body&&f.body.height, 1), (f.color?f.color.body:'#fff'), {size: safeNum(skill.range, 250), dir: f.dir, life: 15}); this.shake(6); }
              }
              if (!f.hasHit && sType !== 'buff' && sType !== 'shot' && sType !== 'range' && sType !== 'summon' && !sType.startsWith('stance')) {
-                 // 本体が当てたかチェック
+                 
+                 // ★ 本体のヒットチェック
                  let mainHit = this.createHitbox(f, skill, opp);
-                 // 影分身が当てたかチェック（本体の引数fをそのまま渡すことで、本体のcomboやcancelフラグをONにする）
+                 // ★ 影分身のヒットチェック（本体の情報をそのまま渡し、座標だけズラして計算）
                  let cloneHit = false;
                  if (!mainHit && f.hasClones) {
-                     cloneHit = this.createHitbox({...f, x: f.x - 40}, skill, opp) || this.createHitbox({...f, x: f.x + 40}, skill, opp);
+                     cloneHit = this.createHitbox(f, skill, opp, f.x - 40) || this.createHitbox(f, skill, opp, f.x + 40);
                  }
                  
                  if (mainHit || cloneHit) {
@@ -516,10 +539,10 @@ const AutoFighter = {
         if (shouldAttack) {
             let bestSkillKey = null; let bestScore = -100;
             let sKeys = Array.isArray(f.skillKeys) ? f.skillKeys : ['jab','upper','smash','sonic'];
-            let safeWidth = safeNum(f.body&&f.body.width, 1.0);
+            let safeWidth = Math.max(0.1, safeNum(f.body&&f.body.width, 1.0));
 
             for (let skey of sKeys) {
-                let s = getSkill(skey); let score = 0; let sRange = safeNum(s.range, 30); let sType = s.type || 'melee';
+                let s = getSkill(skey); let score = 0; let sRange = safeNum(s.range, 30); let sType = String(s.type || 'melee');
                 if (d <= sRange * safeWidth) score += 10; else score -= (d - sRange) * 0.2;
                 if (isAir) { if (sType === 'air') score += 30; else score -= 20; } else { if (sType === 'air') score -= 20; }
                 if (oppIsAir && !isAir) { if (sType === 'anti_air') score += 20; }
@@ -536,7 +559,7 @@ const AutoFighter = {
         } else if (!canCancel) {
             if (isFloating) {
                 let targetY = safeNum(opp.y, this.groundY) - 120; 
-                targetY = Math.max(50, Math.min(this.groundY - 50, targetY)); 
+                targetY = Math.max(80, Math.min(this.groundY - 50, targetY)); 
                 let dy = targetY - f.y;
                 let isMoving = false;
 
@@ -554,7 +577,7 @@ const AutoFighter = {
 
   drawStickman(f, alpha = 1, isTrail = false) {
     if (!f || !f.body || !f.color) return; 
-    let bW = safeNum(f.body.width, 1.0); let bH = safeNum(f.body.height, 1.0); let bHead = safeNum(f.body.head, 1.0);
+    let bW = Math.max(0.1, safeNum(f.body.width, 1.0)); let bH = Math.max(0.1, safeNum(f.body.height, 1.0)); let bHead = Math.max(0.1, safeNum(f.body.head, 1.0));
     let cBody = typeof f.color === 'string' ? f.color : (f.color.body || '#fff');
     let cAura = typeof f.color === 'string' ? '#ff0' : (f.color.aura || '#ff0');
     let useColor = f.isAwakened ? (f.awakenColor || '#f00') : (isTrail ? cAura : cBody);
@@ -609,10 +632,9 @@ const AutoFighter = {
     let dx = safeNum(f.x, 0); let dy = safeNum(f.y, 0) - 20 * bH;
     if ((fst === 'stunned' || fst === 'knockdown') && !isTrail) { dx += (Math.random()-0.5)*4; dy += (Math.random()-0.5)*4; ctx.strokeStyle = '#888'; }
 
-    drawCore(dx, dy, alpha);
-    
-    // ★ 影分身の描画
+    // ★ 描画順の修正（奥に分身、手前に本体を描く）
     if (f.hasClones && !isTrail) { drawCore(dx - 40, dy, 0.4); drawCore(dx + 40, dy, 0.4); }
+    drawCore(dx, dy, alpha);
     
     if (!isTrail && passKey === 'MAHORAGA' && f.hitHistory) {
         let maxAdapt = 0; for(let k in f.hitHistory) if(safeNum(f.hitHistory[k],0) > maxAdapt) maxAdapt = f.hitHistory[k];
@@ -624,7 +646,7 @@ const AutoFighter = {
     }
     ctx.globalAlpha = 1;
 
-    // ★ パラパラ（ファンネル）の描画
+    // パラパラ（ファンネル）の描画
     if (!isTrail && f.funnelTimer > 0) {
         ctx.fillStyle = cAura; ctx.shadowBlur = 10; ctx.shadowColor = cAura;
         let ufoY = dy - 30 + Math.sin(Date.now()/100)*5;
@@ -701,7 +723,7 @@ const AutoFighter = {
         if (v.type === 'slash') { ctx.strokeStyle = v.color; ctx.lineWidth = Math.max(0.1, safeNum(v.width,2) * ratio); ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, safeNum(v.size,10)), safeNum(v.angle,0) - 1.0*ratio, safeNum(v.angle,0) + 1.0*ratio); ctx.stroke(); } 
         else if (v.type === 'impact') { ctx.fillStyle = isHitStop ? '#000' : v.color; ctx.beginPath(); let s = safeNum(v.size,10) * Math.pow(Math.max(0, 1 - ratio), 0.5) + 5; ctx.moveTo(v.x, v.y - s); ctx.lineTo(v.x + s/4, v.y - s/4); ctx.lineTo(v.x + s, v.y); ctx.lineTo(v.x + s/4, v.y + s/4); ctx.lineTo(v.x, v.y + s); ctx.lineTo(v.x - s/4, v.y + s/4); ctx.lineTo(v.x - s, v.y); ctx.lineTo(v.x - s/4, v.y - s/4); ctx.fill(); } 
         else if (v.type === 'shockwave') { ctx.strokeStyle = isHitStop ? '#000' : v.color; ctx.lineWidth = Math.max(0.1, 4 * ratio); ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, safeNum(v.size,10) * (1-ratio)*2 + 10), 0, Math.PI*2); ctx.stroke(); } 
-        else if (v.type === 'beam') { ctx.fillStyle = v.color; let h = 20 * ratio; let bx = v.dir === 1 ? v.x : v.x - safeNum(v.size,100); ctx.fillRect(bx, v.y - h/2, safeNum(v.size,100), h); ctx.fillStyle = '#fff'; ctx.fillRect(bx, v.y - h/6, safeNum(v.size,100), h/3); }
+        else if (v.type === 'beam') { ctx.fillStyle = v.color; let h = 20 * ratio; let bx = v.dir === 1 ? v.x : v.x - safeNum(v.size,100); ctx.fillRect(bx, v.y - h/2, Math.max(0.1, safeNum(v.size,100)), h); ctx.fillStyle = '#fff'; ctx.fillRect(bx, v.y - h/6, Math.max(0.1, safeNum(v.size,100)), h/3); }
     });
     ctx.globalAlpha = 1;
     for (let t of this.texts) { ctx.fillStyle = isHitStop ? '#000' : t.color; ctx.font = 'bold 24px monospace'; ctx.globalAlpha = Math.max(0, t.life / 40); ctx.fillText(t.text, t.x - 30, t.y); ctx.globalAlpha = 1; }
@@ -727,8 +749,8 @@ const AutoFighter = {
         }
     } else if (this.p1 && this.p2) {
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 32); ctx.fillStyle = '#222'; ctx.fillRect(10, 5, 80, 8); ctx.fillRect(110, 5, 80, 8);
-        let p1Col = this.p1.isAwakened ? (this.p1.awakenColor||'#f00') : (this.p1.color ? this.p1.color.body : '#fff');
-        let p2Col = this.p2.isAwakened ? (this.p2.awakenColor||'#f00') : (this.p2.color ? this.p2.color.body : '#fff');
+        let p1Col = this.p1.isAwakened ? (this.p1.awakenColor||'#f00') : (this.p1.color?.body||'#fff');
+        let p2Col = this.p2.isAwakened ? (this.p2.awakenColor||'#f00') : (this.p2.color?.body||'#fff');
         ctx.fillStyle = p1Col; ctx.fillRect(10, 5, Math.max(0, safeNum(this.p1.hp,0)/Math.max(1,safeNum(this.p1.maxHp,1)))*80, 8);
         ctx.fillStyle = p2Col; let p2HpW = Math.max(0, safeNum(this.p2.hp,0)/Math.max(1,safeNum(this.p2.maxHp,1)))*80; ctx.fillRect(190 - p2HpW, 5, p2HpW, 8);
 
