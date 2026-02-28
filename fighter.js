@@ -1,4 +1,11 @@
-// === AUTO FIGHTER (Phase 29: POLICY RESTORATION EDITION) ===
+// === AUTO FIGHTER (Phase 30: AI POLICY & ADVANCED LEARNING) ===
+
+const Policies = {
+    BALANCE: { name: 'バランス', desc: '攻防をバランスよく学習する。迷ったらこれ。' },
+    AGGRESSIVE: { name: '超攻撃的', desc: '被弾を恐れず、攻撃と手数(ATK)を最優先で学習する。' },
+    DEFENSIVE: { name: '鉄壁防御', desc: 'ガードと反撃、耐久力(RES)を最優先で学習する。' },
+    EVADING: { name: '回避特化', desc: '回避とスピード(SPD)を最優先で学習する。Sans等に推奨。' }
+};
 
 const Styles = {
     RUSH: { name: 'インファイター', desc: '常に前進し、接近戦でのコンボを狙う。', aggro: 0.8, guard: 0.1, dodge: 0.1, range: 35 },
@@ -10,15 +17,6 @@ const Styles = {
     DEVIL: { name: 'デビル', desc: '相手をハメることに全力を尽くす。', aggro: 1.0, guard: 0.0, dodge: 0.1, range: 45 },
     SANS: { name: 'Sans', desc: '【特殊】HPが回避ゲージとなり確定回避。', aggro: 0.4, guard: 0.0, dodge: 1.0, range: 200 }
 };
-
-// ★ 新規追加：育成方針（Policy）
-const Policies = {
-    BALANCE: { name: 'バランス', desc: '攻防をバランスよく行う基本方針。', aggro: 1.0, guard: 1.0, dodge: 1.0 },
-    AGGRESSIVE: { name: 'ガン攻め', desc: '防御を捨て、ひたすら攻撃を優先する。', aggro: 1.5, guard: 0.1, dodge: 0.5 },
-    DEFENSIVE: { name: '鉄壁', desc: 'ガードを固め、反撃のチャンスを伺う。', aggro: 0.5, guard: 1.5, dodge: 0.8 },
-    EVASIVE: { name: '回避優先', desc: '攻撃を避けつつ、隙を見て攻撃する。', aggro: 0.6, guard: 0.5, dodge: 1.5 }
-};
-
 const Passives = {
     NONE: { name: 'なし', desc: '特別な効果を持たない。' },
     VAMPIRE: { name: '吸血鬼', desc: '与えたダメージの20%だけ自身のHPを回復。' },
@@ -40,7 +38,6 @@ const Ultimates = {
     ult_all41: {name:'オールフォーワン', dmg:100, kb:20, range:800, start:30, act:30, rec:0, cd:9999, type:'ult_all41', desc:'【1回限定】全技を同時発動。直後に自身は即死。'}
 };
 const UltimateKeys = Object.keys(Ultimates);
-
 const Skills = {
     jab: {name:'ジャブ', dmg:10, kb:2, range:35, start:4, act:8, rec:12, cd:10, vx:4, type:'melee', desc:'発生最速の基本技。'},
     upper: {name:'アッパー', dmg:20, kb:2, range:40, start:7, act:12, rec:20, cd:20, vx:5, type:'anti_air', desc:'相手を高く打ち上げる。'},
@@ -73,7 +70,6 @@ const SansSkillKeys = ['sans_bone', 'sans_blue_bone', 'sans_throw', 'sans_blaste
 const CounterData = {name:'カウンター', dmg:80, kb:15, range:45, start:4, act:15, rec:20, cd:0, vx:8, type:'melee'};
 
 const getStyle = (key) => Styles[key] || Styles['RUSH'];
-const getPolicy = (key) => Policies[key] || Policies['BALANCE'];
 const getPassive = (key) => Passives[key] || Passives['NONE'];
 const getAwaken = (key) => AwakenConds[key] || AwakenConds['NONE'];
 const getAwakenPassive = (key) => AwakenPassives[key] || AwakenPassives['NONE'];
@@ -84,18 +80,18 @@ const safeNum = (val, def) => { let n = Number(val); return (isNaN(n) || !isFini
 const AutoFighter = {
   st: 'menu', menuCur: 0, timer: 0, stageWidth: 800, stageHeight: 500, groundY: 420, scale: 0.65, camX: 0, camY: 0,
   texts: [], vfx: [], bullets: [], clones: [], timeStopTimer: 0, timeStopOwner: 0,
-  isSim: false, simEpoch: 0, simMaxEpoch: 20, simWins: 0, isInfinite: false,
+  isSim: false, simEpoch: 0, simMaxEpoch: 30, simWins: 0, isInfinite: false,
   myAI: {}, savedSlots: [null, null, null], labSt: 'main', labCur: 0, trainingMsg: '',
 
   sanitizeAI(ai) {
       if (!ai || typeof ai !== 'object') ai = {}; ai.name = ai.name || 'MY-AI';
+      ai.policy = Policies[ai.policy] ? ai.policy : 'BALANCE'; // ★ 教育方針
       ai.body = ai.body || {}; ai.body.width = Math.max(0.1, safeNum(ai.body.width, 1.0)); ai.body.height = Math.max(0.1, safeNum(ai.body.height, 1.0)); ai.body.head = Math.max(0.1, safeNum(ai.body.head, 1.0));
       ai.color = ai.color || {}; ai.color.body = typeof ai.color.body === 'string' ? ai.color.body : '#0ff'; ai.color.aura = typeof ai.color.aura === 'string' ? ai.color.aura : '#ff0';
       ai.physics = ai.physics || {}; ai.physics.weight = Math.max(10, safeNum(ai.physics.weight, 100));
       ai.base = ai.base || {}; ai.base.atk = Math.max(0.1, safeNum(ai.base.atk, 1.0)); ai.base.res = Math.max(0.1, safeNum(ai.base.res, 1.0)); ai.base.spd = Math.max(0.1, safeNum(ai.base.spd, 1.0));
       ai.bonus = ai.bonus || {}; ai.bonus.atk = safeNum(ai.bonus.atk, 0); ai.bonus.res = safeNum(ai.bonus.res, 0); ai.bonus.spd = safeNum(ai.bonus.spd, 0);
       ai.styleKey = Styles[ai.styleKey] ? ai.styleKey : 'RUSH';
-      ai.policyKey = Policies[ai.policyKey] ? ai.policyKey : 'BALANCE'; // ★方針の初期化
       ai.ultimateKey = Ultimates[ai.ultimateKey] ? ai.ultimateKey : 'ult_regen';
       ai.brain = ai.brain || {}; ai.brain.aggro = Math.max(0.1, safeNum(ai.brain.aggro, 1.0)); ai.brain.defend = Math.max(0.1, safeNum(ai.brain.defend, 1.0)); ai.brain.skills = ai.brain.skills || {};
 
@@ -108,7 +104,7 @@ const AutoFighter = {
   shake(val) { if(!this.isSim && typeof screenShake !== 'undefined') screenShake(safeNum(val, 0)); },
   stop(val) { if(!this.isSim && typeof hitStop !== 'undefined') hitStop(safeNum(val, 0)); },
   addText(x, y, text, color) { if(this.isSim || !text) return; this.texts.push({x: safeNum(x,0), y: safeNum(y,0), text: String(text), color: color||'#fff', life: 40}); },
-  addVFX(type, x, y, color, extra={}) { if(this.isSim) return; this.vfx.push({type, x: safeNum(x,0), y: safeNum(y,0), color: color||'#fff', life: safeNum(extra.life,20), maxLife: safeNum(extra.maxLife,20), ...extra}); },
+  addVFX(type, x, y, color, extra={}) { if(this.isSim) return; this.vfx.push({type, x: safeNum(x,0), y: safeNum(y,0), color: color||'#fff', life: safeNum(extra.life,20), maxLife: safeNum(extra.maxLife, extra.life||20), vx: safeNum(extra.vx,0), vy: safeNum(extra.vy,0), ...extra}); },
   
   drawDescBox(title, descStr) {
       ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(5, 205, 190, 90); ctx.strokeStyle = '#555'; ctx.strokeRect(5, 205, 190, 90);
@@ -123,8 +119,8 @@ const AutoFighter = {
 
   createFighter(isP2, data) {
       let stKey = Styles[data.styleKey] ? data.styleKey : 'RUSH'; let safeBonus = data.bonus || {atk:0, res:0, spd:0}; let safeBase = data.base || {atk:1, res:1, spd:1};
-      return { id: isP2 ? 2 : 1, isClone: false, x: isP2 ? 550 : 250, y: this.groundY, dir: isP2 ? -1 : 1, hp: 1000, maxHp: 1000, kr: 0, hitCount: 0, dodgeCount: 0, hasDoneFirstAttack: false, usedUlt: false, regenTimer: 0, tkTimer: 0, chaosTimer: 0, 
-          base: { atk: safeBase.atk + safeBonus.atk, res: safeBase.res + safeBonus.res, spd: safeBase.spd + safeBonus.spd }, brain: data.brain, body: data.body || {width:1, height:1, head:1}, color: data.color || {body:'#fff', aura:'#ff0'}, physics: data.physics || {weight:100}, styleKey: stKey, policyKey: data.policyKey || 'BALANCE', skillKeys: data.skillKeys || ['jab','upper','smash','sonic'], ultimateKey: data.ultimateKey || 'ult_regen', passiveKey: data.passiveKey || 'NONE', awakenCond: data.awakenCond || 'NONE', awakenPassive: data.awakenPassive || 'NONE', awakenColor: data.awakenColor || '#f00', dynGuard: getStyle(stKey).guard, dynDodge: getStyle(stKey).dodge, hitHistory: {}, adapting: {}, adapted: {}, state: 'idle', stateFrame: 0, prevState: 'idle', cd: 0, name: data.name || 'FIGHTER', vx: 0, vy: 0, guarding: false, justGuardWindow: 0, trail: [], hitCancel: false, hasHit: false, combo: 0, comboTimer: 0, comboDmg: 0, isAwakened: false, funnelTimer: 0, hasClones: false };
+      return { id: isP2 ? 2 : 1, isClone: false, x: isP2 ? 550 : 250, y: this.groundY, dir: isP2 ? -1 : 1, hp: 1000, maxHp: 1000, kr: 0, hitCount: 0, dodgeCount: 0, hasDoneFirstAttack: false, usedUlt: false, regenTimer: 0, tkTimer: 0, chaosTimer: 0, policy: data.policy || 'BALANCE', 
+          base: { atk: safeBase.atk + safeBonus.atk, res: safeBase.res + safeBonus.res, spd: safeBase.spd + safeBonus.spd }, brain: data.brain, body: data.body || {width:1, height:1, head:1}, color: data.color || {body:'#fff', aura:'#ff0'}, physics: data.physics || {weight:100}, styleKey: stKey, skillKeys: data.skillKeys || ['jab','upper','smash','sonic'], ultimateKey: data.ultimateKey || 'ult_regen', passiveKey: data.passiveKey || 'NONE', awakenCond: data.awakenCond || 'NONE', awakenPassive: data.awakenPassive || 'NONE', awakenColor: data.awakenColor || '#f00', dynGuard: getStyle(stKey).guard, dynDodge: getStyle(stKey).dodge, hitHistory: {}, adapting: {}, adapted: {}, state: 'idle', stateFrame: 0, prevState: 'idle', cd: 0, name: data.name || 'FIGHTER', vx: 0, vy: 0, guarding: false, justGuardWindow: 0, trail: [], hitCancel: false, hasHit: false, combo: 0, comboTimer: 0, comboDmg: 0, isAwakened: false, funnelTimer: 0, hasClones: false };
   },
 
   setupSimBattle() {
@@ -134,7 +130,7 @@ const AutoFighter = {
       else {
           let eStyle = Object.keys(Styles)[Math.floor(Math.random()*Object.keys(Styles).length)]; let dummySkills = []; let dummyPassive = 'NONE';
           if (eStyle === 'ZONE') { dummySkills = ['beam', 'sonic', 'telekinesis', 'magReflect']; dummyPassive = 'HOVER'; } else if (eStyle === 'RUSH' || eStyle === 'DEVIL') { dummySkills = ['jab', 'smash', 'burst', 'throw']; dummyPassive = 'VAMPIRE'; } else if (eStyle === 'AERO') { dummySkills = ['dive', 'meteor', 'sonic', 'telekinesis']; dummyPassive = 'HOVER'; } else if (eStyle === 'COUNTER') { dummySkills = ['physCounter', 'magReflect', 'upper', 'pull']; dummyPassive = 'MAHORAGA'; } else if (eStyle === 'SANS') { dummySkills = [...SansSkillKeys]; dummyPassive = 'SANS_DODGE'; } else { dummySkills = [...SkillKeys].sort(()=>Math.random()-0.5).slice(0,4); dummyPassive = 'CHAOS'; }
-          let dummyData = this.sanitizeAI({ name: 'DUMMY-' + eStyle, styleKey: eStyle, skillKeys: dummySkills, passiveKey: dummyPassive, ultimateKey: UltimateKeys[Math.floor(Math.random()*UltimateKeys.length)], policyKey: Object.keys(Policies)[Math.floor(Math.random()*4)] });
+          let dummyData = this.sanitizeAI({ name: 'DUMMY-' + eStyle, styleKey: eStyle, skillKeys: dummySkills, passiveKey: dummyPassive, ultimateKey: UltimateKeys[Math.floor(Math.random()*UltimateKeys.length)], policy: Object.keys(Policies)[Math.floor(Math.random()*4)] });
           if(eStyle === 'SANS') { dummyData.color = { body: '#fff', aura: '#0ff' }; } this.p2 = this.createFighter(true, dummyData);
       }
       this.camX = (this.p1.x + this.p2.x) / 2 - (200 / this.scale) / 2; this.camY = this.groundY - (300 / this.scale) / 2;
@@ -163,10 +159,12 @@ const AutoFighter = {
               if (this.timeStopTimer > 0 && b.owner.id !== this.timeStopOwner) continue;
 
               if (b.skill.type === 'homing' || b.skill.type === 'telekinesis') {
-                  let opp = b.owner.id === 1 ? this.p2 : this.p1; let dx = safeNum(opp.x, 0) - b.x; let dy = (safeNum(opp.y, this.groundY) - 20) - b.y;
+                  let opp = b.owner.id === 1 ? this.p2 : this.p1;
+                  let dx = safeNum(opp.x, 0) - b.x; let dy = (safeNum(opp.y, this.groundY) - 20) - b.y;
                   let d_len = Math.hypot(dx, dy) || 1; let homingForce = b.skill.type === 'telekinesis' ? 1.5 : 0.8;
                   b.vx += (dx/d_len) * homingForce; b.vy += (dy/d_len) * homingForce;
-                  let maxSpd = b.skill.type === 'telekinesis' ? 18 : 12; let spd = Math.hypot(b.vx, b.vy); if(spd > maxSpd) { b.vx = (b.vx/spd)*maxSpd; b.vy = (b.vy/spd)*maxSpd; }
+                  let maxSpd = b.skill.type === 'telekinesis' ? 18 : 12;
+                  let spd = Math.hypot(b.vx, b.vy); if(spd > maxSpd) { b.vx = (b.vx/spd)*maxSpd; b.vy = (b.vy/spd)*maxSpd; }
               }
               b.x += b.vx; b.y += b.vy; b.life--; 
               let auraCol = (b.owner.color && b.owner.color.aura) ? b.owner.color.aura : '#ff0'; let bAngle = Math.atan2(b.vy, b.vx); 
@@ -204,21 +202,20 @@ const AutoFighter = {
         if (keysDown.a) { if (this.loadSlot(this.labCur)) { this.st = 'menu'; this.play('combo'); this.addText(100, 150, "LOAD SUCCESS!", "#0f0"); } else this.play('hit'); } return;
     }
     if (this.st === 'lab_main') {
-        const items = ['AI名前変更', '戦闘スタイル', '育成方針', 'スキルセット(必殺含)', 'パッシブ＆覚醒', 'ステータス配分', '体型＆カラー', '通常学習(30試合)', '超・無限強化学習', 'AI初期化', '戻る'];
+        const items = ['AI名前変更', '教育方針', '戦闘スタイル', 'スキルセット', 'パッシブ＆覚醒', 'ステータス', '体型＆カラー', '通常学習(30試合)', '超・無限強化学習', 'AI初期化'];
         if (keysDown.up) { this.labCur = (this.labCur - 1 + items.length) % items.length; this.play('sel'); } if (keysDown.down) { this.labCur = (this.labCur + 1) % items.length; this.play('sel'); }
         if (keysDown.a) {
             this.play('hit');
             if (this.labCur === 0) { let n = prompt("名前 (10文字)", this.myAI.name); if (n && n.trim() !== '') { this.myAI.name = n.substring(0, 10); this.play('combo'); } }
-            else if (this.labCur === 1) { this.st = 'lab_style'; this.labCur = 0; } 
-            else if (this.labCur === 2) { this.st = 'lab_policy'; this.labCur = 0; } 
+            else if (this.labCur === 1) { this.st = 'lab_policy'; this.labCur = 0; }
+            else if (this.labCur === 2) { this.st = 'lab_style'; this.labCur = 0; }
             else if (this.labCur === 3) { this.st = 'lab_skills'; this.labCur = 0; }
-            else if (this.labCur === 4) { this.st = 'lab_awaken'; this.labCur = 0; } 
+            else if (this.labCur === 4) { this.st = 'lab_awaken'; this.labCur = 0; }
             else if (this.labCur === 5) { this.st = 'lab_stats'; this.labCur = 0; }
             else if (this.labCur === 6) { this.st = 'lab_body'; this.labCur = 0; }
             else if (this.labCur === 7) { this.isSim = true; this.isInfinite = false; this.simEpoch = 0; this.simMaxEpoch = 30; this.simWins = 0; this.setupSimBattle(); this.st = 'training'; this.trainingMsg = '仮想敵 生成...'; BGM.play('action'); }
             else if (this.labCur === 8) { this.isSim = true; this.isInfinite = true; this.simEpoch = 0; this.simWins = 0; this.setupSimBattle(); this.st = 'training'; this.trainingMsg = 'Bボタンで中断'; BGM.play('action'); }
             else if (this.labCur === 9) { this.myAI = this.sanitizeAI({}); this.texts = []; this.addText(100, 150, "INITIALIZED!", "#f00"); }
-            else { this.st = 'menu'; this.menuCur = 0; }
         }
         if (keysDown.b) { this.st = 'menu'; this.play('hit'); } return;
     }
@@ -227,8 +224,8 @@ const AutoFighter = {
         if (keysDown.b) { this.st = 'lab_main'; this.labCur = 7; this.play('hit'); return; }
         if (keysDown.a) { this.saveSlot(this.labCur); this.st = 'menu'; this.isSim = false; this.play('combo'); this.addText(100, 150, "SAVE COMPLETED!", "#0f0"); } return;
     }
-    if (this.st === 'lab_style') { if (keysDown.b || keysDown.a) { this.myAI = this.sanitizeAI(this.myAI); this.st = 'lab_main'; this.labCur = 1; this.play('hit'); return; } if (keysDown.right || keysDown.left) { this.play('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(Styles); let idx = Math.max(0, keys.indexOf(this.myAI.styleKey)); this.myAI.styleKey = keys[(idx + dir + keys.length) % keys.length]; } return; }
-    if (this.st === 'lab_policy') { if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 2; this.play('hit'); return; } if (keysDown.right || keysDown.left) { this.play('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(Policies); let idx = Math.max(0, keys.indexOf(this.myAI.policyKey)); this.myAI.policyKey = keys[(idx + dir + keys.length) % keys.length]; } return; }
+    if (this.st === 'lab_policy') { if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 1; this.play('hit'); return; } if (keysDown.right || keysDown.left) { this.play('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(Policies); let idx = Math.max(0, keys.indexOf(this.myAI.policy)); this.myAI.policy = keys[(idx + dir + keys.length) % keys.length]; } return; }
+    if (this.st === 'lab_style') { if (keysDown.b || keysDown.a) { this.myAI = this.sanitizeAI(this.myAI); this.st = 'lab_main'; this.labCur = 2; this.play('hit'); return; } if (keysDown.right || keysDown.left) { this.play('sel'); let dir = keysDown.right ? 1 : -1; let keys = Object.keys(Styles); let idx = Math.max(0, keys.indexOf(this.myAI.styleKey)); this.myAI.styleKey = keys[(idx + dir + keys.length) % keys.length]; } return; }
     if (this.st === 'lab_skills') { 
         if (this.myAI.styleKey === 'SANS') { if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 3; this.play('hit'); } return; }
         if (keysDown.up) { this.labCur = (this.labCur - 1 + 5) % 5; this.play('sel'); } if (keysDown.down) { this.labCur = (this.labCur + 1) % 5; this.play('sel'); } if (keysDown.b || keysDown.a) { this.st = 'lab_main'; this.labCur = 3; this.play('hit'); return; } 
@@ -245,7 +242,7 @@ const AutoFighter = {
     if (this.st === 'battle') {
         this.updateBattleState();
         for (let i = this.texts.length - 1; i >= 0; i--) { this.texts[i].life--; this.texts[i].y -= 0.5; if (this.texts[i].life <= 0) this.texts.splice(i, 1); }
-        for (let i = this.vfx.length - 1; i >= 0; i--) { let v = this.vfx[i]; v.life--; if (v.type === 'slash') { v.x += v.vx || 0; v.y += v.vy || 0; } if (v.life <= 0) this.vfx.splice(i, 1); }
+        for (let i = this.vfx.length - 1; i >= 0; i--) { let v = this.vfx[i]; v.life--; if (v.type === 'slash' || v.type === 'particle') { v.x += safeNum(v.vx, 0); v.y += safeNum(v.vy, 0); } if (v.life <= 0) this.vfx.splice(i, 1); }
         if (safeNum(this.p1.hp,0) <= 0 || safeNum(this.p2.hp,0) <= 0) { this.st = 'result'; this.play('combo'); this.shake(10); } return;
     }
 
@@ -256,12 +253,18 @@ const AutoFighter = {
             if (safeNum(this.p1.hp,0) <= 0 || safeNum(this.p2.hp,0) <= 0 || this.timer > 1500) {
                 let win = safeNum(this.p1.hp,0) > safeNum(this.p2.hp,0) && safeNum(this.p1.hp,0) > 0;
                 if (win) this.simWins++;
-                let bAtk = win ? 0.005 : 0.002; let bRes = win ? 0.005 : 0.002; let bSpd = win ? 0.005 : 0.002;
+                
+                // ★ 教育方針に基づいたボーナス分配
+                let pol = this.myAI.policy || 'BALANCE';
+                let bAtk = win ? (pol==='AGGRESSIVE'?0.008:(pol==='DEFENSIVE'?0.002:0.005)) : (pol==='AGGRESSIVE'?0.002:0.001);
+                let bRes = win ? (pol==='DEFENSIVE'?0.008:(pol==='EVADING'?0.002:0.005)) : (pol==='DEFENSIVE'?0.002:0.001);
+                let bSpd = win ? (pol==='EVADING'?0.008:(pol==='AGGRESSIVE'?0.006:0.005)) : (pol==='EVADING'?0.002:0.001);
+
                 if (this.myAI.styleKey === 'SANS') {
                     let penalty = safeNum(this.p1.dodgeCount, 0) + safeNum(this.p1.hitCount, 0) * 5;
-                    if (penalty === 0 && win) { bAtk = 0.005; bRes = 0.005; bSpd = 0.02; this.myAI.brain.defend += 0.1; this.trainingMsg = `【極】 ノーダメージ! 圧倒的成長!`; } 
+                    if (penalty === 0 && win) { bAtk = 0.005; bRes = 0.005; bSpd = 0.02; this.myAI.brain.defend = Math.min(5.0, this.myAI.brain.defend + 0.1); this.trainingMsg = `【極】 ノーダメージ! 圧倒的成長!`; } 
                     else if (penalty < 10 && win) { bAtk = 0.002; bRes = 0.002; bSpd = 0.005; this.trainingMsg = `良: 被弾/回避(${penalty}) 順調に学習中...`; } 
-                    else { bAtk = -0.005; bRes = -0.005; bSpd = -0.01; this.myAI.brain.defend += 0.05; this.trainingMsg = `【罰】 被弾多すぎ(${penalty})! 弱体化!`; }
+                    else { bAtk = -0.005; bRes = -0.005; bSpd = -0.01; this.myAI.brain.defend = Math.min(5.0, this.myAI.brain.defend + 0.05); this.trainingMsg = `【罰】 被弾多すぎ(${penalty})! 弱体化!`; }
                 } else { this.trainingMsg = this.isInfinite ? '超・無限学習中... (Bボタンで中断)' : '仮想敵 生成...'; }
 
                 this.myAI.bonus.atk = Math.max(-0.9, Math.min(5.0, safeNum(this.myAI.bonus.atk, 0) + bAtk)); this.myAI.bonus.res = Math.max(-0.9, Math.min(5.0, safeNum(this.myAI.bonus.res, 0) + bRes)); this.myAI.bonus.spd = Math.max(-0.9, Math.min(5.0, safeNum(this.myAI.bonus.spd, 0) + bSpd));
@@ -306,8 +309,12 @@ const AutoFighter = {
 
            victim.hp -= damage; if (pKeyA === 'VAMPIRE' && !isSansAtk) attacker.hp = Math.min(aMax, aHp + damage * 0.2);
            victim.hitCount = safeNum(victim.hitCount,0) + 1; 
-           if (attacker.id === 1 && attacker.brain) { attacker.brain.aggro += 0.01; let sIdx = attacker.skillKeys.indexOf(sKey); if(sIdx>=0) attacker.brain.skills['s'+sIdx] = safeNum(attacker.brain.skills['s'+sIdx],1) + 0.02; }
-           if (victim.id === 1 && victim.brain) { victim.brain.defend += 0.02; victim.brain.aggro -= 0.01; }
+           
+           // ★ ブレイン学習（教育方針に基づく）
+           let aPol = attacker.id === 1 ? attacker.policy : 'BALANCE';
+           if (attacker.id === 1 && attacker.brain) { let inc = aPol==='AGGRESSIVE'?0.03:0.01; attacker.brain.aggro = Math.min(5.0, safeNum(attacker.brain.aggro,1) + inc); let sIdx = attacker.skillKeys.indexOf(sKey); if(sIdx>=0) attacker.brain.skills['s'+sIdx] = safeNum(attacker.brain.skills['s'+sIdx],1) + 0.02; }
+           let vPol = victim.id === 1 ? victim.policy : 'BALANCE';
+           if (victim.id === 1 && victim.brain) { let incDef = vPol==='DEFENSIVE'?0.03:(vPol==='AGGRESSIVE'?0:0.01); let decAgg = vPol==='AGGRESSIVE'?0:0.01; victim.brain.defend = Math.min(5.0, safeNum(victim.brain.defend,1) + incDef); victim.brain.aggro = Math.max(0.1, safeNum(victim.brain.aggro,1) - decAgg); }
 
            if (!isSansAtk) { victim.state = 'hurt'; victim.stateFrame = 0; victim.comboTimer = 60; victim.comboDmg = safeNum(victim.comboDmg,0) + damage; }
            attacker.hitCancel = true; attacker.combo = safeNum(attacker.combo,0) + 1;
@@ -318,7 +325,14 @@ const AutoFighter = {
                victim.vx = attacker.dir * kbForce;
            }
            let auraCol = isSansAtk ? '#fff' : ((attacker.color && attacker.color.aura) ? attacker.color.aura : '#ff0');
-           if (sName === 'ジャブ' || isSansAtk) { this.play('hit'); this.shake(2); this.addVFX('impact', hx, hy, '#fff', {size: 20}); } else { this.play('combo'); this.shake(10); this.stop(5); this.addVFX('impact', hx, hy, auraCol, {size: 50}); this.addVFX('slash', hx, hy, '#fff', {size: 40, angle: Math.random()*Math.PI*2, width: 4}); } return true;
+           if (sName === 'ジャブ' || isSansAtk) { 
+               this.play('hit'); this.shake(2); this.addVFX('impact', hx, hy, '#fff', {size: 20}); 
+               for(let i=0; i<3; i++) this.addVFX('particle', hx, hy, '#fff', {vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, size: 2, life: 15});
+           } else { 
+               this.play('combo'); this.shake(10); this.stop(5); this.addVFX('impact', hx, hy, auraCol, {size: 50}); this.addVFX('slash', hx, hy, '#fff', {size: 40, angle: Math.random()*Math.PI*2, width: 4}); 
+               this.addVFX('ring', hx, hy, auraCol, {size: 60, life: 20});
+               for(let i=0; i<8; i++) this.addVFX('particle', hx, hy, auraCol, {vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, size: 4, life: 25});
+           } return true;
        } catch(e) { console.error("Hit Error:", e); return false; }
   },
 
@@ -338,7 +352,8 @@ const AutoFighter = {
         if (f.passiveKey === 'CHAOS' || (f.isAwakened && f.awakenPassive === 'CHAOS')) {
             f.chaosTimer = safeNum(f.chaosTimer, 0) - 1;
             if (f.chaosTimer <= 0) {
-                f.chaosTimer = 60; f.body.width = Math.max(0.3, Math.random() * 1.8); f.body.height = Math.max(0.3, Math.random() * 1.8); f.base.spd = Math.max(0.5, Math.random() * 2.0); f.chaosSubPassive = Math.random() < 0.5 ? 'VAMPIRE' : 'GIANT'; this.addVFX('shockwave', f.x, f.y, '#f0f', {size: 30, life: 10});
+                f.chaosTimer = 60; f.body.width = Math.max(0.3, Math.random() * 1.8); f.body.height = Math.max(0.3, Math.random() * 1.8); f.base.spd = Math.max(0.5, Math.random() * 2.0);
+                f.chaosSubPassive = Math.random() < 0.5 ? 'VAMPIRE' : 'GIANT'; this.addVFX('shockwave', f.x, f.y, '#f0f', {size: 30, life: 10});
             }
             if(f.chaosSubPassive === 'VAMPIRE') f.passiveKey = 'VAMPIRE'; if(f.chaosSubPassive === 'GIANT') f.passiveKey = 'GIANT';
         }
@@ -347,6 +362,7 @@ const AutoFighter = {
         if (safeNum(f.kr, 0) > 0 && f.stateFrame % 3 === 0) { f.hp -= 1; f.kr -= 1; this.addVFX('impact', safeNum(f.x,0) + (Math.random()-0.5)*30, safeNum(f.y,this.groundY) - Math.random()*50, '#c0c', {size: 4, life: 5}); }
         if (f.funnelTimer > 0) { f.funnelTimer--; if (f.funnelTimer % 30 === 0) { let by = safeNum(f.y, this.groundY) - 60; let oy = safeNum(opp.y, this.groundY); let dx = safeNum(opp.x, 0) - safeNum(f.x, 0); let dy = oy - by; let dist = Math.hypot(dx, dy) || 1; this.bullets.push({x: safeNum(f.x, 0), y: by, vx: (dx/dist)*10, vy: (dy/dist)*10, owner: f, skill: {name:'パラ弾', dmg: 5, kb: 1, type: 'shot'}, life: 60}); this.addVFX('impact', safeNum(f.x, 0), by, '#0ff', {size: 15, life: 5}); } }
         if (f.tkTimer > 0) { f.tkTimer--; f.state = 'atk_telekinesis'; f.hitCancel = false; }
+        
         if (f.state !== f.prevState) { f.hasHit = false; f.prevState = f.state; }
         f.stateFrame++; let safeSpd = Math.max(0.5, safeNum(f.base && f.base.spd, 1.0)); if (f.cd > 0) f.cd -= safeSpd;
         
@@ -402,26 +418,42 @@ const AutoFighter = {
              }
 
              if (f.stateFrame === sFrame && sType === 'telekinesis') { f.tkTimer = 180; this.addText(f.x, f.y-40, "念力", "#885"); this.bullets.push({x: f.x + f.dir*50, y: this.groundY, vx: 0, vy: -5, owner: f, skill: skill, life: 180}); }
-             
              if (f.stateFrame === sFrame - 2 && (sType === 'warp' || sType === 'sans_warp')) { f.x = safeNum(opp.x,0) - safeNum(opp.dir,1) * (Math.random()*100 + 40); f.dir = safeNum(opp.dir,1); if (sType === 'sans_warp') { this.addText(f.x, f.y - 50, "ちかみち", "#ccc"); if (Math.random() < 0.5) f.y = this.groundY - 80 - Math.random()*40; } this.addVFX('shockwave', f.x, f.y, '#ccc', {size: 30, life: 10}); }
-             
              if (sType === 'multi' && f.stateFrame % 6 === 0) f.hasHit = false; if (sType === 'sans_bone' && f.stateFrame % 8 === 0 && f.stateFrame <= sFrame + actFrame) { f.hasHit = false; }
+             
              if (f.stateFrame >= sFrame && f.stateFrame <= sFrame + actFrame) { 
                  let originX = f.x + 20*f.dir; let originY = f.y - 20 * Math.max(0.1, safeNum(f.body&&f.body.height, 1)); let targetX = safeNum(opp.x, 250); let targetY = safeNum(opp.y, this.groundY) - 20 * Math.max(0.1, safeNum(opp.body&&opp.body.height, 1)); let angleToOpp = Math.atan2(targetY - originY, targetX - originX);
                  if (f.stateFrame === sFrame) {
                      if (sName !== 'ジャブ' && sName !== 'アッパー' && !sType.startsWith('ult_')) this.addText(f.x, f.y - 50, sName, "#fff");
                      if (sType === 'anti_air') { f.vy = -12; f.vx = f.dir * 4; } if (sName === '急降下') { f.vy = 10; f.vx = f.dir * 12; } if (sType === 'buff') { f.hp = Math.min(f.maxHp, f.hp + 200); this.addVFX('shockwave', f.x, f.y, '#0f0', {size: 50}); this.play('combo'); } if (sType === 'summon') { f.funnelTimer = 180; this.play('jmp'); } 
                      if (sType === 'shot') { this.play('jmp'); this.bullets.push({x: originX, y: originY, vx: Math.cos(angleToOpp)*12, vy: Math.sin(angleToOpp)*12, owner: f, skill: skill, life: 60}); } else if (sType === 'range') { this.addVFX('beam', originX, originY, (f.color?f.color.body:'#fff'), {size: safeNum(skill.range, 350), angle: angleToOpp, life: 15}); this.shake(6); }
-                     if (sType === 'sans_blaster_shoot') { let bx = originX - f.dir*30; let by = originY - 40; this.addVFX('g_blaster', bx, by, '#fff', {dir: f.dir, angle: angleToOpp, life: 30}); this.addVFX('beam', bx, by, '#0ff', {size: 800, angle: angleToOpp, life: 20, width: 40}); this.play('combo'); this.shake(15); }
+                     
+                     if (sType === 'sans_blaster_shoot') { 
+                         let bx = originX - f.dir*30; let by = originY - 40;
+                         this.addVFX('g_blaster', bx, by, '#fff', {dir: f.dir, angle: angleToOpp, life: 30});
+                         this.addVFX('beam', bx, by, '#0ff', {size: 800, angle: angleToOpp, life: 20, width: 40}); 
+                         this.play('combo'); this.shake(15); 
+                     }
                      if (sType === 'sans_blaster_ride') { f.vx = f.dir * 18; f.vy = 0; this.addVFX('shockwave', originX, originY, '#0ff', {size: 40}); this.play('jmp'); }
-                     if (sType === 'sans_throw' || sType === 'sans_blue_bone') { for(let i=0; i<4; i++) { this.bullets.push({x: originX, y: originY - i*20, vx: f.dir*(8+Math.random()*4), vy: (Math.random()-0.5)*2, owner: f, skill: skill, life: 80, isBone: true, color: sType==='sans_blue_bone'?'#0ff':'#fff'}); } this.play('jmp'); }
+                     if (sType === 'sans_throw' || sType === 'sans_blue_bone') { 
+                         for(let i=0; i<4; i++) { this.bullets.push({x: originX, y: originY - i*20, vx: f.dir*(8+Math.random()*4), vy: (Math.random()-0.5)*2, owner: f, skill: skill, life: 80, isBone: true, color: sType==='sans_blue_bone'?'#0ff':'#fff'}); } this.play('jmp'); 
+                     }
                      if (sType === 'pull') { this.addVFX('hook', originX, originY, (f.color?f.color.body:'#fff'), {targetX: targetX, targetY: targetY, life: 10}); }
                  }
                  if (!f.hasHit && sType !== 'buff' && sType !== 'shot' && sType !== 'range' && sType !== 'summon' && sType !== 'sans_throw' && sType !== 'sans_blue_bone' && sType !== 'telekinesis' && !sType.startsWith('stance') && !sType.startsWith('ult_')) {
                      let mainHit = false; 
-                     if (sType === 'sans_bone') { let hitX = f.x + f.dir * (60 + Math.random()*80); mainHit = this.createHitbox({...f, x: hitX}, {...skill, range: 150}, opp, 0); if(f.stateFrame % 6 === 0) this.addVFX('bone_wall', hitX, this.groundY, '#fff', {size: 80 + Math.random()*40, life: 15}); } else if (sType === 'sans_blaster_shoot') { mainHit = this.createHitbox({...f, x: originX - f.dir*30, y: originY - 40}, {...skill, range: 600}, opp, 0); } else { mainHit = this.createHitbox(f, skill, opp, 0); }
+                     if (sType === 'sans_bone') { 
+                         let hitX = f.x + f.dir * (60 + Math.random()*80); 
+                         mainHit = this.createHitbox({...f, x: hitX}, {...skill, range: 150}, opp, 0); 
+                         if(f.stateFrame % 6 === 0) this.addVFX('bone_wall', hitX, this.groundY, '#fff', {size: 80 + Math.random()*40, life: 15}); 
+                     } else if (sType === 'sans_blaster_shoot') {
+                         mainHit = this.createHitbox({...f, x: originX - f.dir*30, y: originY - 40}, {...skill, range: 600}, opp, 0);
+                     } else { mainHit = this.createHitbox(f, skill, opp, 0); }
                      let cloneHit = false; if (!mainHit && f.hasClones) { cloneHit = this.createHitbox(f, skill, opp, -40) || this.createHitbox(f, skill, opp, 40); }
-                     if (mainHit || cloneHit) { f.hasHit = true; let angle = f.dir === 1 ? 0 : Math.PI; if (sType === 'anti_air') angle -= (Math.PI/4) * f.dir; if (sType === 'air') angle += (Math.PI/4) * f.dir; if (sName !== 'ジャブ' && sType !== 'sans_bone' && sType !== 'sans_blaster_shoot' && sType !== 'sans_blaster_ride') this.addVFX('slash', originX, originY, (f.color?f.color.body:'#fff'), {size: safeNum(skill.range, 30) * Math.max(0.1, safeNum(f.body&&f.body.width, 1)), angle: angle, width: 10}); }
+                     if (mainHit || cloneHit) { 
+                         f.hasHit = true; let angle = f.dir === 1 ? 0 : Math.PI; if (sType === 'anti_air') angle -= (Math.PI/4) * f.dir; if (sType === 'air') angle += (Math.PI/4) * f.dir; 
+                         if (sName !== 'ジャブ' && sType !== 'sans_bone' && sType !== 'sans_blaster_shoot' && sType !== 'sans_blaster_ride') this.addVFX('slash', originX, originY, (f.color?f.color.body:'#fff'), {size: safeNum(skill.range, 30) * Math.max(0.1, safeNum(f.body&&f.body.width, 1)), angle: angle, width: 10}); 
+                     }
                  }
              }
              if (f.stateFrame > (sFrame + actFrame + recFrame)) { f.state = 'idle'; f.stateFrame = 0; f.hitCancel = false; f.hasHit = false; }
@@ -429,18 +461,25 @@ const AutoFighter = {
         
         let canCancel = isAtk && f.hitCancel && skill && f.stateFrame > (safeNum(skill.start, 5) + 5) / safeSpd;
         if ((f.state === 'idle' && f.cd <= 0 && f.tkTimer <= 0) || canCancel) {
-            let d = Math.abs(f.x - safeNum(opp.x,0)); let isAir = f.y < this.groundY - 10; let oppIsAir = safeNum(opp.y,this.groundY) < this.groundY - 10; let st = getStyle(f.styleKey); let pol = getPolicy(f.policyKey); let ninjaSpd = pKey === 'NINJA' ? 1.5 : 1.0; let oppStateStr = opp.state || '';
-            let aiAggro = st.aggro * (f.brain ? safeNum(f.brain.aggro, 1.0) : 1.0) * pol.aggro; let aiDefend = (f.brain ? safeNum(f.brain.defend, 1.0) : 1.0);
-            let dynG = (st.name === 'デビル' || st.name === 'Sans' ? 0 : safeNum(f.dynGuard, 0.2)) * aiDefend * pol.guard; let dynD = (st.name === 'デビル' ? 0 : safeNum(f.dynDodge, 0.2)) * aiDefend * pol.dodge;
+            let d = Math.abs(f.x - safeNum(opp.x,0)); let isAir = f.y < this.groundY - 10; let oppIsAir = safeNum(opp.y,this.groundY) < this.groundY - 10; let st = getStyle(f.styleKey); let ninjaSpd = pKey === 'NINJA' ? 1.5 : 1.0; let oppStateStr = opp.state || '';
+            
+            // ★ AI Brainによる行動確率の補正（平方根でマイルド化し棒立ちを防ぐ）
+            let bAggro = Math.sqrt(safeNum(f.brain ? f.brain.aggro : 1.0, 1.0)); let bDefend = Math.sqrt(safeNum(f.brain ? f.brain.defend : 1.0, 1.0));
+            let aiAggro = Math.max(0.1, Math.min(1.0, st.aggro * bAggro)); 
+            let dynG = (st.name === 'デビル' || st.name === 'Sans' ? 0 : safeNum(f.dynGuard, 0.2)) * bDefend; let dynD = (st.name === 'デビル' ? 0 : safeNum(f.dynDodge, 0.2)) * bDefend;
 
             if (oppStateStr.startsWith('atk_') && d < 80 && !isAir && !canCancel && st.name !== 'デビル') { if (Math.random() < dynG + dynD) { if (Math.random() < (dynD / Math.max(0.01, dynG + dynD)) && d > 30) { f.state = 'move'; f.stateFrame = 0; f.vx = -f.dir * 12 * ninjaSpd; f.cd = 10; this.addVFX('shockwave', f.x, f.y, '#fff', {size: 20, life: 10}); this.play('sel'); this.addText(f.x, f.y - 40, "DODGE", "#ccc"); return; } else { f.state = 'guard'; f.stateFrame = 0; f.guarding = true; f.justGuardWindow = 10; return; } } }
             
             let shouldAttack = false; let moveDir = 0;
             if (opp.state === 'hurt' || opp.state === 'stunned' || opp.state === 'knockdown') { shouldAttack = true; if (oppIsAir && !isAir && d < 60 && f.state !== 'move' && !isFloating) { f.state = 'move'; f.stateFrame = 0; f.vy = -16; f.vx = f.dir * 5; f.cd = 0; f.hitCancel = false; return; } } else { if (st.name === '空の支配者' && !isAir && Math.random() < 0.2 && !canCancel && !isFloating) { f.state = 'move'; f.stateFrame = 0; f.vy = -18; f.vx = f.dir * 6; return; } if (d < safeNum(st.range, 50)) { if (Math.random() < aiAggro) shouldAttack = true; else moveDir = -f.dir; } else { moveDir = f.dir; } }
-            if (st.name === 'Sans') { if (d < 180) moveDir = -f.dir; if (d < 100 && f.cd <= 0 && Math.random() < 0.5 * aiDefend) { f.state = 'atk_sans_warp'; f.stateFrame = 0; f.cd = 20; return; } }
+            
+            if (st.name === 'Sans') { if (d < 180) moveDir = -f.dir; if (d < 100 && f.cd <= 0 && Math.random() < 0.5 * bDefend) { f.state = 'atk_sans_warp'; f.stateFrame = 0; f.cd = 20; return; } }
 
             if (shouldAttack) {
-                let bestSkillKey = null; let bestScore = -100; let sKeys = f.styleKey === 'SANS' ? SansSkillKeys : (Array.isArray(f.skillKeys) ? f.skillKeys : ['jab','upper','smash','sonic']); let safeWidth = Math.max(0.1, safeNum(f.body&&f.body.width, 1.0));
+                let bestSkillKey = null; let bestScore = -100; 
+                let sKeys = f.styleKey === 'SANS' ? SansSkillKeys : (Array.isArray(f.skillKeys) ? f.skillKeys : ['jab','upper','smash','sonic']); 
+                let safeWidth = Math.max(0.1, safeNum(f.body&&f.body.width, 1.0));
+                
                 for (let i=0; i<sKeys.length; i++) {
                     let skey = sKeys[i]; let s = getSkill(skey); let score = 0; let sRange = safeNum(s.range, 30); let sType = s.type || 'melee';
                     if (d <= sRange * safeWidth) score += 10; else score -= (d - sRange) * 0.2;
@@ -451,6 +490,7 @@ const AutoFighter = {
                     if (sType === 'throw') { if (opp.guarding && d < 40) score += 40; else score -= 10; }
                     if (canCancel) { if (safeNum(s.start, 5) < 10) score += 15; if (sType === 'shot' || sType === 'buff' || sType === 'summon' || sType.startsWith('stance')) score -= 20; }
                     if (st.name === 'デビル') { if (sType === 'multi' || sType === 'pull') score += 20; }
+                    
                     let bWeight = (f.brain && f.brain.skills) ? safeNum(f.brain.skills['s'+i], 1.0) : 1.0; score *= Math.max(0.1, bWeight);
                     score += Math.random() * 10; if (score > bestScore) { bestScore = score; bestSkillKey = skey; }
                 }
@@ -475,9 +515,9 @@ const AutoFighter = {
         } else {
             ctx.fillStyle = '#112'; ctx.fillRect(10, 10, 180, 90); ctx.strokeStyle = '#335'; ctx.strokeRect(10, 10, 180, 90); ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText(`[ ${this.myAI.name} ] Lv.${Math.floor(safeNum(this.myAI.learningLevel,0)/10)}`, 15, 25); ctx.fillText('NORMAL', 55, 35); ctx.fillText('AWAKENED', 130, 35); let safeC = this.myAI.color || {}; let safeAwkC = this.myAI.awakenColor || '#f00'; let prevF = { x: 0, y: 0, dir: 1, state: 'idle', stateFrame: 0, body: this.myAI.body, color: safeC, isAwakened: false }; ctx.save(); ctx.translate(50, 80); this.drawStickman(prevF); ctx.restore(); prevF.isAwakened = true; prevF.color = {body: safeC.body||'#fff', aura: safeAwkC}; ctx.save(); ctx.translate(145, 80); this.drawStickman(prevF); ctx.restore();
             ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace';
-            if (this.st === 'lab_main') { ctx.fillText('【CUSTOMIZE MENU】', 30, 100); ctx.font = '10px monospace'; const items = ['AI名前変更', '戦闘スタイル', '育成方針', 'スキルセット(必殺含)', 'パッシブ＆覚醒', 'ステータス配分', '体型＆カラー', '通常学習(30試合)', '超・無限強化学習', 'AI初期化', '戻る']; for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 115 + i * 13); } }
+            if (this.st === 'lab_main') { ctx.fillText('【CUSTOMIZE MENU】', 30, 110); ctx.font = '10px monospace'; const items = ['AI名前変更', '教育方針', '戦闘スタイル', 'スキルセット', 'パッシブ＆覚醒', 'ステータス', '体型＆カラー', '通常学習(30回)', '超・無限強化学習', 'AI初期化']; for(let i=0; i<items.length; i++) { ctx.fillStyle = this.labCur === i ? '#ff0' : '#fff'; ctx.fillText((this.labCur === i ? '> ' : '  ') + items[i], 20, 125 + i * 13); } }
+            else if (this.st === 'lab_policy') { ctx.fillText('【EDUCATION POLICY】', 40, 120); ctx.font = '11px monospace'; let pName = Policies[this.myAI.policy].name; ctx.fillStyle = '#ff0'; ctx.fillText(`◀ ${pName.padEnd(8,' ')} ▶`, 35, 160); this.drawDescBox(`[ ${pName} ]`, Policies[this.myAI.policy].desc); }
             else if (this.st === 'lab_style') { ctx.fillText('【BATTLE STYLE】', 40, 120); ctx.font = '11px monospace'; let sName = getStyle(this.myAI.styleKey).name; ctx.fillStyle = '#ff0'; ctx.fillText(`◀ ${sName.padEnd(8,' ')} ▶`, 35, 160); this.drawDescBox(`[ ${sName} ]`, getStyle(this.myAI.styleKey).desc); }
-            else if (this.st === 'lab_policy') { ctx.fillText('【TRAINING POLICY】', 35, 120); ctx.font = '11px monospace'; let pName = getPolicy(this.myAI.policyKey).name; ctx.fillStyle = '#ff0'; ctx.fillText(`◀ ${pName.padEnd(8,' ')} ▶`, 35, 160); this.drawDescBox(`[ ${pName} ]`, getPolicy(this.myAI.policyKey).desc); }
             else if (this.st === 'lab_skills') { 
                 ctx.fillText('【SKILL SETTING】', 40, 110); ctx.font = '10px monospace'; 
                 if(this.myAI.styleKey === 'SANS') { 
@@ -498,10 +538,12 @@ const AutoFighter = {
     let isHitStop = typeof hitStopTimer !== 'undefined' && hitStopTimer > 3; let isTimeStop = this.timeStopTimer > 0;
     const grad = ctx.createLinearGradient(0, 0, 0, 300); if (isHitStop) { grad.addColorStop(0, '#fff'); grad.addColorStop(1, '#ccc'); } else if (isTimeStop) { grad.addColorStop(0, '#300'); grad.addColorStop(1, '#505'); } else { grad.addColorStop(0, '#050510'); grad.addColorStop(1, '#202030'); } ctx.fillStyle = grad; ctx.fillRect(0, 0, 200, 300);
     applyShake(); ctx.save(); ctx.scale(this.scale, this.scale); ctx.translate(-this.camX, -this.camY);
-    ctx.strokeStyle = isTimeStop ? '#f0f' : '#445'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, this.groundY); ctx.lineTo(this.stageWidth, this.groundY); ctx.stroke();
-    for(let i=0; i<this.stageWidth; i+=40) { ctx.beginPath(); ctx.moveTo(i, this.groundY); ctx.lineTo(i - 30, this.stageHeight); ctx.stroke(); }
+    ctx.strokeStyle = isTimeStop ? '#f0f' : '#445'; ctx.lineWidth = 2; let bgOffset = isTimeStop ? 0 : (this.timer * 2) % 40;
+    ctx.beginPath(); ctx.moveTo(0, this.groundY); ctx.lineTo(this.stageWidth, this.groundY); ctx.stroke();
+    for(let i=0; i<this.stageWidth+40; i+=40) { ctx.beginPath(); ctx.moveTo(i - bgOffset, this.groundY); ctx.lineTo(i - 30 - bgOffset, this.stageHeight); ctx.stroke(); }
     for(let i=0; i<=this.stageHeight; i+=60) { ctx.strokeStyle = isTimeStop ? 'rgba(255,0,255,0.1)' : 'rgba(100,255,100,0.05)'; ctx.strokeRect(0, i, this.stageWidth, 1); }
     for(let i=0; i<=this.stageWidth; i+=60) { ctx.strokeRect(i, 0, 1, this.stageHeight); }
+
     [this.p1, this.p2, ...this.clones].forEach(f => { if(!f)return; let tList = f.trail||[]; for(let i=0; i<tList.length; i++) { let tr = tList[i]; if(!tr)continue; let tempF = {...f, x: tr.x, y: tr.y, dir: tr.dir, state: tr.state, frame: tr.frame}; this.drawStickman(tempF, 0.4 - (i*0.08), true); } });
     if(this.p1 && (!isHitStop || this.p1.state === 'hurt' || this.p1.state === 'stunned')) this.drawStickman(this.p1);
     if(this.p2 && (!isHitStop || this.p2.state === 'hurt' || this.p2.state === 'stunned')) this.drawStickman(this.p2);
@@ -509,9 +551,28 @@ const AutoFighter = {
     
     this.vfx.forEach(v => {
         let ratio = Math.max(0, safeNum(v.life,1)) / Math.max(1, safeNum(v.maxLife,1)); ctx.globalAlpha = ratio; let vSize = Math.max(0.1, safeNum(v.size, 10));
-        if (v.type === 'bone') { ctx.save(); ctx.translate(safeNum(v.x,0), safeNum(v.y,0)); ctx.rotate(safeNum(v.angle,0)); ctx.fillStyle = v.color || '#fff'; ctx.fillRect(-12, -3, 24, 6); ctx.beginPath(); ctx.arc(-12, -3, 4, 0, Math.PI*2); ctx.arc(-12, 3, 4, 0, Math.PI*2); ctx.arc(12, -3, 4, 0, Math.PI*2); ctx.arc(12, 3, 4, 0, Math.PI*2); ctx.fill(); ctx.restore(); }
-        else if (v.type === 'bone_wall') { let h = vSize * Math.sin((1 - ratio) * Math.PI); ctx.fillStyle = v.color || '#fff'; ctx.fillRect(safeNum(v.x,0) - 6, safeNum(v.y,0) - h, 12, h); ctx.beginPath(); ctx.arc(safeNum(v.x,0) - 3, safeNum(v.y,0) - h, 4, 0, Math.PI*2); ctx.arc(safeNum(v.x,0) + 3, safeNum(v.y,0) - h, 4, 0, Math.PI*2); ctx.fill(); }
-        else if (v.type === 'g_blaster') { ctx.save(); ctx.translate(safeNum(v.x,0), safeNum(v.y,0)); ctx.rotate(safeNum(v.angle,0) - Math.PI/2); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-15, -20); ctx.lineTo(15, -20); ctx.lineTo(25, 0); ctx.lineTo(10, 25); ctx.lineTo(-10, 25); ctx.lineTo(-25, 0); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-8, -5, 5, 0, Math.PI*2); ctx.arc(8, -5, 5, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.arc(8, -5, 2, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=15; ctx.shadowColor='#0ff'; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-5, 15); ctx.lineTo(-5, 25); ctx.moveTo(5, 15); ctx.lineTo(5, 25); ctx.stroke(); ctx.restore(); }
+        
+        if (v.type === 'bone') {
+            ctx.save(); ctx.translate(safeNum(v.x,0), safeNum(v.y,0)); ctx.rotate(safeNum(v.angle,0));
+            ctx.fillStyle = v.color || '#fff'; ctx.fillRect(-12, -3, 24, 6);
+            ctx.beginPath(); ctx.arc(-12, -3, 4, 0, Math.PI*2); ctx.arc(-12, 3, 4, 0, Math.PI*2); ctx.arc(12, -3, 4, 0, Math.PI*2); ctx.arc(12, 3, 4, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+        else if (v.type === 'bone_wall') {
+            let h = vSize * Math.sin((1 - ratio) * Math.PI); 
+            ctx.fillStyle = v.color || '#fff'; ctx.fillRect(safeNum(v.x,0) - 6, safeNum(v.y,0) - h, 12, h);
+            ctx.beginPath(); ctx.arc(safeNum(v.x,0) - 3, safeNum(v.y,0) - h, 4, 0, Math.PI*2); ctx.arc(safeNum(v.x,0) + 3, safeNum(v.y,0) - h, 4, 0, Math.PI*2); ctx.fill();
+        }
+        else if (v.type === 'g_blaster') {
+            ctx.save(); ctx.translate(safeNum(v.x,0), safeNum(v.y,0)); ctx.rotate(safeNum(v.angle,0) - Math.PI/2); 
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-15, -20); ctx.lineTo(15, -20); ctx.lineTo(25, 0); ctx.lineTo(10, 25); ctx.lineTo(-10, 25); ctx.lineTo(-25, 0); ctx.fill();
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-8, -5, 5, 0, Math.PI*2); ctx.arc(8, -5, 5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.arc(8, -5, 2, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=15; ctx.shadowColor='#0ff'; ctx.fill();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-5, 15); ctx.lineTo(-5, 25); ctx.moveTo(5, 15); ctx.lineTo(5, 25); ctx.stroke();
+            ctx.restore();
+        }
+        else if (v.type === 'particle') { ctx.fillStyle = v.color; ctx.beginPath(); ctx.arc(safeNum(v.x,0), safeNum(v.y,0), vSize * ratio, 0, Math.PI*2); ctx.fill(); }
+        else if (v.type === 'ring') { ctx.strokeStyle = v.color; ctx.lineWidth = 3 * ratio; ctx.beginPath(); ctx.arc(safeNum(v.x,0), safeNum(v.y,0), vSize * (1-ratio), 0, Math.PI*2); ctx.stroke(); }
         else if (v.type === 'rock') { ctx.save(); ctx.translate(safeNum(v.x,0), safeNum(v.y,0)); ctx.rotate(safeNum(v.angle,0)); ctx.fillStyle = v.color; ctx.beginPath(); ctx.moveTo(-vSize,-vSize); ctx.lineTo(vSize,-vSize*0.5); ctx.lineTo(vSize*0.8,vSize); ctx.lineTo(-vSize*0.5,vSize); ctx.fill(); ctx.restore(); }
         else if (v.type === 'slash') { ctx.strokeStyle = v.color; ctx.lineWidth = Math.max(0.1, safeNum(v.width,2) * ratio); ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(safeNum(v.x,0), safeNum(v.y,0), vSize, safeNum(v.angle,0) - 1.0*ratio, safeNum(v.angle,0) + 1.0*ratio); ctx.stroke(); } 
         else if (v.type === 'impact') { ctx.fillStyle = v.color; ctx.beginPath(); let s = Math.max(0.1, vSize * Math.pow(Math.max(0, 1 - ratio), 0.5) + 5); ctx.moveTo(v.x, v.y - s); ctx.lineTo(v.x + s/4, v.y - s/4); ctx.lineTo(v.x + s, v.y); ctx.lineTo(v.x + s/4, v.y + s/4); ctx.lineTo(v.x, v.y + s); ctx.lineTo(v.x - s/4, v.y + s/4); ctx.lineTo(v.x - s, v.y); ctx.lineTo(v.x - s/4, v.y - s/4); ctx.fill(); } 
@@ -581,7 +642,7 @@ const AutoFighter = {
         }
         else if (fst === 'atk_telekinesis') { p.hL={x:15,y:-30}; p.hR={x:15,y:-30}; p.eL={x:5,y:-10}; p.eR={x:5,y:-10}; p.h={x:5,y:-5}; p.kL.x+=5; p.kR.x-=5; }
         else if (fst === 'atk_heal' || fst === 'atk_ult_regen') { p.hL={x:0,y:-20}; p.hR={x:0,y:-20}; p.h={x:0,y:-5}; p.hip={x:0,y:20}; p.kL={x:-10,y:30}; p.kR={x:10,y:30}; p.fL={x:-15,y:40}; p.fR={x:15,y:40}; }
-        else if (fst === 'atk_warpAtk' || fst === 'atk_counter' || fst === 'atk_sans_warp' || fst === 'atk_ult_stop') { if (sf < 4) { p.hR={x:-20,y:15}; p.h.y+=5; p.hip.y+=5; p.kL.x-=8; p.kR.x+=8; } else { p.hR={x:25,y:-30}; p.h.x+=10; p.fR.x+=15; p.fR.y-=5; p.fL.x-=5; } }
+        else if (fst === 'atk_warpAtk' || fst === 'atk_counter' || fst === 'atk_sans_warp' || fst === 'atk_ult_stop' || fst === 'atk_ult_clone') { if (sf < 4) { p.hR={x:-20,y:15}; p.h.y+=5; p.hip.y+=5; p.kL.x-=8; p.kR.x+=8; } else { p.hR={x:25,y:-30}; p.h.x+=10; p.fR.x+=15; p.fR.y-=5; p.fL.x-=5; } }
         else if (fst === 'atk_throw' || fst === 'atk_pull') { if (sf < 8) { p.hR={x:25,y:5}; p.eR={x:15,y:5}; p.h.x+=5; } else { p.hL={x:-15,y:25}; p.hR={x:-15,y:25}; p.h.x-=10; p.hip.x-=5; } }
         else if (fst === 'atk_physCounter') { p.hL={x:5,y:-5}; p.hR={x:-5,y:-5}; p.eL={x:10,y:5}; p.eR={x:-10,y:5}; } 
         else if (fst === 'atk_magReflect' || fst === 'atk_bone_up') { p.hR={x:25,y:-5}; p.eR={x:15,y:0}; if(!isTrail){ctx.shadowBlur=15; ctx.shadowColor='#0ff';} } 
@@ -603,7 +664,7 @@ const AutoFighter = {
     if ((fst === 'stunned' || fst === 'knockdown') && !isTrail) { dx += (Math.random()-0.5)*4; dy += (Math.random()-0.5)*4; ctx.strokeStyle = '#888'; }
 
     drawCore(dx, dy, alpha);
-    if (!isTrail && f.passiveKey === 'CHAOS') { ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('CHAOS', dx-15, dy-30); }
+    if (f.hasClones && !isTrail) { drawCore(dx - 40, dy, 0.4); drawCore(dx + 40, dy, 0.4); }
     if (!isTrail && passKey === 'MAHORAGA' && f.hitHistory) {
         let maxAdapt = 0; for(let k in f.hitHistory) if(safeNum(f.hitHistory[k],0) > maxAdapt) maxAdapt = f.hitHistory[k];
         if (maxAdapt > 0) { ctx.shadowBlur = 0; ctx.strokeStyle = '#ff0'; ctx.lineWidth = 1; let rot = (sf * maxAdapt) * 0.1; ctx.beginPath(); for(let i=0; i<8; i++){ ctx.moveTo(dx, dy-15*bH); ctx.lineTo(dx + Math.cos(rot+i*Math.PI/4)*10, dy-15*bH + Math.sin(rot+i*Math.PI/4)*10); } ctx.stroke(); }
