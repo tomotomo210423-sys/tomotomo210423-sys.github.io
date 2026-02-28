@@ -1,4 +1,4 @@
-// === AUTO FIGHTER (Phase 32: PURE BRAIN LEARNING EDITION) ===
+// === AUTO FIGHTER (Phase 33: SANS BUG FIX EDITION) ===
 
 const Styles = {
     RUSH: { name: 'インファイター', desc: '常に前進し、接近戦でのコンボを狙う。', aggro: 0.8, guard: 0.1, dodge: 0.1, range: 35 },
@@ -98,8 +98,22 @@ const AutoFighter = {
       ai.brain.skills = ai.brain.skills || {};
       ai.brain.bestDist = safeNum(ai.brain.bestDist, 100);
 
-      if (ai.styleKey === 'SANS') { ai.skillKeys = [...SansSkillKeys]; ai.passiveKey = 'SANS_DODGE'; ai.color.body = '#fff'; ai.color.aura = '#0ff'; } 
-      else { if (!Array.isArray(ai.skillKeys)) ai.skillKeys = ['jab', 'upper', 'smash', 'sonic']; while (ai.skillKeys.length < 4) ai.skillKeys.push('jab'); for (let i = 0; i < 4; i++) if (!Skills[ai.skillKeys[i]] || ai.skillKeys[i].startsWith('sans_')) ai.skillKeys[i] = 'jab'; ai.passiveKey = Passives[ai.passiveKey] && ai.passiveKey !== 'SANS_DODGE' ? ai.passiveKey : 'NONE'; }
+      // ★ SANSスタイルの場合は専用スキルを強制セット
+      if (ai.styleKey === 'SANS') { 
+          ai.skillKeys = [...SansSkillKeys]; 
+          ai.passiveKey = 'SANS_DODGE'; ai.color.body = '#fff'; ai.color.aura = '#0ff'; 
+      } else { 
+          // ★ 別のスタイルに変更された場合、スキル枠を強制的に4つに切り詰める（裏に残るバグを完全防止）
+          if (!Array.isArray(ai.skillKeys)) ai.skillKeys = ['jab', 'upper', 'smash', 'sonic']; 
+          ai.skillKeys = ai.skillKeys.slice(0, 4); 
+          while (ai.skillKeys.length < 4) ai.skillKeys.push('jab'); 
+          
+          for (let i = 0; i < 4; i++) {
+              if (!Skills[ai.skillKeys[i]] || ai.skillKeys[i].startsWith('sans_')) ai.skillKeys[i] = 'jab'; 
+          }
+          ai.passiveKey = Passives[ai.passiveKey] && ai.passiveKey !== 'SANS_DODGE' ? ai.passiveKey : 'NONE'; 
+      }
+      
       ai.awakenCond = AwakenConds[ai.awakenCond] ? ai.awakenCond : 'NONE'; ai.awakenPassive = AwakenPassives[ai.awakenPassive] ? ai.awakenPassive : 'NONE'; ai.awakenColor = typeof ai.awakenColor === 'string' ? ai.awakenColor : '#f00'; ai.learningLevel = Math.max(0, safeNum(ai.learningLevel, 0)); return ai;
   },
 
@@ -123,7 +137,7 @@ const AutoFighter = {
   createFighter(isP2, data) {
       let stKey = Styles[data.styleKey] ? data.styleKey : 'RUSH'; 
       return { id: isP2 ? 2 : 1, isClone: false, x: isP2 ? 550 : 250, y: this.groundY, dir: isP2 ? -1 : 1, hp: 1000, maxHp: 1000, kr: 0, hitCount: 0, dodgeCount: 0, hasDoneFirstAttack: false, usedUlt: false, regenTimer: 0, tkTimer: 0, chaosTimer: 0, policy: data.policy || 'BALANCE', 
-          base: { atk: data.base.atk, res: data.base.res, spd: data.base.spd }, // ★ボーナス廃止で純粋なベース値のみ
+          base: { atk: data.base.atk, res: data.base.res, spd: data.base.spd }, 
           brain: data.brain, body: data.body || {width:1, height:1, head:1}, color: data.color || {body:'#fff', aura:'#ff0'}, physics: data.physics || {weight:100}, styleKey: stKey, skillKeys: data.skillKeys || ['jab','upper','smash','sonic'], ultimateKey: data.ultimateKey || 'ult_regen', passiveKey: data.passiveKey || 'NONE', awakenCond: data.awakenCond || 'NONE', awakenPassive: data.awakenPassive || 'NONE', awakenColor: data.awakenColor || '#f00', dynGuard: getStyle(stKey).guard, dynDodge: getStyle(stKey).dodge, hitHistory: {}, adapting: {}, adapted: {}, state: 'idle', stateFrame: 0, prevState: 'idle', cd: 0, name: data.name || 'FIGHTER', vx: 0, vy: 0, guarding: false, justGuardWindow: 0, trail: [], hitCancel: false, hasHit: false, combo: 0, comboTimer: 0, comboDmg: 0, isAwakened: false, funnelTimer: 0, hasClones: false };
   },
 
@@ -132,7 +146,6 @@ const AutoFighter = {
       let isMirror = Math.random() < 0.25; 
       if (isMirror) { this.p2 = this.createFighter(true, this.myAI); this.p2.name = 'MIRROR'; this.p2.color = { body: '#555', aura: '#888' }; } 
       else {
-          // ★ 敵NPC（仮想敵）の超多様化
           let eStyle = Object.keys(Styles)[Math.floor(Math.random()*Object.keys(Styles).length)]; let dummySkills = []; let dummyPassive = 'NONE';
           if (eStyle === 'ZONE') { dummySkills = Math.random()<0.5 ? ['beam', 'sonic', 'parapara', 'magReflect'] : ['beam', 'slide', 'telekinesis', 'random']; dummyPassive = Math.random()<0.5 ? 'HOVER' : 'NINJA'; } 
           else if (eStyle === 'RUSH' || eStyle === 'DEVIL') { dummySkills = Math.random()<0.5 ? ['jab', 'smash', 'burst', 'throw'] : ['slide', 'upper', 'pull', 'burst']; dummyPassive = Math.random()<0.5 ? 'VAMPIRE' : 'DESPERATION'; } 
@@ -505,7 +518,6 @@ const AutoFighter = {
                     if (sType === 'throw') { if (opp.guarding && d < 40) score += 40; else score -= 10; }
                     if (canCancel) { if (safeNum(s.start, 5) < 10) score += 15; if (sType === 'shot' || sType === 'buff' || sType === 'summon' || sType.startsWith('stance')) score -= 20; }
                     if (st.name === 'デビル') { if (sType === 'multi' || sType === 'pull') score += 20; }
-                    
                     let bWeight = (f.brain && f.brain.skills) ? safeNum(f.brain.skills['s'+i], 1.0) : 1.0; score *= Math.max(0.1, bWeight);
                     score += Math.random() * 10; if (score > bestScore) { bestScore = score; bestSkillKey = skey; }
                 }
@@ -601,14 +613,14 @@ const AutoFighter = {
 
     if (this.st === 'training') {
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, 200, 75); ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace'; ctx.fillText(this.isInfinite ? '◆ 無限強化学習中 ◆' : '◆ AI TRAINING ◆', 25, 15); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`世代(EPOCH): ${this.simEpoch}`, 10, 35); ctx.fillStyle = '#ff0'; ctx.fillText(`WINS: ${this.simWins}`, 120, 35);
+        let safeBonus = this.myAI.bonus || {atk:0,res:0,spd:0}; let sBrain = this.myAI.brain || {};
         
-        // ★ フレーバーテキスト化
         ctx.fillStyle = '#aaf'; ctx.font = '9px monospace'; 
         let learnTexts = ["攻撃タイミングを分析中...", "敵の隙を学習中...", "最適な間合いを計算中...", "回避パターンを最適化中..."];
         let tMsg = learnTexts[Math.floor(this.timer/20) % learnTexts.length];
         if(this.myAI.styleKey === 'SANS') tMsg = "回避と反撃のパターンを最適化中...";
         ctx.fillText(`▶ ${tMsg}`, 5, 50);
-        ctx.fillStyle = '#faa'; ctx.fillText(`脳内モデル更新中... (思考パラメータ微調整)`, 5, 62);
+        ctx.fillStyle = '#faa'; ctx.fillText(`▶ 脳内モデル構築中...`, 5, 62);
         
         if (!this.isInfinite) { ctx.fillStyle = '#444'; ctx.fillRect(10, 70, 180, 3); ctx.fillStyle = '#0f0'; ctx.fillRect(10, 70, (this.simEpoch / Math.max(1,this.simMaxEpoch)) * 180, 3); }
     } else if (this.p1 && this.p2) {
