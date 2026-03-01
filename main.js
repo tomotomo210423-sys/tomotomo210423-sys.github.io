@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 5.9: Removed AutoFighter) ===
+// === CORE SYSTEM (Phase 6.0: Musou Infinity Integrated) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -145,11 +145,11 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// メニュー管理 (AI闘技場を削除)
+// メニュー管理 (無限無双 を組み込み)
 // ★============================================★
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', 'ローカルランキング', '設定', '王様の間'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'ローカルランキング', '設定', '王様の間'], 
   holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
   update() {
@@ -158,7 +158,7 @@ const Menu = {
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
     
     if (keysDown.a) { 
-        // ★ 読み込まれていない場合は null にする
+        // ★ 読み込まれていない場合は null になる安全装置
         const appObjs = [
             typeof Guide !== 'undefined' ? Guide : null, 
             typeof Tetri !== 'undefined' ? Tetri : null, 
@@ -166,6 +166,7 @@ const Menu = {
             typeof Online !== 'undefined' ? Online : null, 
             typeof Rhythm !== 'undefined' ? Rhythm : null, 
             typeof Slot !== 'undefined' ? Slot : null, 
+            typeof Musou !== 'undefined' ? Musou : null, // ★無限無双
             typeof Ranking !== 'undefined' ? Ranking : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
@@ -175,13 +176,14 @@ const Menu = {
             switchApp(appObjs[this.cur]); 
         } else {
             playSnd('hit');
-            console.warn("そのゲーム（jsファイル）はまだ読み込まれていません！");
+            console.warn("そのゲーム（jsファイル）はまだ読み込まれていません！ index.htmlを確認してください。");
         }
     }
   },
   draw() {
-    bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('5in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v8.0', 60, 40);
-    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 63 + i * 20); }
+    bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('6in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v9.0', 60, 40);
+    // 項目が増えたので行間を少し詰めました
+    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 63 + i * 19); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };
