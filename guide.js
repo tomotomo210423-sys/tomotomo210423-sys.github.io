@@ -1,9 +1,9 @@
-// === GUIDE APP (Phase 8.1: Musou Infinity Added) ===
+// === GUIDE APP (Phase 9: Abyss General Added) ===
 const Guide = {
   cur: 0,
   page: 0,
   scrollY: 0, // 縦スクロール位置
-  scrollX: 0, // 横スクロール位置 ★追加
+  scrollX: 0, // 横スクロール位置
   games: [
     { 
       name: 'テトリベーダー', 
@@ -103,7 +103,6 @@ const Guide = {
         '溜まったジャックポットを 総取りできるぞ！'
       ] 
     },
-    // ★ 無限無双 を追加！
     {
       name: '無限無双',
       text: [
@@ -125,6 +124,54 @@ const Guide = {
         'タイトル画面の【SHOP】から',
         '基礎能力を ずっと強化できるぞ！',
         'やればやるほど 確実に 強くなるのじゃ！'
+      ]
+    },
+    // ★ アビス・ジェネラル を追加！
+    {
+      name: 'アビス・ジェネラル',
+      text: [
+        '魔王となって 無限に迫りくる勇者軍から',
+        'コアを守り抜く 超マルチタスク防衛ゲームじゃ！',
+        '起動すると 筐体が【横画面】に 変形するぞ！',
+        '',
+        '【操作】',
+        '左手(十字キー): 触手を動かして 敵を直接殴る！',
+        '右手(スワイプ): 画面に図形を描いて 魔法発動！',
+        '右手(タップ): 右下のSHOPボタンで 強化を開く！',
+        '右手(長押し): 左上のオルゴールの ネジを巻く！',
+        '',
+        '【ジェスチャー魔法】',
+        '画面を 一筆書きで なぞるのじゃ！',
+        ' | (縦線): メテオ！ 上から隕石を落とす',
+        ' ― (横線): 眷属召喚！ 自動で敵に突撃する群れを出す',
+        ' O (丸形): シールド！ 敵を弾き飛ばす防壁を張る',
+        ' ※シールドは 連続で描けば 多重に張れるぞ！',
+        '',
+        '【⚠魔界のオルゴール (重要)】',
+        '画面左上にある 四角い箱じゃ。',
+        '放置して 緑のゲージが ゼロになると…',
+        '狂気に飲まれて 【即ゲームオーバー】になるぞ！',
+        '時々 指で【長押し】して ネジを巻くのじゃ！',
+        '',
+        '【クロノ・ドメイン (強化SHOP)】',
+        '敵を倒すと「魂(SOUL)」が 手に入る。',
+        '右下の SHOP を開くと 時間が「スロー」になり、',
+        '魂を使って 魔王軍を 強化できるぞ！',
+        ' 邪眼召喚: 自動で弾を撃つ 目玉を設置',
+        ' コア修復: コアのHPを回復し 最大値もUP',
+        ' 触手火力UP: 触手で殴った時の ダメージ増加',
+        ' 触手分裂: なんと！ 触手の本数が 増えるぞ！',
+        ' メテオ巨大化: 隕石の 範囲と威力がUP (最大Lv3)',
+        '',
+        '※ヒント：SHOPを開いている間も 左手で',
+        '触手を動かして 敵を殴ることが 可能じゃ！',
+        '',
+        '【登場キャラクター設定】',
+        '・魔王のコア: プレイヤーの本体。赤黒く脈打つ水晶体。',
+        '・アビス・テンタクル(触手): コアを守る 恐ろしい腕。',
+        '・アビス・スウォーム(眷属): 召喚される 赤い魔物。',
+        '・邪眼: 敵を睨み 血玉を吐き出す 防衛器官。',
+        '・勇者軍: 魔王討伐のため 無限に湧いてくる 人間たち。'
       ]
     },
     { 
@@ -152,7 +199,7 @@ const Guide = {
     this.cur = 0; 
     this.page = 0; 
     this.scrollY = 0;
-    this.scrollX = 0; // ★初期化
+    this.scrollX = 0;
   },
   
   update() {
@@ -169,7 +216,7 @@ const Guide = {
       if (keysDown.down) { this.scrollY = Math.min(this.scrollY + 3, maxScrollY); playSnd('sel'); }
       if (keysDown.up) { this.scrollY = Math.max(this.scrollY - 3, 0); playSnd('sel'); }
 
-      // ★横スクロール（最大200pxまで右にずらせるように設定）
+      // 横スクロール（最大200pxまで右にずらせるように設定）
       const maxScrollX = 200;
       if (keysDown.right) { this.scrollX = Math.min(this.scrollX + 10, maxScrollX); playSnd('sel'); }
       if (keysDown.left) { this.scrollX = Math.max(this.scrollX - 10, 0); playSnd('sel'); }
@@ -183,11 +230,14 @@ const Guide = {
       // メニュー画面
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ゲーム解説館】', 40, 30);
       ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
-      for (let i = 0; i < this.games.length; i++) {
-        if (i === this.cur) { ctx.fillStyle = '#ff0'; ctx.fillRect(10, 50 + i * 22, 180, 18); ctx.fillStyle = '#000'; } 
-        // ★ リストの一番最後（王様の間）だけシアン色にするように修正
+      
+      // 項目が増えたので、メニュー画面も少しスクロールさせる処理を追加
+      let startY = 50;
+      let drawStart = Math.max(0, this.cur - 8);
+      for (let i = drawStart; i < Math.min(this.games.length, drawStart + 10); i++) {
+        if (i === this.cur) { ctx.fillStyle = '#ff0'; ctx.fillRect(10, startY + (i - drawStart) * 22 - 13, 180, 18); ctx.fillStyle = '#000'; } 
         else { ctx.fillStyle = i === this.games.length - 1 ? '#0ff' : '#aaa'; }
-        ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, 63 + i * 22);
+        ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, startY + (i - drawStart) * 22);
       }
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 読む  SELECT: 戻る', 45, 290);
       
@@ -210,7 +260,7 @@ const Guide = {
         else if (lineStr.includes('【') && !lineStr.includes('操作')) ctx.fillStyle = '#ff0';
         else ctx.fillStyle = '#fff';
         
-        // ★ X座標を scrollX 分だけずらして描画
+        // X座標を scrollX 分だけずらして描画
         ctx.fillText(lineStr, 10 - this.scrollX, 50 + i * 15);
       }
       
@@ -220,7 +270,7 @@ const Guide = {
       if (this.scrollY > 0) ctx.fillText('▲', 185, 45); // 上矢印
       if (this.scrollY < maxScrollY) ctx.fillText('▼', 185, 250); // 下矢印
 
-      // ★ 横スクロール矢印
+      // 横スクロール矢印
       if (this.scrollX > 0) ctx.fillText('◀', 2, 150); // 左矢印
       if (this.scrollX < 200) ctx.fillText('▶', 190, 150); // 右矢印
       
