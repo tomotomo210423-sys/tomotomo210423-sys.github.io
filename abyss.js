@@ -1,6 +1,6 @@
-// === ABYSS GENERAL (FINAL: Ultimate Edition - Fixed) ===
+// === ABYSS GENERAL (Phase 10: Despair Rush & Holy Seals) ===
 const Abyss = {
-    st: 'title', // title, play, shop, gameover
+    st: 'title',
     tmr: 0,
     core: { x: 40, y: 120 },
     target: { x: 150, y: 120 },
@@ -10,11 +10,17 @@ const Abyss = {
     winding: false, 
     musicBox: 100,  
     
-    vfx: [], shieldTmr: 0, swarms: [], eyes: [], projectiles: [], enemies: [],
+    vfx: [], shieldTmr: 0, swarms: [], eyes: [], 
+    projectiles: [], // 邪眼の弾
+    enemies: [], 
+    enemyProjectiles: [], // 遠距離兵の矢
+    holySeals: [], // 聖なる封印（タップ破壊タスク）
     
     coreHp: 100, coreMaxHp: 100, score: 0, soul: 0,
     lv: { tentacle: 1, meteor: 1, swarm: 1 },
     
+    bgmInt: null, // 絶望BGM用
+
     init() {
         document.getElementById('gameboy').classList.add('mode-abyss');
         canvas.width = 400; canvas.height = 240;
@@ -22,7 +28,6 @@ const Abyss = {
         this.st = 'title';
         this.tmr = 0;
         
-        // タイトル画面用のデモ触手
         this.tentacles = [];
         this.addTentacle();
         this.target = { x: 200, y: 120 };
@@ -36,11 +41,40 @@ const Abyss = {
         if (typeof BGM !== 'undefined') BGM.play('spell');
     },
 
+    playDespairBGM() {
+        if (typeof BGM !== 'undefined') BGM.stop();
+        if (this.bgmInt) clearInterval(this.bgmInt);
+        if (!audioCtx) return;
+        
+        // ドクン…ドクン…という不気味な心音ループ
+        this.bgmInt = setInterval(() => {
+            if (this.st !== 'play' && this.st !== 'shop') return;
+            let n = audioCtx.currentTime;
+            let o = audioCtx.createOscillator(); let g = audioCtx.createGain();
+            o.type = 'triangle'; o.frequency.setValueAtTime(40, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.3);
+            g.gain.setValueAtTime(0.3, n); g.gain.exponentialRampToValueAtTime(0.01, n + 0.3);
+            o.connect(g); g.connect(audioCtx.destination); o.start(n); o.stop(n + 0.4);
+            
+            // 不協和音ノイズ
+            if (Math.random() < 0.3) {
+                let o2 = audioCtx.createOscillator(); let g2 = audioCtx.createGain();
+                o2.type = 'sawtooth'; o2.frequency.setValueAtTime(100 + Math.random()*200, n);
+                g2.gain.setValueAtTime(0.02, n); g2.gain.linearRampToValueAtTime(0.001, n + 0.5);
+                o2.connect(g2); g2.connect(audioCtx.destination); o2.start(n); o2.stop(n + 0.5);
+            }
+        }, 800);
+    },
+
+    stopDespairBGM() {
+        if (this.bgmInt) { clearInterval(this.bgmInt); this.bgmInt = null; }
+    },
+
     startGame() {
         this.st = 'play';
         this.tmr = 0; 
         this.vfx = []; this.shieldTmr = 0; this.swarms = [];
         this.eyes = []; this.projectiles = []; this.enemies = []; 
+        this.enemyProjectiles = []; this.holySeals = [];
         this.coreHp = 100; this.coreMaxHp = 100; this.score = 0; this.soul = 0;
         this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
         this.musicBox = 100; this.winding = false;
@@ -50,8 +84,9 @@ const Abyss = {
         this.target = { x: 150, y: 120 };
         
         if (typeof pointer !== 'undefined') pointer.path = [];
-        if (typeof BGM !== 'undefined') BGM.play('action');
+        
         if (typeof playSnd !== 'undefined') playSnd('combo');
+        this.playDespairBGM();
     },
     
     addTentacle() {
@@ -59,9 +94,7 @@ const Abyss = {
         let offsets = [{x:0, y:0}, {x:0, y:-20}, {x:0, y:20}, {x:-20, y:-10}, {x:-20, y:10}];
         let o = offsets[idx % 5];
         let segs = [];
-        for (let i = 0; i < 20; i++) {
-            segs.push({ x: this.core.x + o.x, y: this.core.y + o.y });
-        }
+        for (let i = 0; i < 20; i++) { segs.push({ x: this.core.x + o.x, y: this.core.y + o.y }); }
         this.tentacles.push({ root: o, segments: segs, num: 20, len: 14 });
     },
     
@@ -123,6 +156,7 @@ const Abyss = {
         if (typeof keysDown !== 'undefined' && keysDown.select) {
             document.getElementById('gameboy').classList.remove('mode-abyss');
             canvas.width = 200; canvas.height = 300;
+            this.stopDespairBGM();
             if (typeof switchApp !== 'undefined') switchApp(Menu);
             return;
         }
@@ -137,12 +171,10 @@ const Abyss = {
             this.target.y = 120 + Math.cos(this.tmr * 0.03) * 80;
             for (let i = 0; i < 3; i++) this.updateIK();
 
-            // ★ タップ または Aボタン でスタート！
             let tapped = (typeof pointer !== 'undefined' && pointer.active && !this.prevPointerActive);
             if ((typeof keysDown !== 'undefined' && keysDown.a) || tapped) {
                 this.startGame();
             }
-            
             if (typeof pointer !== 'undefined') this.prevPointerActive = pointer.active;
             return; 
         }
@@ -154,14 +186,12 @@ const Abyss = {
             for (let i = 0; i < 3; i++) this.updateIK();
             this.updateVFX(1.0);
             
-            // ★ タップ または Aボタン でタイトルへ戻る！
             let tapped = (typeof pointer !== 'undefined' && pointer.active && !this.prevPointerActive);
             if (this.tmr > 60 && ((typeof keysDown !== 'undefined' && keysDown.a) || tapped)) {
-                this.st = 'title';
-                this.tmr = 0;
+                this.st = 'title'; this.tmr = 0;
                 if (typeof pointer !== 'undefined') pointer.path = [];
+                if (typeof BGM !== 'undefined') BGM.play('spell');
             }
-            
             if (typeof pointer !== 'undefined') this.prevPointerActive = pointer.active;
             return;
         }
@@ -172,6 +202,7 @@ const Abyss = {
         let ts = (this.st === 'shop') ? 0.2 : 1.0;
         if (this.shieldTmr > 0) this.shieldTmr -= ts;
         
+        // --- 左手操作 ---
         let speed = 12;
         let isMoving = false;
         if (typeof keys !== 'undefined') {
@@ -184,81 +215,97 @@ const Abyss = {
         this.target.y = Math.max(0, Math.min(240, this.target.y));
         
         let maxDist = 20 * 14; 
-        let dx = this.target.x - this.core.x;
-        let dy = this.target.y - this.core.y;
+        let dx = this.target.x - this.core.x; let dy = this.target.y - this.core.y;
         let d = Math.hypot(dx, dy);
-        if (d > maxDist) {
-            this.target.x = this.core.x + (dx / d) * maxDist;
-            this.target.y = this.core.y + (dy / d) * maxDist;
-        }
+        if (d > maxDist) { this.target.x = this.core.x + (dx / d) * maxDist; this.target.y = this.core.y + (dy / d) * maxDist; }
         for (let i = 0; i < 3; i++) this.updateIK();
 
         let isMeteorMax = (this.lv.meteor >= 3.0); 
 
-        // --- 右手とUI、オルゴールの判定 ---
+        // --- 右手とUI、オルゴール、封印破壊の判定 ---
+        let touchHandled = false;
         if (typeof pointer !== 'undefined') {
             if (pointer.active && !this.prevPointerActive) {
                 let px = pointer.x, py = pointer.y;
                 
-                if (px < 60 && py < 60) {
-                    this.winding = true;
-                    pointer.path = [];
-                } 
-                else if (this.st === 'play' && px > 340 && py > 190) {
-                    this.st = 'shop'; pointer.path = [];
-                    if(typeof playSnd !== 'undefined') playSnd('combo');
-                } 
-                else if (this.st === 'shop') {
-                    if (px > 60 && px < 340 && py > 40 && py < 200) {
-                        let btnY = Math.floor((py - 50) / 30);
-                        if (btnY === 0 && this.soul >= 30) {
-                            this.soul -= 30; this.eyes.push({ x: this.core.x + 30 + Math.random()*20, y: this.core.y - 80 + Math.random()*160, tmr: 0 });
-                            if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 1 && this.soul >= 40) {
-                            this.soul -= 40; this.coreMaxHp += 20; this.coreHp = Math.min(this.coreMaxHp, this.coreHp + 50);
-                            if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 2 && this.soul >= 50) {
-                            this.soul -= 50; this.lv.tentacle += 0.5;
-                            if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 3 && this.soul >= 80) { 
-                            this.soul -= 80; this.addTentacle();
-                            if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 4 && !isMeteorMax && this.soul >= 50) { 
-                            this.soul -= 50; this.lv.meteor += 0.5;
-                            if(typeof playSnd !== 'undefined') playSnd('combo');
+                // 【新タスク】聖なる封印（魔法陣）のタップ破壊判定
+                if (this.st === 'play') {
+                    for (let i = this.holySeals.length - 1; i >= 0; i--) {
+                        let seal = this.holySeals[i];
+                        if (Math.hypot(px - seal.x, py - seal.y) < 35) {
+                            seal.hp--;
+                            if (typeof playSnd !== 'undefined') playSnd('sel');
+                            this.vfx.push({ type: 'spark', x: px, y: py, vx: Math.random()*4-2, vy: Math.random()*4-2, life: 10, maxLife: 10, color: '#0ff' });
+                            if (seal.hp <= 0) {
+                                this.vfx.push({ type: 'text', text: 'SEAL BROKEN!', x: seal.x - 30, y: seal.y, life: 30, color: '#fff' });
+                                this.score += 20; // 破壊スコア
+                                this.holySeals.splice(i, 1);
+                                if (typeof playSnd !== 'undefined') playSnd('hit');
+                            }
+                            pointer.path = []; touchHandled = true;
+                            break; 
                         }
                     }
-                    if (px > 150 && px < 250 && py > 200 && py < 230) {
-                        this.st = 'play'; pointer.path = [];
-                        if(typeof playSnd !== 'undefined') playSnd('sel');
+                }
+
+                if (!touchHandled) {
+                    if (px < 60 && py < 60) {
+                        this.winding = true; pointer.path = [];
+                    } else if (this.st === 'play' && px > 340 && py > 190) {
+                        this.st = 'shop'; pointer.path = [];
+                        if(typeof playSnd !== 'undefined') playSnd('combo');
+                    } else if (this.st === 'shop') {
+                        if (px > 60 && px < 340 && py > 40 && py < 200) {
+                            let btnY = Math.floor((py - 50) / 30);
+                            if (btnY === 0 && this.soul >= 30) {
+                                this.soul -= 30; this.eyes.push({ x: this.core.x + 30 + Math.random()*20, y: this.core.y - 80 + Math.random()*160, tmr: 0 });
+                                if(typeof playSnd !== 'undefined') playSnd('combo');
+                            } else if (btnY === 1 && this.soul >= 40) {
+                                this.soul -= 40; this.coreMaxHp += 20; this.coreHp = Math.min(this.coreMaxHp, this.coreHp + 50);
+                                if(typeof playSnd !== 'undefined') playSnd('combo');
+                            } else if (btnY === 2 && this.soul >= 50) {
+                                this.soul -= 50; this.lv.tentacle += 0.5;
+                                if(typeof playSnd !== 'undefined') playSnd('combo');
+                            } else if (btnY === 3 && this.soul >= 80) { 
+                                this.soul -= 80; this.addTentacle();
+                                if(typeof playSnd !== 'undefined') playSnd('combo');
+                            } else if (btnY === 4 && !isMeteorMax && this.soul >= 50) { 
+                                this.soul -= 50; this.lv.meteor += 0.5;
+                                if(typeof playSnd !== 'undefined') playSnd('combo');
+                            }
+                        }
+                        if (px > 150 && px < 250 && py > 200 && py < 230) {
+                            this.st = 'play'; pointer.path = [];
+                            if(typeof playSnd !== 'undefined') playSnd('sel');
+                        }
+                        pointer.path = []; 
                     }
-                    pointer.path = []; 
                 }
             }
             
-            if (!pointer.active) {
-                this.winding = false; 
-            }
+            if (!pointer.active) this.winding = false; 
             
-            if (!this.winding && !pointer.active && this.prevPointerActive && this.st === 'play') {
-                if (pointer.path.length > 0) {
-                    let g = this.recognizeGesture(pointer.path);
-                    if (g) {
-                        let cx = 0, cy = 0;
-                        for(let p of pointer.path) { cx += p.x; cy += p.y; }
-                        cx /= pointer.path.length; cy /= pointer.path.length;
-                        this.spawnMagic(g, cx, cy);
-                    }
+            if (!this.winding && !pointer.active && this.prevPointerActive && this.st === 'play' && pointer.path.length > 0) {
+                let g = this.recognizeGesture(pointer.path);
+                if (g) {
+                    let cx = 0, cy = 0;
+                    for(let p of pointer.path) { cx += p.x; cy += p.y; }
+                    cx /= pointer.path.length; cy /= pointer.path.length;
+                    this.spawnMagic(g, cx, cy);
                 }
             }
             this.prevPointerActive = pointer.active;
         }
 
+        // --- 妨害兵（ジャマー）によるオルゴール減衰ペナルティ ---
+        let jammerCount = this.enemies.filter(e => e.type === 'jammer').length;
+        let drainRate = 0.05 + (0.05 * jammerCount); // ジャマーがいると減りが倍速！
+
         if (this.winding) {
             this.musicBox = Math.min(100, this.musicBox + 0.6);
             if (this.tmr % 5 < 1 && typeof playSnd !== 'undefined') playSnd('sel'); 
         } else {
-            this.musicBox -= 0.05 * ts; 
+            this.musicBox -= drainRate * ts; 
         }
         
         if (this.musicBox <= 0 && this.coreHp > 0) {
@@ -267,22 +314,54 @@ const Abyss = {
             if (typeof screenShake !== 'undefined') screenShake(20);
         }
 
-        let diff = 1 + (this.tmr / 1800);
-        if (Math.random() < (0.02 * diff * ts)) {
-            let isBig = Math.random() < 0.15;
+        // --- 聖なる封印（勇者の干渉）の生成と発動 ---
+        let diff = 1 + (this.tmr / 1200); 
+        if (Math.random() < (0.003 * diff * ts) && this.holySeals.length < 3) {
+            this.holySeals.push({ x: 100 + Math.random()*200, y: 30 + Math.random()*180, life: 600, maxLife: 600, hp: 3 });
+        }
+        
+        for (let i = this.holySeals.length - 1; i >= 0; i--) {
+            let s = this.holySeals[i];
+            s.life -= ts;
+            if (s.life <= 0) {
+                // 封印完成（大ダメージ＆オルゴール激減！）
+                this.coreHp -= 20;
+                this.musicBox -= 30;
+                this.vfx.push({ type: 'explosion', x: s.x, y: s.y, size: 100, life: 30, maxLife: 30 });
+                this.vfx.push({ type: 'text', text: 'HOLY JUDGMENT!', x: s.x - 50, y: s.y - 30, life: 60, color: '#0ff' });
+                if (typeof playSnd !== 'undefined') playSnd('hit');
+                if (typeof screenShake !== 'undefined') screenShake(15);
+                this.holySeals.splice(i, 1);
+            }
+        }
+
+        // --- 敵の生成（怒涛のラッシュ対応） ---
+        let spawnRate = 0.02 * diff * ts;
+        if (this.tmr > 3600) spawnRate += 0.02; // ラッシュ
+        if (this.tmr > 7200) spawnRate += 0.04; // 絶望ラッシュ
+
+        if (Math.random() < spawnRate) {
+            let r = Math.random();
+            let eType = 'normal';
+            let eHp = 15, eAtk = 2, eSpeed = 0.5 + Math.random();
+            
+            if (r < 0.1) { eType = 'boss'; eHp = 200; eAtk = 15; eSpeed = 0.3; this.vfx.push({ type: 'text', text: 'BOSS WARNING!', x: 250, y: 120, life: 90, color: '#f00' }); }
+            else if (r < 0.25) { eType = 'archer'; eHp = 10; eSpeed = 0.6; }
+            else if (r < 0.35) { eType = 'jammer'; eHp = 20; eSpeed = 0.8; }
+
             this.enemies.push({
                 x: 420, y: 20 + Math.random() * 200,
-                speed: (0.5 + Math.random()) * (isBig ? 0.4 : 1) * (1 + diff * 0.1),
-                hp: (isBig ? 60 : 15) * diff, maxHp: (isBig ? 60 : 15) * diff,
-                atk: (isBig ? 10 : 2) * diff, type: isBig ? 'big' : 'small', hitCd: 0
+                speed: eSpeed * (1 + diff * 0.1),
+                hp: eHp * diff, maxHp: eHp * diff,
+                atk: eAtk * diff, type: eType, hitCd: 0
             });
         }
 
+        // --- 邪眼の射撃 ---
         for (let t of this.eyes) {
             t.tmr += ts;
             if (t.tmr > 60 && this.enemies.length > 0) {
-                let target = this.enemies[0];
-                let minDist = Math.hypot(target.x - t.x, target.y - t.y);
+                let target = this.enemies[0]; let minDist = 999;
                 for (let e of this.enemies) {
                     let d = Math.hypot(e.x - t.x, e.y - t.y);
                     if (d < minDist) { minDist = d; target = e; }
@@ -290,10 +369,10 @@ const Abyss = {
                 let angle = Math.atan2(target.y - t.y, target.x - t.x);
                 this.projectiles.push({ x: t.x, y: t.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, life: 60 });
                 t.tmr = 0;
-                if (typeof playSnd !== 'undefined') playSnd('sel');
             }
         }
 
+        // 邪眼の弾の当たり判定
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             let p = this.projectiles[i];
             p.x += p.vx * ts; p.y += p.vy * ts; p.life -= ts;
@@ -308,20 +387,61 @@ const Abyss = {
             if (hit || p.life <= 0) this.projectiles.splice(i, 1);
         }
 
+        // --- 遠距離兵の矢（敵の攻撃）の処理 ---
+        for (let i = this.enemyProjectiles.length - 1; i >= 0; i--) {
+            let p = this.enemyProjectiles[i];
+            p.x += p.vx * ts; p.y += p.vy * ts; p.life -= ts;
+            let hit = false;
+
+            // シールドで弾くか
+            let maxRings = Math.min(3, Math.ceil(this.shieldTmr / 180));
+            let shieldRadius = 50 + maxRings * 15; 
+            if (this.shieldTmr > 0 && Math.hypot(p.x - this.core.x, p.y - this.core.y) < shieldRadius) {
+                hit = true;
+                this.vfx.push({ type: 'spark', x: p.x, y: p.y, vx: -p.vx, vy: -p.vy, life: 10, maxLife: 10, color: '#0ff' });
+            } 
+            // コアに当たったか
+            else if (Math.hypot(p.x - this.core.x, p.y - this.core.y) < 25) {
+                hit = true;
+                this.coreHp -= 5;
+                if (typeof screenShake !== 'undefined') screenShake(3);
+                if (typeof playSnd !== 'undefined') playSnd('hit');
+            }
+
+            // 触手で弾き落とせるか（パッシブ防御）
+            if (!hit) {
+                for (let t of this.tentacles) {
+                    for (let seg of t.segments) {
+                        if (Math.hypot(p.x - seg.x, p.y - seg.y) < 15) {
+                            hit = true; this.vfx.push({ type: 'spark', x: p.x, y: p.y, vx: 0, vy: 0, life: 5, maxLife: 5, color: '#fff' });
+                            break;
+                        }
+                    }
+                    if(hit) break;
+                }
+            }
+
+            if (hit || p.life <= 0) this.enemyProjectiles.splice(i, 1);
+        }
+
+        // --- 敵の当たり判定と移動 ---
         for (let e of this.enemies) {
             if (e.hp <= 0) continue;
             let coreAngle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
 
+            // ① 触手の超ノックバック物理攻撃
             if (isMoving && e.hitCd <= 0) {
                 let hit = false;
                 for (let t of this.tentacles) {
                     for (let i = 0; i < t.num; i++) {
                         let seg = t.segments[i];
-                        if (Math.hypot(e.x - seg.x, e.y - seg.y) < (e.type === 'big' ? 20 : 12)) {
-                            e.hp -= (1 * this.lv.tentacle); 
+                        if (Math.hypot(e.x - seg.x, e.y - seg.y) < (e.type === 'boss' ? 25 : 15)) {
+                            e.hp -= (2 * this.lv.tentacle); 
                             e.hitCd = 10; 
-                            e.x -= Math.cos(coreAngle) * 10; e.y -= Math.sin(coreAngle) * 10;
-                            this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: Math.random()*2-1, vy: Math.random()*2-1, life: 10, maxLife: 10, color: '#fff' });
+                            // ★ ノックバック大幅強化（ボスは重い）
+                            let kb = e.type === 'boss' ? 3 : 25;
+                            e.x -= Math.cos(coreAngle) * kb; e.y -= Math.sin(coreAngle) * kb;
+                            this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: Math.random()*4-2, vy: Math.random()*4-2, life: 10, maxLife: 10, color: '#fff' });
                             hit = true; break;
                         }
                     }
@@ -329,25 +449,28 @@ const Abyss = {
                 }
             }
 
+            // ② メテオ
             for (let v of this.vfx) {
                 if (v.type === 'explosion' && v.life > v.maxLife - 2) { 
                     if (Math.hypot(e.x - v.x, e.y - v.y) < v.size) { 
-                        e.hp -= 15 * this.lv.meteor; e.x -= Math.cos(coreAngle) * 15; 
+                        e.hp -= 20 * this.lv.meteor; e.x -= Math.cos(coreAngle) * (e.type==='boss'?5:25); 
                     } 
                 }
             }
 
+            // ③ 眷属
             for (let s of this.swarms) {
                 if (s.life <= 0) continue;
                 let dist = Math.hypot(e.x - s.x, e.y - s.y);
                 if (dist < 15) {
-                    e.hp -= 5; s.life = 0; 
+                    e.hp -= 8; s.life = 0; 
                     this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: 0, vy: -2, life: 10, maxLife: 10, color: '#f00' });
                 } else if (dist < 100) {
-                    s.vx += (e.x - s.x) * 0.03 * ts; s.vy += (e.y - s.y) * 0.03 * ts; 
+                    s.vx += (e.x - s.x) * 0.05 * ts; s.vy += (e.y - s.y) * 0.05 * ts; 
                 }
             }
 
+            // ④ シールド弾き
             let maxRings = Math.min(3, Math.ceil(this.shieldTmr / 180));
             let shieldRadius = 50 + maxRings * 15; 
             let distToCore = Math.hypot(e.x - this.core.x, e.y - this.core.y);
@@ -355,46 +478,53 @@ const Abyss = {
             if (this.shieldTmr > 0 && distToCore < shieldRadius) {
                 e.x = this.core.x - Math.cos(coreAngle) * shieldRadius;
                 e.y = this.core.y - Math.sin(coreAngle) * shieldRadius;
-                e.hp -= 1 * ts; 
+                e.hp -= 2 * ts; 
                 if (Math.random() < 0.2) this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: 0, vy: 0, life: 5, maxLife: 5, color: '#0ff' });
             } 
             else if (distToCore < 30) {
-                this.coreHp -= e.atk; e.hp = 0; 
+                this.coreHp -= e.atk; e.hp -= 50; // ボス以外は特攻自爆
                 if (typeof screenShake !== 'undefined') screenShake(6);
                 if (typeof playSnd !== 'undefined') playSnd('hit');
             }
         }
 
+        // --- 敵の行動と死亡処理 ---
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             let e = this.enemies[i];
             if (e.hp <= 0) {
                 if (this.coreHp > 0) { 
-                    this.score += (e.type === 'big' ? 50 : 10);
-                    this.soul += (e.type === 'big' ? 10 : 2); 
+                    this.score += (e.type === 'boss' ? 100 : 10);
+                    this.soul += (e.type === 'boss' ? 20 : 2); 
                 }
-                this.vfx.push({ type: 'explosion', x: e.x, y: e.y, size: e.type === 'big' ? 40 : 20, life: 10, maxLife: 10 });
+                this.vfx.push({ type: 'explosion', x: e.x, y: e.y, size: e.type === 'boss' ? 60 : 20, life: 10, maxLife: 10 });
                 if (typeof playSnd !== 'undefined') playSnd('hit');
                 this.enemies.splice(i, 1);
             } else {
-                let angle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
-                e.x += Math.cos(angle) * e.speed * ts;
-                e.y += Math.sin(angle) * e.speed * ts;
+                // 遠距離兵の特殊行動（止まって撃つ）
+                if (e.type === 'archer' && Math.hypot(this.core.x - e.x, this.core.y - e.y) < 220) {
+                    if (Math.random() < 0.02 * ts) { // 矢を放つ
+                        let angle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
+                        this.enemyProjectiles.push({x: e.x, y: e.y, vx: Math.cos(angle)*4, vy: Math.sin(angle)*4, life: 120});
+                    }
+                } else {
+                    let angle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
+                    e.x += Math.cos(angle) * e.speed * ts;
+                    e.y += Math.sin(angle) * e.speed * ts;
+                }
                 if (e.hitCd > 0) e.hitCd -= ts;
             }
         }
 
+        // ゲームオーバー判定
         if (this.coreHp <= 0 && this.st === 'play') {
             this.st = 'gameover';
             this.tmr = 0;
-            for(let i=0; i<10; i++) {
-                this.vfx.push({ type: 'explosion', x: this.core.x + (Math.random()-0.5)*50, y: this.core.y + (Math.random()-0.5)*50, size: 50, life: 20+Math.random()*20, maxLife: 40 });
+            this.stopDespairBGM();
+            for(let i=0; i<15; i++) {
+                this.vfx.push({ type: 'explosion', x: this.core.x + (Math.random()-0.5)*80, y: this.core.y + (Math.random()-0.5)*80, size: 60, life: 20+Math.random()*30, maxLife: 50 });
             }
-            if (typeof BGM !== 'undefined') BGM.stop();
             if (typeof playSnd !== 'undefined') playSnd('hit');
-            
-            if (typeof SaveSys !== 'undefined') {
-                SaveSys.addLog('ｱﾋﾞｽ･ｼﾞｪﾈﾗﾙ', `激戦の末、スコア ${this.score} で散った…`);
-            }
+            if (typeof SaveSys !== 'undefined') SaveSys.addLog('ｱﾋﾞｽ･ｼﾞｪﾈﾗﾙ', `魔将陥落… SCORE: ${this.score}`);
         }
 
         this.updateVFX(ts);
@@ -437,15 +567,24 @@ const Abyss = {
         bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
 
+        // 聖なる封印（魔法陣）
+        for (let s of this.holySeals) {
+            ctx.strokeStyle = `rgba(0, 255, 255, ${0.5 + Math.sin(this.tmr*0.2)*0.5})`;
+            ctx.lineWidth = 2; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+            ctx.beginPath(); ctx.arc(s.x, s.y, 25 * (s.life/s.maxLife), 0, Math.PI*2); ctx.stroke();
+            
+            ctx.fillStyle = '#0ff'; ctx.font = '10px monospace';
+            ctx.fillText(`TAP x${s.hp}`, s.x - 18, s.y + 4);
+            ctx.shadowBlur = 0;
+        }
+
+        // 邪眼
         for(let e of this.eyes) {
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill(); 
-            
-            let target = this.enemies[0] || {x: 400, y: 120};
-            let minDist = 999;
+            let target = this.enemies[0] || {x: 400, y: 120}; let minDist = 999;
             for(let en of this.enemies) { let d = Math.hypot(en.x - e.x, en.y - e.y); if(d < minDist) { minDist = d; target = en; } }
             let angle = Math.atan2(target.y - e.y, target.x - e.x);
-            
             ctx.fillStyle = '#a00';
             ctx.beginPath(); ctx.arc(e.x + Math.cos(angle)*4, e.y + Math.sin(angle)*4, 4, 0, Math.PI*2); ctx.fill();
         }
@@ -453,11 +592,27 @@ const Abyss = {
         ctx.fillStyle = '#f00';
         for(let p of this.projectiles) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); }
 
+        ctx.fillStyle = '#0f0'; // 敵の矢（緑）
+        for(let p of this.enemyProjectiles) {
+            ctx.fillRect(p.x-4, p.y-2, 8, 4);
+        }
+
+        // 敵の描画（種類で色分け）
         for (let e of this.enemies) {
-            ctx.fillStyle = e.type === 'big' ? '#88f' : '#ccc';
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.type === 'big' ? 15 : 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#f00'; ctx.fillRect(e.x - 10, e.y - (e.type === 'big'? 22 : 14), 20, 3);
-            ctx.fillStyle = '#0f0'; ctx.fillRect(e.x - 10, e.y - (e.type === 'big'? 22 : 14), 20 * (e.hp/e.maxHp), 3);
+            if (e.type === 'normal') ctx.fillStyle = '#ccc';
+            else if (e.type === 'archer') ctx.fillStyle = '#0a0';
+            else if (e.type === 'jammer') ctx.fillStyle = '#a0a';
+            else if (e.type === 'boss') ctx.fillStyle = '#44f';
+            
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.type === 'boss' ? 20 : 8, 0, Math.PI*2); ctx.fill();
+            
+            // ボスは少し豪華に
+            if (e.type === 'boss') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
+            // ジャマーは妨害オーラ
+            if (e.type === 'jammer') { ctx.strokeStyle = `rgba(255,0,255,${Math.random()})`; ctx.beginPath(); ctx.arc(e.x, e.y, 15, 0, Math.PI*2); ctx.stroke(); }
+
+            ctx.fillStyle = '#f00'; ctx.fillRect(e.x - 10, e.y - (e.type === 'boss'? 28 : 14), 20, 3);
+            ctx.fillStyle = '#0f0'; ctx.fillRect(e.x - 10, e.y - (e.type === 'boss'? 28 : 14), 20 * (e.hp/e.maxHp), 3);
         }
 
         ctx.fillStyle = '#f00';
@@ -543,7 +698,6 @@ const Abyss = {
             
             if (this.tmr % 60 < 30) {
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-                // ★ 文言を「TAP」に変更
                 ctx.fillText('TAP TO START', 140, 200);
             }
         } 
@@ -555,7 +709,6 @@ const Abyss = {
             ctx.fillText(`FINAL SCORE: ${this.score}`, 130, 140);
             if (this.tmr > 60) {
                 ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
-                // ★ 文言を「TAP」に変更
                 ctx.fillText('TAP TO RETURN', 150, 200);
             }
         }
@@ -565,7 +718,10 @@ const Abyss = {
             ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
             ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
 
-            ctx.fillStyle = '#421'; ctx.fillRect(10, 10, 40, 40); 
+            // ジャマー影響時はオルゴールUIを紫に点滅
+            let hasJammer = this.enemies.some(e => e.type === 'jammer');
+            ctx.fillStyle = hasJammer && this.tmr % 10 < 5 ? '#505' : '#421'; 
+            ctx.fillRect(10, 10, 40, 40); 
             ctx.fillStyle = '#210'; ctx.fillRect(15, 15, 30, 30); 
             ctx.fillStyle = this.musicBox < 20 ? '#f00' : '#0a0';
             ctx.fillRect(15, 45, 30, -(this.musicBox / 100) * 30); 
@@ -602,7 +758,6 @@ const Abyss = {
                     ctx.font = '12px monospace';
                     ctx.fillText(items[i].name, 85, y + 17);
                     ctx.fillStyle = canBuy ? '#ff0' : '#888';
-                    
                     let costText = items[i].cost === 'MAX' ? '[MAX]' : `${items[i].cost} 魂`;
                     ctx.fillText(costText, 280, y + 17);
                 }
