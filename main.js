@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 6.0: Musou Infinity Integrated) ===
+// === CORE SYSTEM (Phase 6.1: D-Pad Slide Control Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -145,7 +145,7 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// メニュー管理 (無限無双 を組み込み)
+// メニュー管理
 // ★============================================★
 const Menu = {
   cur: 0, 
@@ -158,7 +158,6 @@ const Menu = {
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
     
     if (keysDown.a) { 
-        // ★ 読み込まれていない場合は null になる安全装置
         const appObjs = [
             typeof Guide !== 'undefined' ? Guide : null, 
             typeof Tetri !== 'undefined' ? Tetri : null, 
@@ -166,7 +165,7 @@ const Menu = {
             typeof Online !== 'undefined' ? Online : null, 
             typeof Rhythm !== 'undefined' ? Rhythm : null, 
             typeof Slot !== 'undefined' ? Slot : null, 
-            typeof Musou !== 'undefined' ? Musou : null, // ★無限無双
+            typeof Musou !== 'undefined' ? Musou : null, 
             typeof Ranking !== 'undefined' ? Ranking : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
@@ -176,13 +175,11 @@ const Menu = {
             switchApp(appObjs[this.cur]); 
         } else {
             playSnd('hit');
-            console.warn("そのゲーム（jsファイル）はまだ読み込まれていません！ index.htmlを確認してください。");
         }
     }
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('6in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v9.0', 60, 40);
-    // 項目が増えたので行間を少し詰めました
     for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 63 + i * 19); }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
@@ -259,9 +256,81 @@ const setBtn = (id, k) => {
   e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('touchcancel', r, {passive: false});
   e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
 };
-['btn-up','btn-down','btn-left','btn-right','btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['up','down','left','right','a','b','select'][i]); });
+
+// 単発ボタン（A, B, SELECTなど）の登録
+['btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
 
+
+// ★====================================================★
+// ★ 提案1: 十字キーの「親指ぐりぐり（スライド）」操作対応 ★
+// ★====================================================★
+const dpad = document.getElementById('dpad');
+let dpadActive = false;
+
+const handleDpad = (ev) => {
+  ev.preventDefault();
+  if (!dpadActive && ev.type !== 'touchstart' && ev.type !== 'mousedown') return;
+  if (ev.type === 'touchstart' || ev.type === 'mousedown') {
+    dpadActive = true;
+    initAudio();
+  }
+  
+  let clientX, clientY;
+  if (ev.touches && ev.touches.length > 0) {
+    clientX = ev.touches[0].clientX;
+    clientY = ev.touches[0].clientY;
+  } else {
+    clientX = ev.clientX;
+    clientY = ev.clientY;
+  }
+  
+  const rect = dpad.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  
+  const dx = clientX - centerX;
+  const dy = clientY - centerY;
+  const dist = Math.hypot(dx, dy);
+  
+  let newKeys = { up: false, down: false, left: false, right: false };
+  
+  // 中心から15px以上指が離れたら方向を判定（デッドゾーン設定）
+  if (dist > 15) {
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    
+    // 8方向の角度判定でスムーズな斜め移動を実現
+    if (angle > -67.5 && angle < 67.5) newKeys.right = true;
+    if (angle > 112.5 || angle < -112.5) newKeys.left = true;
+    if (angle > 22.5 && angle < 157.5) newKeys.down = true;
+    if (angle < -22.5 && angle > -157.5) newKeys.up = true;
+  }
+  
+  // キーの状態が変化した瞬間を捉えるための処理
+  ['up', 'down', 'left', 'right'].forEach(k => {
+    if (newKeys[k] && !keys[k]) keyPressQueue[k] = true;
+    keys[k] = newKeys[k];
+  });
+};
+
+const releaseDpad = (ev) => {
+  ev.preventDefault();
+  dpadActive = false;
+  keys.up = keys.down = keys.left = keys.right = false;
+};
+
+if (dpad) {
+  dpad.addEventListener('touchstart', handleDpad, {passive: false});
+  dpad.addEventListener('touchmove', handleDpad, {passive: false});
+  dpad.addEventListener('touchend', releaseDpad, {passive: false});
+  dpad.addEventListener('touchcancel', releaseDpad, {passive: false});
+  
+  dpad.addEventListener('mousedown', handleDpad);
+  window.addEventListener('mousemove', (ev) => { if (dpadActive) handleDpad(ev); });
+  window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
+}
+
+// キーボード操作（PCでのプレイ用）
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
   if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
@@ -284,7 +353,6 @@ window.addEventListener('keyup', e => {
 // ==========================================
 // iOS Safari 音声強制ブロック解除システム
 // ==========================================
-
 const unlockAudio = () => {
   if (typeof audioCtx !== 'undefined' && audioCtx !== null) {
     if (audioCtx.state === 'suspended') {
