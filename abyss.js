@@ -1,46 +1,67 @@
-// === ABYSS GENERAL (Phase 6: No MP & Chrono Shop) ===
+// === ABYSS GENERAL (Phase 7: Multi-Tentacles & Music Box) ===
 const Abyss = {
     st: 'play',
     tmr: 0,
     core: { x: 40, y: 120 },
-    tentacle: { segments: [], num: 20, len: 14, target: { x: 150, y: 120 } },
+    target: { x: 150, y: 120 },
+    tentacles: [], // ★ 触手を配列化（複数対応！）
     
     prevPointerActive: false,
-    vfx: [], shieldTmr: 0, swarms: [], turrets: [], projectiles: [], enemies: [],
+    winding: false, // オルゴールを巻いているか
+    musicBox: 100,  // オルゴールのゲージ
+    
+    vfx: [], shieldTmr: 0, swarms: [], eyes: [], projectiles: [], enemies: [],
     
     coreHp: 100, coreMaxHp: 100, score: 0, soul: 0,
-    
-    // ★ 強化ステータス
     lv: { tentacle: 1, meteor: 1, swarm: 1 },
     
     init() {
         document.getElementById('gameboy').classList.add('mode-abyss');
         canvas.width = 400; canvas.height = 240;
         
-        this.tentacle.segments = [];
-        for (let i = 0; i < this.tentacle.num; i++) {
-            this.tentacle.segments.push({ x: this.core.x + i * this.tentacle.len, y: this.core.y });
-        }
-        this.tentacle.target = { x: 150, y: 120 };
+        this.tentacles = [];
+        this.addTentacle(); // 初期は1本
+        this.target = { x: 150, y: 120 };
         
-        this.st = 'play'; this.tmr = 0; this.vfx = []; this.shieldTmr = 0; this.swarms = [];
-        this.turrets = []; this.projectiles = []; this.enemies = []; 
+        this.st = 'play'; this.tmr = 0; 
+        this.vfx = []; this.shieldTmr = 0; this.swarms = [];
+        this.eyes = []; this.projectiles = []; this.enemies = []; 
         this.coreHp = 100; this.coreMaxHp = 100; this.score = 0; this.soul = 0;
         this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
+        this.musicBox = 100; this.winding = false;
+        
         if (typeof playSnd !== 'undefined') playSnd('combo');
     },
     
-    updateIK() {
-        let segs = this.tentacle.segments; let len = this.tentacle.len;
-        segs[segs.length - 1].x = this.tentacle.target.x; segs[segs.length - 1].y = this.tentacle.target.y;
-        for (let i = segs.length - 2; i >= 0; i--) {
-            let dx = segs[i].x - segs[i+1].x; let dy = segs[i].y - segs[i+1].y; let dist = Math.hypot(dx, dy) || 1;
-            segs[i].x = segs[i+1].x + (dx / dist) * len; segs[i].y = segs[i+1].y + (dy / dist) * len;
+    // ★ 触手を追加する関数
+    addTentacle() {
+        let idx = this.tentacles.length;
+        // 本数が増えると生える位置（根元）が少しズレる
+        let offsets = [{x:0, y:0}, {x:0, y:-20}, {x:0, y:20}, {x:-20, y:-10}, {x:-20, y:10}];
+        let o = offsets[idx % 5];
+        let segs = [];
+        for (let i = 0; i < 20; i++) {
+            segs.push({ x: this.core.x + o.x, y: this.core.y + o.y });
         }
-        segs[0].x = this.core.x; segs[0].y = this.core.y;
-        for (let i = 1; i < segs.length; i++) {
-            let dx = segs[i].x - segs[i-1].x; let dy = segs[i].y - segs[i-1].y; let dist = Math.hypot(dx, dy) || 1;
-            segs[i].x = segs[i-1].x + (dx / dist) * len; segs[i].y = segs[i-1].y + (dy / dist) * len;
+        this.tentacles.push({ root: o, segments: segs, num: 20, len: 14 });
+    },
+    
+    updateIK() {
+        for (let t of this.tentacles) {
+            let segs = t.segments; let len = t.len;
+            // ターゲット位置も本数によって少しバラけさせる
+            segs[segs.length - 1].x = this.target.x + t.root.x * 0.5; 
+            segs[segs.length - 1].y = this.target.y + t.root.y * 0.5;
+            
+            for (let i = segs.length - 2; i >= 0; i--) {
+                let dx = segs[i].x - segs[i+1].x; let dy = segs[i].y - segs[i+1].y; let dist = Math.hypot(dx, dy) || 1;
+                segs[i].x = segs[i+1].x + (dx / dist) * len; segs[i].y = segs[i+1].y + (dy / dist) * len;
+            }
+            segs[0].x = this.core.x + t.root.x; segs[0].y = this.core.y + t.root.y;
+            for (let i = 1; i < segs.length; i++) {
+                let dx = segs[i].x - segs[i-1].x; let dy = segs[i].y - segs[i-1].y; let dist = Math.hypot(dx, dy) || 1;
+                segs[i].x = segs[i-1].x + (dx / dist) * len; segs[i].y = segs[i-1].y + (dy / dist) * len;
+            }
         }
     },
     
@@ -63,10 +84,9 @@ const Abyss = {
     },
     
     spawnMagic(type, cx, cy) {
-        // ★ MP制限を完全撤廃！魔王の力で無限に撃ちまくれる！
         if (type === 'O') {
             this.shieldTmr = 180; 
-            this.vfx.push({ type: 'text', text: 'SHIELD!', x: this.core.x, y: this.core.y - 50, life: 60, color: '#0ff' });
+            this.vfx.push({ type: 'text', text: 'SHIELD!', x: this.core.x, y: this.core.y - 60, life: 60, color: '#0ff' });
             if (typeof playSnd !== 'undefined') playSnd('sel');
         } else if (type === '|') { 
             this.vfx.push({ type: 'text', text: 'METEOR!', x: cx - 30, y: cy - 30, life: 60, color: '#fa0' });
@@ -75,7 +95,7 @@ const Abyss = {
         } else if (type === '-') {
             this.vfx.push({ type: 'text', text: 'SWARM!', x: cx - 20, y: cy - 30, life: 60, color: '#f0f' });
             for(let i=0; i<15; i++) {
-                this.swarms.push({ x: cx + (Math.random()-0.5)*40, y: cy + (Math.random()-0.5)*40, vx: Math.random()*4+1, vy: (Math.random()-0.5)*4, life: 180 * this.lv.swarm });
+                this.swarms.push({ x: cx + (Math.random()-0.5)*40, y: cy + (Math.random()-0.5)*40, vx: Math.random()*4+1, vy: (Math.random()-0.5)*4, life: 180 });
             }
             if (typeof playSnd !== 'undefined') playSnd('sel');
         }
@@ -89,52 +109,51 @@ const Abyss = {
             return;
         }
         
-        // ★ ショップ画面中は時間の進みが「0.2倍（スローモーション）」になる！
         let ts = (this.st === 'shop') ? 0.2 : 1.0;
-        
         this.tmr += ts;
         if (this.shieldTmr > 0) this.shieldTmr -= ts;
         
-        // --- 1. 左手(十字キー)で触手を操作（スロー中でも動かせる！） ---
+        // --- 1. 左手(十字キー)で触手のターゲットを操作 ---
         let speed = 12;
         let isMoving = false;
         if (typeof keys !== 'undefined') {
-            if (keys.left) { this.tentacle.target.x -= speed; isMoving = true; }
-            if (keys.right) { this.tentacle.target.x += speed; isMoving = true; }
-            if (keys.up) { this.tentacle.target.y -= speed; isMoving = true; }
-            if (keys.down) { this.tentacle.target.y += speed; isMoving = true; }
+            if (keys.left) { this.target.x -= speed; isMoving = true; }
+            if (keys.right) { this.target.x += speed; isMoving = true; }
+            if (keys.up) { this.target.y -= speed; isMoving = true; }
+            if (keys.down) { this.target.y += speed; isMoving = true; }
         }
-        this.tentacle.target.x = Math.max(0, Math.min(400, this.tentacle.target.x));
-        this.tentacle.target.y = Math.max(0, Math.min(240, this.tentacle.target.y));
+        this.target.x = Math.max(0, Math.min(340, this.target.x)); 
+        this.target.y = Math.max(0, Math.min(240, this.target.y));
         
-        let maxDist = this.tentacle.num * this.tentacle.len;
-        let dx = this.tentacle.target.x - this.core.x;
-        let dy = this.tentacle.target.y - this.core.y;
+        let maxDist = 20 * 14; // 触手の最大長
+        let dx = this.target.x - this.core.x;
+        let dy = this.target.y - this.core.y;
         let d = Math.hypot(dx, dy);
         if (d > maxDist) {
-            this.tentacle.target.x = this.core.x + (dx / d) * maxDist;
-            this.tentacle.target.y = this.core.y + (dy / d) * maxDist;
+            this.target.x = this.core.x + (dx / d) * maxDist;
+            this.target.y = this.core.y + (dy / d) * maxDist;
         }
         for (let i = 0; i < 3; i++) this.updateIK();
 
-        // --- 2. 右手(スワイプ)とUIタップ判定 ---
+        // --- 2. 右手とUI、★オルゴールの判定 ---
         if (typeof pointer !== 'undefined') {
             if (pointer.active && !this.prevPointerActive) {
                 let px = pointer.x, py = pointer.y;
                 
-                if (this.st === 'play') {
-                    // プレイ中：右下の「SHOPボタン」タップ判定
-                    if (px > 340 && py > 190) {
-                        this.st = 'shop'; // ショップ（スローモーション）画面へ移行！
-                        pointer.path = [];
-                        if(typeof playSnd !== 'undefined') playSnd('combo');
-                    }
-                } else if (this.st === 'shop') {
-                    // ショップ中：強化メニューのボタン判定
+                // ★ オルゴール巻き上げ判定（左上の箱をタップ）
+                if (px < 60 && py < 60) {
+                    this.winding = true;
+                    pointer.path = [];
+                } 
+                else if (this.st === 'play' && px > 340 && py > 190) {
+                    this.st = 'shop'; pointer.path = [];
+                    if(typeof playSnd !== 'undefined') playSnd('combo');
+                } 
+                else if (this.st === 'shop') {
                     if (px > 60 && px < 340 && py > 40 && py < 200) {
                         let btnY = Math.floor((py - 50) / 30);
                         if (btnY === 0 && this.soul >= 30) {
-                            this.soul -= 30; this.turrets.push({ x: this.core.x + 30 + Math.random()*20, y: this.core.y - 60 + Math.random()*120, tmr: 0 });
+                            this.soul -= 30; this.eyes.push({ x: this.core.x + 30 + Math.random()*20, y: this.core.y - 80 + Math.random()*160, tmr: 0 });
                             if(typeof playSnd !== 'undefined') playSnd('combo');
                         } else if (btnY === 1 && this.soul >= 40) {
                             this.soul -= 40; this.coreMaxHp += 20; this.coreHp = Math.min(this.coreMaxHp, this.coreHp + 50);
@@ -142,22 +161,27 @@ const Abyss = {
                         } else if (btnY === 2 && this.soul >= 50) {
                             this.soul -= 50; this.lv.tentacle += 0.5;
                             if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 3 && this.soul >= 50) {
-                            this.soul -= 50; this.lv.meteor += 0.5;
+                        } else if (btnY === 3 && this.soul >= 80) { // ★ 触手分裂
+                            this.soul -= 80; this.addTentacle();
                             if(typeof playSnd !== 'undefined') playSnd('combo');
                         } else if (btnY === 4 && this.soul >= 50) {
-                            this.soul -= 50; this.lv.swarm += 0.5;
+                            this.soul -= 50; this.lv.meteor += 0.5;
                             if(typeof playSnd !== 'undefined') playSnd('combo');
                         }
                     }
-                    // CLOSEボタン判定
                     if (px > 150 && px < 250 && py > 200 && py < 230) {
                         this.st = 'play'; pointer.path = [];
                         if(typeof playSnd !== 'undefined') playSnd('sel');
                     }
-                    pointer.path = []; // ショップ中はジェスチャー禁止
+                    pointer.path = []; 
                 }
-            } else if (!pointer.active && this.prevPointerActive && this.st === 'play') {
+            }
+            
+            if (!pointer.active) {
+                this.winding = false; // 指を離したら巻き上げ終了
+            }
+            
+            if (!this.winding && !pointer.active && this.prevPointerActive && this.st === 'play') {
                 if (pointer.path.length > 0) {
                     let g = this.recognizeGesture(pointer.path);
                     if (g) {
@@ -171,7 +195,22 @@ const Abyss = {
             this.prevPointerActive = pointer.active;
         }
 
-        // --- 3. 敵の生成と行動（ts を掛けてスローにする） ---
+        // ★ オルゴールの処理
+        if (this.winding) {
+            this.musicBox = Math.min(100, this.musicBox + 0.6); // 高速回復
+            if (this.tmr % 5 < 1 && typeof playSnd !== 'undefined') playSnd('sel'); // カチカチ音
+        } else {
+            this.musicBox -= 0.05 * ts; // 常に減り続ける（スロー中は減りも遅い）
+        }
+        
+        // オルゴール切れ（即死）
+        if (this.musicBox <= 0 && this.coreHp > 0) {
+            this.coreHp = 0;
+            this.vfx.push({ type: 'text', text: 'MIND CRUSHED...', x: 130, y: 120, life: 180, color: '#f00' });
+            if (typeof screenShake !== 'undefined') screenShake(20);
+        }
+
+        // --- 3. 敵の生成 ---
         let diff = 1 + (this.tmr / 1800);
         if (Math.random() < (0.02 * diff * ts)) {
             let isBig = Math.random() < 0.15;
@@ -183,7 +222,8 @@ const Abyss = {
             });
         }
 
-        for (let t of this.turrets) {
+        // --- 4. 邪眼（タレット）の射撃処理 ---
+        for (let t of this.eyes) {
             t.tmr += ts;
             if (t.tmr > 60 && this.enemies.length > 0) {
                 let target = this.enemies[0];
@@ -205,41 +245,47 @@ const Abyss = {
             let hit = false;
             for (let e of this.enemies) {
                 if (e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 15) {
-                    e.hp -= 2; 
-                    this.vfx.push({ type: 'spark', x: p.x, y: p.y, vx: 0, vy: 0, life: 10, maxLife: 10, color: '#0f0' });
+                    e.hp -= 3; 
+                    this.vfx.push({ type: 'spark', x: p.x, y: p.y, vx: Math.random()*2-1, vy: Math.random()*2-1, life: 10, maxLife: 10, color: '#f00' });
                     hit = true; break;
                 }
             }
             if (hit || p.life <= 0) this.projectiles.splice(i, 1);
         }
 
-        // 当たり判定
+        // --- 5. 敵の当たり判定と移動 ---
         for (let e of this.enemies) {
             if (e.hp <= 0) continue;
             let coreAngle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
 
+            // ① 触手（複数）の判定
             if (isMoving && e.hitCd <= 0) {
-                for (let i = 0; i < this.tentacle.num; i++) {
-                    let seg = this.tentacle.segments[i];
-                    if (Math.hypot(e.x - seg.x, e.y - seg.y) < (e.type === 'big' ? 20 : 12)) {
-                        e.hp -= (1 * this.lv.tentacle); // 触手レベルで火力UP
-                        e.hitCd = 10; 
-                        e.x -= Math.cos(coreAngle) * 8; e.y -= Math.sin(coreAngle) * 8;
-                        this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: Math.random()*2-1, vy: Math.random()*2-1, life: 10, maxLife: 10, color: '#fff' });
-                        break;
+                let hit = false;
+                for (let t of this.tentacles) {
+                    for (let i = 0; i < t.num; i++) {
+                        let seg = t.segments[i];
+                        if (Math.hypot(e.x - seg.x, e.y - seg.y) < (e.type === 'big' ? 20 : 12)) {
+                            e.hp -= (1 * this.lv.tentacle); 
+                            e.hitCd = 10; 
+                            e.x -= Math.cos(coreAngle) * 10; e.y -= Math.sin(coreAngle) * 10;
+                            this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: Math.random()*2-1, vy: Math.random()*2-1, life: 10, maxLife: 10, color: '#fff' });
+                            hit = true; break;
+                        }
                     }
+                    if (hit) break; // 1フレームにつき1回のみヒット
                 }
             }
 
+            // ② メテオの爆発判定
             for (let v of this.vfx) {
                 if (v.type === 'explosion' && v.life > v.maxLife - 2) { 
                     if (Math.hypot(e.x - v.x, e.y - v.y) < v.size) { 
-                        e.hp -= 15 * this.lv.meteor; // メテオレベルで火力UP
-                        e.x -= Math.cos(coreAngle) * 15; 
+                        e.hp -= 15 * this.lv.meteor; e.x -= Math.cos(coreAngle) * 15; 
                     } 
                 }
             }
 
+            // ③ 眷属の突撃
             for (let s of this.swarms) {
                 if (s.life <= 0) continue;
                 let dist = Math.hypot(e.x - s.x, e.y - s.y);
@@ -251,22 +297,30 @@ const Abyss = {
                 }
             }
 
-            if (Math.hypot(e.x - this.core.x, e.y - this.core.y) < 30) {
-                if (this.shieldTmr > 0) {
-                    e.x += 15; e.hp -= 10; 
-                } else {
-                    this.coreHp -= e.atk; e.hp = 0; 
-                    if (typeof screenShake !== 'undefined') screenShake(6);
-                    if (typeof playSnd !== 'undefined') playSnd('hit');
-                }
+            // ④ シールドの【完全弾き】判定！
+            let distToCore = Math.hypot(e.x - this.core.x, e.y - this.core.y);
+            if (this.shieldTmr > 0 && distToCore < 65) {
+                // シールド内に侵入しようとしたら、完全に外側に押し戻す！
+                e.x = this.core.x - Math.cos(coreAngle) * 65;
+                e.y = this.core.y - Math.sin(coreAngle) * 65;
+                e.hp -= 1 * ts; // ガリガリ削るダメージ
+                if (Math.random() < 0.2) this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: 0, vy: 0, life: 5, maxLife: 5, color: '#0ff' });
+            } 
+            // ⑤ コアへの到達（ダメージ）
+            else if (distToCore < 30) {
+                this.coreHp -= e.atk; e.hp = 0; 
+                if (typeof screenShake !== 'undefined') screenShake(6);
+                if (typeof playSnd !== 'undefined') playSnd('hit');
             }
         }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             let e = this.enemies[i];
             if (e.hp <= 0) {
-                this.score += (e.type === 'big' ? 50 : 10);
-                this.soul += (e.type === 'big' ? 10 : 2); 
+                if (this.coreHp > 0) { // 死んでない時だけスコア加算
+                    this.score += (e.type === 'big' ? 50 : 10);
+                    this.soul += (e.type === 'big' ? 10 : 2); 
+                }
                 this.vfx.push({ type: 'explosion', x: e.x, y: e.y, size: e.type === 'big' ? 40 : 20, life: 10, maxLife: 10 });
                 if (typeof playSnd !== 'undefined') playSnd('hit');
                 this.enemies.splice(i, 1);
@@ -278,13 +332,16 @@ const Abyss = {
             }
         }
 
-        if (this.coreHp <= 0) {
-            this.vfx.push({ type: 'text', text: `GAME OVER... SCORE:${this.score}`, x: 100, y: 120, life: 180, color: '#f00' });
-            this.enemies = []; this.turrets = []; this.coreHp = 100; this.score = 0; this.soul = 0; this.tmr = 0; 
+        if (this.coreHp <= 0 && this.enemies.length === 0) {
+            // リトライ処理
+            this.enemies = []; this.eyes = []; this.coreHp = 100; this.score = 0; this.soul = 0; this.tmr = 0; 
             this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
+            this.tentacles = []; this.addTentacle();
+            this.musicBox = 100; this.winding = false;
             this.st = 'play';
         }
 
+        // VFXの更新
         for (let i = this.vfx.length - 1; i >= 0; i--) {
             let v = this.vfx[i];
             v.life -= ts;
@@ -321,12 +378,22 @@ const Abyss = {
         bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
 
-        ctx.fillStyle = '#0a0';
-        for(let t of this.turrets) {
-            ctx.fillRect(t.x-8, t.y-8, 16, 16);
-            ctx.fillStyle = '#000'; ctx.fillRect(t.x-4, t.y-4, 8, 8); ctx.fillStyle = '#0a0';
+        // ★ 邪眼（タレット）の描画
+        for(let e of this.eyes) {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill(); // 白目
+            
+            // 瞳孔が一番近い敵をギョロっと見る
+            let target = this.enemies[0] || {x: 400, y: 120};
+            let minDist = 999;
+            for(let en of this.enemies) { let d = Math.hypot(en.x - e.x, en.y - e.y); if(d < minDist) { minDist = d; target = en; } }
+            let angle = Math.atan2(target.y - e.y, target.x - e.x);
+            
+            ctx.fillStyle = '#a00';
+            ctx.beginPath(); ctx.arc(e.x + Math.cos(angle)*4, e.y + Math.sin(angle)*4, 4, 0, Math.PI*2); ctx.fill(); // 赤い瞳
         }
-        ctx.fillStyle = '#0f0';
+        
+        ctx.fillStyle = '#f00';
         for(let p of this.projectiles) { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill(); }
 
         for (let e of this.enemies) {
@@ -339,29 +406,32 @@ const Abyss = {
         ctx.fillStyle = '#f00';
         for(let s of this.swarms) { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI*2); ctx.fill(); }
 
-        let segs = this.tentacle.segments;
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y);
-        for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y);
-        ctx.strokeStyle = '#000'; ctx.lineWidth = 20; ctx.stroke();
-        
-        ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y);
-        for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y);
-        ctx.strokeStyle = '#d0f'; ctx.lineWidth = 6; ctx.shadowBlur = 15; ctx.shadowColor = '#d0f'; ctx.stroke(); ctx.shadowBlur = 0;
-        
-        let tip = segs[segs.length - 1]; let preTip = segs[segs.length - 2];
-        let angle = Math.atan2(tip.y - preTip.y, tip.x - preTip.x);
-        ctx.fillStyle = '#fff'; ctx.beginPath();
-        ctx.moveTo(tip.x + Math.cos(angle - Math.PI/2)*8, tip.y + Math.sin(angle - Math.PI/2)*8);
-        ctx.lineTo(tip.x + Math.cos(angle)*25, tip.y + Math.sin(angle)*25);
-        ctx.lineTo(tip.x + Math.cos(angle + Math.PI/2)*8, tip.y + Math.sin(angle + Math.PI/2)*8);
-        ctx.fill();
+        // ★ 複数触手の描画
+        for (let t of this.tentacles) {
+            let segs = t.segments;
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y);
+            for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y);
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 20; ctx.stroke();
+            
+            ctx.beginPath(); ctx.moveTo(segs[0].x, segs[0].y);
+            for (let i = 1; i < segs.length; i++) ctx.lineTo(segs[i].x, segs[i].y);
+            ctx.strokeStyle = '#d0f'; ctx.lineWidth = 6; ctx.shadowBlur = 15; ctx.shadowColor = '#d0f'; ctx.stroke(); ctx.shadowBlur = 0;
+            
+            let tip = segs[segs.length - 1]; let preTip = segs[segs.length - 2];
+            let angle = Math.atan2(tip.y - preTip.y, tip.x - preTip.x);
+            ctx.fillStyle = '#fff'; ctx.beginPath();
+            ctx.moveTo(tip.x + Math.cos(angle - Math.PI/2)*8, tip.y + Math.sin(angle - Math.PI/2)*8);
+            ctx.lineTo(tip.x + Math.cos(angle)*25, tip.y + Math.sin(angle)*25);
+            ctx.lineTo(tip.x + Math.cos(angle + Math.PI/2)*8, tip.y + Math.sin(angle + Math.PI/2)*8);
+            ctx.fill();
+        }
 
         if (this.shieldTmr > 0) {
             ctx.strokeStyle = `rgba(0, 255, 255, ${this.shieldTmr / 180})`;
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
-            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 60, this.tmr*0.1, this.tmr*0.1 + Math.PI*1.5); ctx.stroke();
-            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 75, -this.tmr*0.05, -this.tmr*0.05 + Math.PI*1.5); ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 65, this.tmr*0.1, this.tmr*0.1 + Math.PI*1.5); ctx.stroke();
+            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 80, -this.tmr*0.05, -this.tmr*0.05 + Math.PI*1.5); ctx.stroke();
             ctx.shadowBlur = 0;
         }
 
@@ -390,7 +460,7 @@ const Abyss = {
             }
         }
 
-        if (this.st === 'play' && typeof pointer !== 'undefined' && pointer.active && pointer.path.length > 0) {
+        if (!this.winding && this.st === 'play' && typeof pointer !== 'undefined' && pointer.active && pointer.path.length > 0) {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
             ctx.lineJoin = 'round'; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(pointer.path[0].x, pointer.path[0].y);
@@ -398,10 +468,22 @@ const Abyss = {
             ctx.stroke(); ctx.shadowBlur = 0;
         }
 
+        // --- ステータスUI ---
         ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
-        ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 10, 20);
-        ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 120, 20);
-        ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 200, 20);
+        ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 70, 20);
+        ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
+        ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
+
+        // ★ 魔界のオルゴール (FNAF Box) UI描画
+        ctx.fillStyle = '#421'; ctx.fillRect(10, 10, 40, 40); // 箱
+        ctx.fillStyle = '#210'; ctx.fillRect(15, 15, 30, 30); // 穴
+        ctx.fillStyle = this.musicBox < 20 ? '#f00' : '#0a0';
+        ctx.fillRect(15, 45, 30, -(this.musicBox / 100) * 30); // ゲージ（下から上に伸びる）
+        ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('WIND!', 18, 55);
+        if (this.winding) {
+            ctx.fillStyle = '#ff0'; ctx.font = '12px monospace';
+            ctx.fillText('♪', 25 + Math.random()*5, 10 + Math.random()*5);
+        }
 
         // --- SHOP(スロー)画面の描画 ---
         if (this.st === 'shop') {
@@ -411,11 +493,11 @@ const Abyss = {
             ctx.fillText('-- CHRONO UPGRADE --', 110, 30);
             
             let items = [
-                { name: 'タレット設置', cost: 30, desc: '自動迎撃砲台を置く' },
+                { name: '邪眼召喚', cost: 30, desc: '血を吐く目玉を置く' },
                 { name: 'コア修復＆HP↑', cost: 40, desc: 'HP回復＆最大値UP' },
                 { name: '触手火力UP', cost: 50, desc: '触手のダメージ増加' },
-                { name: 'メテオ巨大化', cost: 50, desc: '爆発の範囲と威力UP' },
-                { name: '眷属寿命UP', cost: 50, desc: 'コウモリの生存時間UP' }
+                { name: '触手分裂', cost: 80, desc: '★触手の本数が増加' },
+                { name: 'メテオ巨大化', cost: 50, desc: '爆発の範囲と威力UP' }
             ];
             
             for (let i = 0; i < items.length; i++) {
@@ -435,11 +517,7 @@ const Abyss = {
             ctx.fillStyle = '#a00'; ctx.fillRect(150, 200, 100, 30);
             ctx.fillStyle = '#fff'; ctx.fillText('CLOSE', 180, 220);
             
-            ctx.fillStyle = '#f55'; ctx.font = 'bold 14px monospace';
-            ctx.fillText('⚠ 敵が ゆっくり迫っているぞ！ ⚠', 60, 100 + Math.sin(this.tmr)*10);
-            
         } else {
-            // プレイ中の右下SHOPボタン
             ctx.fillStyle = '#00a'; ctx.fillRect(340, 190, 60, 50);
             ctx.strokeStyle = '#0ff'; ctx.strokeRect(340, 190, 60, 50);
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
