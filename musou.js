@@ -1,4 +1,4 @@
-// === MUSOU INFINITY (Phase 2: DADA-SURVIVOR EDITION - Part 1) ===
+// === MUSOU INFINITY (Phase 2.1: CRASH FIX EDITION - Part 1) ===
 
 const Musou = {
     st: 'title', // title, shop, play, levelup, over
@@ -157,7 +157,6 @@ const Musou = {
     },
 
     dropItem(x, y, expVal) {
-        // 5%の確率でコイン、それ以外は経験値ジェム
         if (Math.random() < 0.05) {
             this.items.push({ type: 'coin', x, y, val: 1, vx: 0, vy: 0, state: 'idle' });
         } else {
@@ -188,7 +187,10 @@ const Musou = {
         }
     },
 
+    // ★ 修正箇所：二重キル防止の安全装置を追加
     damageEnemy(e, dmg) {
+        if (e.hp <= 0) return; 
+
         let isCrit = Math.random() < 0.1;
         let finalDmg = isCrit ? dmg * 3 : dmg;
         e.hp -= finalDmg;
@@ -213,7 +215,6 @@ const Musou = {
         this.choices = [];
         let pool = Object.keys(this.skills).filter(k => this.skills[k].lv < this.skillDefs[k].maxLv);
         
-        // シャッフルして最大3つ選ぶ
         for (let i = pool.length - 1; i > 0; i--) {
             let j = Math.floor(Math.random() * (i + 1));
             [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -231,7 +232,6 @@ const Musou = {
             this.menuCur = 0;
             if (typeof playSnd !== 'undefined') playSnd('combo');
         } else {
-            // カンスト時は全回復＋コイン付与
             this.p.hp = this.p.maxHp;
             this.saveData.coins += 50;
             this.addText(this.p.x, this.p.y - 30, "ALL MAX! +50G", "#ff0", 60);
@@ -657,31 +657,32 @@ const Musou = {
         for (let e of this.enemies) {
             ctx.fillStyle = e.color;
             ctx.beginPath();
-            ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+            ctx.arc(e.x, e.y, Math.max(0.1, e.size), 0, Math.PI * 2);
             ctx.fill();
         }
 
         // VFX描画
         ctx.globalCompositeOperation = 'lighter';
         for (let v of this.vfx) {
-            let ratio = v.life / v.maxLife;
+            let ratio = Math.max(0, v.life / v.maxLife); 
             ctx.globalAlpha = ratio;
             if (v.type === 'slash') {
                 ctx.strokeStyle = v.color; ctx.lineWidth = 3 * ratio;
-                ctx.beginPath(); ctx.arc(v.x, v.y, v.size, v.angle - 1, v.angle + 1); ctx.stroke();
+                ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size), v.angle - 1, v.angle + 1); ctx.stroke();
             } else if (v.type === 'explosion') {
                 ctx.fillStyle = v.color;
-                ctx.beginPath(); ctx.arc(v.x, v.y, v.size * (1 - ratio), 0, Math.PI * 2); ctx.fill();
+                // ★ クラッシュ原因だったマイナス値をMath.maxで完全ブロック！
+                ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size * (1 - ratio)), 0, Math.PI * 2); ctx.fill();
             } else if (v.type === 'particle' || v.type === 'hit') {
                 ctx.fillStyle = v.color;
-                ctx.beginPath(); ctx.arc(v.x, v.y, v.size * ratio, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size * ratio), 0, Math.PI * 2); ctx.fill();
             } else if (v.type === 'ring') {
                 ctx.strokeStyle = v.color; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(v.x, v.y, v.size * (1 - ratio), 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size * (1 - ratio)), 0, Math.PI * 2); ctx.stroke();
             } else if (v.type === 'beam') {
                 ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle);
-                ctx.fillStyle = v.color; ctx.fillRect(0, -v.size/2 * ratio, 400, v.size * ratio);
-                ctx.fillStyle = '#fff'; ctx.fillRect(0, -v.size/4 * ratio, 400, v.size/2 * ratio);
+                ctx.fillStyle = v.color; ctx.fillRect(0, -Math.max(0.1, v.size/2 * ratio), 400, Math.max(0.1, v.size * ratio));
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, -Math.max(0.1, v.size/4 * ratio), 400, Math.max(0.1, v.size/2 * ratio));
                 ctx.restore();
             } else if (v.type === 'levelUp') {
                 ctx.fillStyle = v.color;
@@ -703,7 +704,7 @@ const Musou = {
         for (let t of this.texts) {
             ctx.fillStyle = t.color;
             ctx.font = 'bold 10px monospace';
-            ctx.globalAlpha = t.life / t.maxLife;
+            ctx.globalAlpha = Math.max(0, t.life / t.maxLife);
             ctx.fillText(t.text, t.x - 10, t.y);
         }
         ctx.globalAlpha = 1;
@@ -718,9 +719,9 @@ const Musou = {
         ctx.fillStyle = '#ff0'; ctx.fillText(`KILLS: ${this.formatNum(this.kills)}`, 110, 10);
         
         ctx.fillStyle = '#400'; ctx.fillRect(5, 15, 80, 5);
-        ctx.fillStyle = '#f00'; ctx.fillRect(5, 15, (Math.max(0, this.p.hp) / this.p.maxHp) * 80, 5);
+        ctx.fillStyle = '#f00'; ctx.fillRect(5, 15, Math.min(80, Math.max(0, (this.p.hp / this.p.maxHp) * 80)), 5);
         ctx.fillStyle = '#040'; ctx.fillRect(110, 15, 80, 5);
-        ctx.fillStyle = '#0f0'; ctx.fillRect(110, 15, (this.exp / this.maxExp) * 80, 5);
+        ctx.fillStyle = '#0f0'; ctx.fillRect(110, 15, Math.min(80, Math.max(0, (this.exp / this.maxExp) * 80)), 5);
 
         // レベルアップ画面 (3択)
         if (this.st === 'levelup') {
