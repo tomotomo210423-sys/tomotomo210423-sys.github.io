@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 6.2: D-Pad Visual Sync Edition) ===
+// === CORE SYSTEM (Phase 7: Multi-Touch & 7in1 Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -7,6 +7,9 @@ const keysDown = { ...keys };
 let prevKeys = { ...keys };
 const keyPressQueue = { ...keys };
 let activeApp = null;
+
+// ★ 右手のタッチ（スワイプ）軌跡を保存するオブジェクト
+const pointer = { x: 0, y: 0, active: false, path: [] };
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx, noiseBuffer = null, bgmInterval = null;
@@ -78,45 +81,25 @@ const SaveSys = {
   }
 };
 
-// ★============================================★
-const GEMINI_API_KEY = [
-  "AIza",
-  "SyDa7Ku8RWSO",
-  "OGDXKCQTdw",
-  "AObBHi6A8GcKA"
-].join("");
-// ★============================================★
+const GEMINI_API_KEY = ["AIza","SyDa7Ku8RWSO","OGDXKCQTdw","AObBHi6A8GcKA"].join("");
 
 const AISys = {
   status: 'ready',
   async chat(sysPrompt, userPrompt) {
     const key = GEMINI_API_KEY.trim();
-    if (key.includes("ここに") || key.length < 30) {
-      return "わしの 頭脳（APIキー）が まだ 設定されておらぬようじゃ！ main.js を確認せい！";
-    }
+    if (key.includes("ここに") || key.length < 30) return "わしの 頭脳（APIキー）が まだ 設定されておらぬようじゃ！ main.js を確認せい！";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-    const payload = {
-      contents: [{ parts: [{ text: userPrompt }] }],
-      systemInstruction: { parts: [{ text: sysPrompt }] },
-      generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
-    };
+    const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: sysPrompt }] }, generationConfig: { temperature: 0.7, maxOutputTokens: 100 } };
     try {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) {
-        const errorDetail = await response.json(); const errMsg = errorDetail.error?.message || "";
-        if (response.status === 429) {
-          const match = errMsg.match(/retry in ([\d\.]+)s/); let waitSec = 60; 
-          if (match && match[1]) waitSec = Math.ceil(parseFloat(match[1])); 
-          return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！\nすまぬが【あと ${waitSec}秒 】ほど休ませてから 話しかけてくれい！`;
-        }
-        return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！ 電波の良いところで 頼むぞ！`;
+        if (response.status === 429) return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！`;
+        return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！`;
       }
       const data = await response.json();
-      if (!data.candidates || data.candidates.length === 0) return "かみさまが 沈黙しておる…… もういちど 話しかけてみてくれい。";
+      if (!data.candidates || data.candidates.length === 0) return "かみさまが 沈黙しておる……";
       return data.candidates[0].content.parts[0].text.trim();
-    } catch (e) {
-      return `むむっ… 世界の繋がり（ネットワーク）が 切れておるようじゃ！`;
-    }
+    } catch (e) { return `むむっ… 世界の繋がり（ネットワーク）が 切れておるようじゃ！`; }
   }
 };
 
@@ -142,14 +125,14 @@ const drawSprite = (x, y, c, d, s = 2.5) => {
 };
 
 let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
-function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<10; x++) { if ((x + y) < (20 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
+function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// メニュー管理
+// メニュー管理 (7in1 に変更！)
 // ★============================================★
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'ローカルランキング', '設定', '王様の間'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', 'ローカルランキング', '設定', '王様の間'], 
   holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
   update() {
@@ -166,6 +149,7 @@ const Menu = {
             typeof Rhythm !== 'undefined' ? Rhythm : null, 
             typeof Slot !== 'undefined' ? Slot : null, 
             typeof Musou !== 'undefined' ? Musou : null, 
+            typeof Abyss !== 'undefined' ? Abyss : null, // ★追加
             typeof Ranking !== 'undefined' ? Ranking : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
@@ -174,8 +158,17 @@ const Menu = {
     }
   },
   draw() {
-    bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('6in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v9.0', 60, 40);
-    for (let i = 0; i < this.apps.length; i++) { ctx.fillStyle = i === this.cur ? '#0f0' : '#aaa'; ctx.font = '11px monospace'; ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, 63 + i * 19); }
+    bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
+    ctx.fillText('7in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v10.0', 60, 40);
+    
+    // スクロール対応の描画（項目が増えたため）
+    let startY = 63;
+    let drawStart = Math.max(0, this.cur - 8);
+    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
+        ctx.fillStyle = i === this.cur ? '#0f0' : (i === 7 ? '#f00' : '#aaa'); // アビスジェネラルは赤くする
+        ctx.font = '11px monospace'; 
+        ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, startY + (i - drawStart) * 19); 
+    }
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };
@@ -238,7 +231,6 @@ function loop() {
     
     if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
     
-    // ★ 追加：十字キーの見た目を実際の入力と毎フレーム完全に同期させる！
     ['up', 'down', 'left', 'right'].forEach(dir => {
       const btn = document.getElementById('btn-' + dir);
       if (btn) {
@@ -248,11 +240,10 @@ function loop() {
     });
 
   } catch (err) {
-    console.error(err); ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = "#fff"; ctx.fillText("ERROR CRASHED", 10, 50);
+    console.error(err); ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = "#fff"; ctx.fillText("ERROR CRASHED", 10, 50);
   }
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
 const setBtn = (id, k) => {
   const e = document.getElementById(id); if (!e) return;
@@ -262,79 +253,87 @@ const setBtn = (id, k) => {
   e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
 };
 
-// 単発ボタン（A, B, SELECTなど）の登録
 ['btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
 
-// ★====================================================★
-// ★ 提案1: 十字キーの「親指ぐりぐり（スライド）」操作対応 ★
-// ★====================================================★
 const dpad = document.getElementById('dpad');
 let dpadActive = false;
 
 const handleDpad = (ev) => {
   ev.preventDefault();
   if (!dpadActive && ev.type !== 'touchstart' && ev.type !== 'mousedown') return;
-  if (ev.type === 'touchstart' || ev.type === 'mousedown') {
-    dpadActive = true;
-    initAudio();
-  }
+  if (ev.type === 'touchstart' || ev.type === 'mousedown') { dpadActive = true; initAudio(); }
   
   let clientX, clientY;
-  if (ev.touches && ev.touches.length > 0) {
-    clientX = ev.touches[0].clientX;
-    clientY = ev.touches[0].clientY;
-  } else {
-    clientX = ev.clientX;
-    clientY = ev.clientY;
-  }
+  if (ev.touches && ev.touches.length > 0) { clientX = ev.touches[0].clientX; clientY = ev.touches[0].clientY; } 
+  else { clientX = ev.clientX; clientY = ev.clientY; }
   
   const rect = dpad.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  
-  const dx = clientX - centerX;
-  const dy = clientY - centerY;
-  const dist = Math.hypot(dx, dy);
+  const centerX = rect.left + rect.width / 2; const centerY = rect.top + rect.height / 2;
+  const dx = clientX - centerX; const dy = clientY - centerY; const dist = Math.hypot(dx, dy);
   
   let newKeys = { up: false, down: false, left: false, right: false };
-  
-  // 中心から15px以上指が離れたら方向を判定（デッドゾーン設定）
   if (dist > 15) {
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-    
-    // 8方向の角度判定でスムーズな斜め移動を実現
     if (angle > -67.5 && angle < 67.5) newKeys.right = true;
     if (angle > 112.5 || angle < -112.5) newKeys.left = true;
     if (angle > 22.5 && angle < 157.5) newKeys.down = true;
     if (angle < -22.5 && angle > -157.5) newKeys.up = true;
   }
   
-  // キーの状態が変化した瞬間を捉えるための処理
-  ['up', 'down', 'left', 'right'].forEach(k => {
-    if (newKeys[k] && !keys[k]) keyPressQueue[k] = true;
-    keys[k] = newKeys[k];
-  });
+  ['up', 'down', 'left', 'right'].forEach(k => { if (newKeys[k] && !keys[k]) keyPressQueue[k] = true; keys[k] = newKeys[k]; });
 };
 
-const releaseDpad = (ev) => {
-  ev.preventDefault();
-  dpadActive = false;
-  keys.up = keys.down = keys.left = keys.right = false;
-};
+const releaseDpad = (ev) => { ev.preventDefault(); dpadActive = false; keys.up = keys.down = keys.left = keys.right = false; };
 
 if (dpad) {
-  dpad.addEventListener('touchstart', handleDpad, {passive: false});
-  dpad.addEventListener('touchmove', handleDpad, {passive: false});
-  dpad.addEventListener('touchend', releaseDpad, {passive: false});
-  dpad.addEventListener('touchcancel', releaseDpad, {passive: false});
-  
-  dpad.addEventListener('mousedown', handleDpad);
-  window.addEventListener('mousemove', (ev) => { if (dpadActive) handleDpad(ev); });
-  window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
+  dpad.addEventListener('touchstart', handleDpad, {passive: false}); dpad.addEventListener('touchmove', handleDpad, {passive: false});
+  dpad.addEventListener('touchend', releaseDpad, {passive: false}); dpad.addEventListener('touchcancel', releaseDpad, {passive: false});
+  dpad.addEventListener('mousedown', handleDpad); window.addEventListener('mousemove', (ev) => { if (dpadActive) handleDpad(ev); }); window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
 }
 
-// キーボード操作
+// ★ Canvasの直接タッチ（右手スワイプ用）のイベントリスナー ★
+const handlePointerDown = (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  pointer.active = true;
+  pointer.x = (clientX - rect.left) * (canvas.width / rect.width);
+  pointer.y = (clientY - rect.top) * (canvas.height / rect.height);
+  pointer.path = [{x: pointer.x, y: pointer.y}];
+};
+
+const handlePointerMove = (e) => {
+  if (!pointer.active) return;
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  pointer.x = (clientX - rect.left) * (canvas.width / rect.width);
+  pointer.y = (clientY - rect.top) * (canvas.height / rect.height);
+  
+  // 少し指が動いたら軌跡として記録する
+  let last = pointer.path[pointer.path.length-1];
+  if (Math.hypot(pointer.x - last.x, pointer.y - last.y) > 5) {
+      pointer.path.push({x: pointer.x, y: pointer.y});
+  }
+};
+
+const handlePointerUp = (e) => {
+  e.preventDefault();
+  pointer.active = false;
+};
+
+canvas.addEventListener('mousedown', handlePointerDown);
+canvas.addEventListener('mousemove', handlePointerMove);
+canvas.addEventListener('mouseup', handlePointerUp);
+canvas.addEventListener('mouseleave', handlePointerUp);
+canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+canvas.addEventListener('touchmove', handlePointerMove, {passive: false});
+canvas.addEventListener('touchend', handlePointerUp, {passive: false});
+
+// Keyboard mapping
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
   if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
@@ -354,19 +353,11 @@ window.addEventListener('keyup', e => {
   if (e.key === 'Shift') keys.select = false;
 });
 
-// ==========================================
-// iOS Safari 音声強制ブロック解除システム
-// ==========================================
 const unlockAudio = () => {
   if (typeof audioCtx !== 'undefined' && audioCtx !== null) {
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume().then(() => {
-        console.log("Safariの音声ブロックを解除しました！");
-      }).catch(err => console.error("音声ブロック解除エラー:", err));
-    }
+    if (audioCtx.state === 'suspended') { audioCtx.resume().then(() => { console.log("Audio Unlocked!"); }).catch(err => console.error(err)); }
   }
 };
-
 window.addEventListener('touchstart', unlockAudio, { passive: true });
 window.addEventListener('mousedown', unlockAudio);
 window.addEventListener('keydown', unlockAudio);
