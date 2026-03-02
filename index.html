@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>5in1 RETRO SYSTEM</title>
+<title>6in1 RETRO SYSTEM</title>
 
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
@@ -30,7 +30,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 .boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
 
-/* ★ 修正ポイント：width 100% をやめ、常に枠内に収まるように自動調整する魔法をかけました */
 #gameCanvas { 
   background: #000; 
   height: 100%; 
@@ -89,7 +88,7 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 <div id="gameboy">
   <div id="screen-container">
     <div id="boot">
-      <div class="boot-text">5in1 RETRO SYSTEM</div>
+      <div class="boot-text">6in1 RETRO SYSTEM</div>
       <div class="boot-text">SYSTEM BOOTING...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
       <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
@@ -153,9 +152,7 @@ const bootInterval = setInterval(() => {
 <script src="rhythm.js"></script>
 <script src="slot.js"></script>
 <script src="king.js"></script>
-<script src="fighter.js"></script>
-
-<script>
+<script src="musou.js"></script> <script>
 window.onload = () => {
   activeApp = Menu;
   activeApp.init();
