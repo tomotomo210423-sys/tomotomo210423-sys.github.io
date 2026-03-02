@@ -1,4 +1,4 @@
-// === RETRO SLOT MACHINE - AUTO & PACHISLO EVOLUTION ===
+// === RETRO SLOT MACHINE - AUTO & PACHISLO EVOLUTION (FIXED) ===
 const Slot={
   st:'bet', coins:100, bet:1, win:0, lines:[], msg:'', tmr:0, rTmr:0,
   jp:1000, free:0, symH:32, stoppedCount:0,
@@ -34,7 +34,7 @@ const Slot={
   ],
 
   init(){
-    document.getElementById('gameboy').classList.add('mode-slot');
+    // ★バグの原因だった画面モード切り替え処理を削除しました
     let d=SaveSys.data; this.coins=d.slotCoins||100; this.jp=d.jackpotPool||1000;
     if(this.coins<=0)this.coins=10;
     this.bet=1; this.st='bet'; this.tmr=0; this.free=0; 
@@ -169,7 +169,7 @@ const Slot={
            // カジノ退出処理
            if (item.id === 'exit') {
                this.auto = false;
-               document.getElementById('gameboy').classList.remove('mode-slot');
+               // ★バグの原因だった画面モード切り替え処理を削除しました
                switchApp(Menu); return;
            }
 
