@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 6.1: D-Pad Slide Control Edition) ===
+// === CORE SYSTEM (Phase 6.2: D-Pad Visual Sync Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -170,12 +170,7 @@ const Menu = {
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
-        
-        if (appObjs[this.cur]) {
-            switchApp(appObjs[this.cur]); 
-        } else {
-            playSnd('hit');
-        }
+        if (appObjs[this.cur]) { switchApp(appObjs[this.cur]); } else { playSnd('hit'); }
     }
   },
   draw() {
@@ -242,6 +237,16 @@ function loop() {
     else { if (activeApp && activeApp.update) activeApp.update(); }
     
     if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
+    
+    // ★ 追加：十字キーの見た目を実際の入力と毎フレーム完全に同期させる！
+    ['up', 'down', 'left', 'right'].forEach(dir => {
+      const btn = document.getElementById('btn-' + dir);
+      if (btn) {
+        btn.style.background = keys[dir] ? '#111' : '';
+        btn.style.transform = keys[dir] ? 'translateY(2px)' : '';
+      }
+    });
+
   } catch (err) {
     console.error(err); ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = "#fff"; ctx.fillText("ERROR CRASHED", 10, 50);
   }
@@ -260,7 +265,6 @@ const setBtn = (id, k) => {
 // 単発ボタン（A, B, SELECTなど）の登録
 ['btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
-
 
 // ★====================================================★
 // ★ 提案1: 十字キーの「親指ぐりぐり（スライド）」操作対応 ★
@@ -330,7 +334,7 @@ if (dpad) {
   window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
 }
 
-// キーボード操作（PCでのプレイ用）
+// キーボード操作
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
   if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
