@@ -1,4 +1,4 @@
-// === RETRO SLOT MACHINE - AUTO & PACHISLO EVOLUTION (FIXED) ===
+// === RETRO SLOT MACHINE - AUTO & PACHISLO EVOLUTION (FIXED v2) ===
 const Slot={
   st:'bet', coins:100, bet:1, win:0, lines:[], msg:'', tmr:0, rTmr:0,
   jp:1000, free:0, symH:32, stoppedCount:0,
@@ -10,7 +10,7 @@ const Slot={
     { id: 'f_ticket', name: 'Fスピン券', cost: 120, desc: '即座にフリースピン10回獲得!' },
     { id: 'safety', name: 'お守り', cost: 30, desc: '次スピンで外れても30G返金' },
     { id: 'hack', name: 'ハッキング', cost: 300, desc: 'ランダムな図柄を強制揃え' },
-    { id: 'bibine', name: 'バイバイン', cost: 500, desc: '所持金(最大2千)が1.2～2倍!' },
+    { id: 'bibine', name: 'バイバイン', cost: 500, desc: '全所持金を1.2～2倍にする!' }, // ★説明文も変更
     { id: 'remote', name: 'リモコン', cost: 1500, desc: '次スピンで強制JP発生(1回)' },
     { id: 'exit', name: 'EXIT CASINO', cost: 0, desc: 'カジノを出てメニューに戻ります' }
   ],
@@ -34,7 +34,6 @@ const Slot={
   ],
 
   init(){
-    // ★バグの原因だった画面モード切り替え処理を削除しました
     let d=SaveSys.data; this.coins=d.slotCoins||100; this.jp=d.jackpotPool||1000;
     if(this.coins<=0)this.coins=10;
     this.bet=1; this.st='bet'; this.tmr=0; this.free=0; 
@@ -132,12 +131,10 @@ const Slot={
   },
 
   update(){
-    // AUTOトグル (SELECTボタン)
     if(keysDown.select) {
         this.auto = !this.auto; playSnd('sel'); this.autoTmr = 0;
     }
 
-    // AUTO機能のAIロジック
     if (this.auto) {
         this.autoTmr++;
         if (this.st === 'bet' && this.autoTmr > 20) {
@@ -166,10 +163,8 @@ const Slot={
         if(keysDown.a) {
            let item = this.shopData[this.shopCur];
            
-           // カジノ退出処理
            if (item.id === 'exit') {
                this.auto = false;
-               // ★バグの原因だった画面モード切り替え処理を削除しました
                switchApp(Menu); return;
            }
 
@@ -177,10 +172,16 @@ const Slot={
                if (item.id === 'f_ticket') {
                    this.coins -= item.cost; this.free += 10; playSnd('combo'); this.msg = 'GET 10 FREE SPINS!!';
                } else if (item.id === 'bibine') {
-                   this.coins -= item.cost;
-                   let target = Math.min(this.coins, 2000); let multi = 1.2 + Math.random() * 0.8;
-                   let gain = Math.floor(target * multi) - target;
-                   this.coins += gain; playSnd('combo'); this.msg = `CREDIT +${gain} !!`;
+                   // ★バグ修正ポイント：バイバインの詐欺処理を修正
+                   // 500Gは没収せず、そのまま所持金を倍加させる！
+                   if (this.coins >= 9999) {
+                       this.msg = 'COINS LIMIT REACHED!'; playSnd('hit');
+                   } else {
+                       let multi = 1.2 + Math.random() * 0.8;
+                       let gain = Math.floor(this.coins * multi) - this.coins;
+                       this.coins += gain; 
+                       playSnd('combo'); this.msg = `CREDIT +${gain} !!`;
+                   }
                } else {
                    if (this.activeItem !== item.id) {
                        this.coins -= item.cost; this.activeItem = item.id; playSnd('combo'); this.msg = `${item.name} SET!`;
@@ -218,14 +219,10 @@ const Slot={
     else if(this.st==='spin'){
       let targetReel = -1;
       
-      // 個別目押し判定
       if (keysDown.left && !this.reels[0].st) targetReel = 0;
       else if (keysDown.down && !this.reels[1].st) targetReel = 1;
       else if (keysDown.right && !this.reels[2].st) targetReel = 2;
-      // オート/初心者向けの順押し判定
-      else if (keysDown.a) {
-          targetReel = this.reels.findIndex(r => !r.st);
-      }
+      else if (keysDown.a) { targetReel = this.reels.findIndex(r => !r.st); }
 
       if (targetReel !== -1) {
         let r=this.reels[targetReel]; r.st=true; r.s=0; 
@@ -235,7 +232,6 @@ const Slot={
             if (this.stoppedCount < 2) { r.p = centerPos * this.symH; } 
             else { this.slipCount = Math.floor(Math.random() * 3) + 1; r.p = ((centerPos - this.slipCount + 20) % 20) * this.symH; }
         } else { 
-            // ビタ止まり計算
             r.p=(Math.round(r.p/this.symH)%20)*this.symH; 
         }
         
@@ -270,7 +266,7 @@ const Slot={
     }
     else if(this.st === 'nudge') {
         if (this.tmr > 20 && this.tmr % 15 === 0) {
-            let r = this.reels.find(x=>x.b===10) || this.reels[2]; // 適当に直近を揺らす
+            let r = this.reels.find(x=>x.b===10) || this.reels[2]; 
             r.p += this.symH; if (r.p >= 20 * this.symH) r.p -= 20 * this.symH;
             r.b = 5; this.slipCount--; playSnd('hit'); this.msg = 'NUDGE...! (HACKING)'; screenShake(3);
             if (this.slipCount <= 0) { this.st = 'pay'; this.tmr = 0; this.targetSym = null; this.chkWin(); }
@@ -337,7 +333,6 @@ const Slot={
         ctx.fillStyle = '#888'; ctx.font = '8px monospace'; ctx.fillText('A:BUY / B,◀:EXIT', 50, 255);
     } else {
         
-        // ショップタブ描画
         if (this.st === 'bet') {
             ctx.fillStyle = '#ff0'; ctx.fillRect(180, 120, 10, 40);
             ctx.fillStyle = '#000'; ctx.font = '8px monospace';
@@ -352,7 +347,6 @@ const Slot={
         ctx.font = 'bold 12px monospace';
         ctx.fillText(`★ JACKPOT: ${this.jp}`, 30, 40);
         
-        // AUTO ラベル
         if (this.auto) {
             ctx.fillStyle = '#f00'; ctx.fillRect(25, 23, 30, 10);
             ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('AUTO', 28, 31);
@@ -415,7 +409,6 @@ const Slot={
             ctx.font='9px monospace'; ctx.fillText(this.msg, 30, 225);
         }
         
-        // オペレーションガイド表示
         ctx.fillStyle = '#0f0'; ctx.font = '9px monospace'; 
         if (this.st === 'spin') {
             ctx.fillText('◀:L  ▼:C  ▶:R  A:AUTO', 28, 238);
