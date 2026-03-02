@@ -1,14 +1,14 @@
-// === ABYSS GENERAL (Phase 7: Multi-Tentacles & Music Box) ===
+// === ABYSS GENERAL (FINAL: Ultimate Edition) ===
 const Abyss = {
-    st: 'play',
+    st: 'title', // title, play, shop, gameover
     tmr: 0,
     core: { x: 40, y: 120 },
     target: { x: 150, y: 120 },
-    tentacles: [], // ★ 触手を配列化（複数対応！）
+    tentacles: [], 
     
     prevPointerActive: false,
-    winding: false, // オルゴールを巻いているか
-    musicBox: 100,  // オルゴールのゲージ
+    winding: false, 
+    musicBox: 100,  
     
     vfx: [], shieldTmr: 0, swarms: [], eyes: [], projectiles: [], enemies: [],
     
@@ -19,24 +19,37 @@ const Abyss = {
         document.getElementById('gameboy').classList.add('mode-abyss');
         canvas.width = 400; canvas.height = 240;
         
-        this.tentacles = [];
-        this.addTentacle(); // 初期は1本
-        this.target = { x: 150, y: 120 };
+        this.st = 'title';
+        this.tmr = 0;
         
-        this.st = 'play'; this.tmr = 0; 
+        // タイトル画面用のデモ触手
+        this.tentacles = [];
+        this.addTentacle();
+        this.target = { x: 200, y: 120 };
+        
+        if (typeof BGM !== 'undefined') BGM.play('spell');
+    },
+
+    startGame() {
+        this.st = 'play';
+        this.tmr = 0; 
         this.vfx = []; this.shieldTmr = 0; this.swarms = [];
         this.eyes = []; this.projectiles = []; this.enemies = []; 
         this.coreHp = 100; this.coreMaxHp = 100; this.score = 0; this.soul = 0;
         this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
         this.musicBox = 100; this.winding = false;
         
+        this.tentacles = [];
+        this.addTentacle();
+        this.target = { x: 150, y: 120 };
+        
+        if (typeof pointer !== 'undefined') pointer.path = [];
+        if (typeof BGM !== 'undefined') BGM.play('action');
         if (typeof playSnd !== 'undefined') playSnd('combo');
     },
     
-    // ★ 触手を追加する関数
     addTentacle() {
         let idx = this.tentacles.length;
-        // 本数が増えると生える位置（根元）が少しズレる
         let offsets = [{x:0, y:0}, {x:0, y:-20}, {x:0, y:20}, {x:-20, y:-10}, {x:-20, y:10}];
         let o = offsets[idx % 5];
         let segs = [];
@@ -49,7 +62,6 @@ const Abyss = {
     updateIK() {
         for (let t of this.tentacles) {
             let segs = t.segments; let len = t.len;
-            // ターゲット位置も本数によって少しバラけさせる
             segs[segs.length - 1].x = this.target.x + t.root.x * 0.5; 
             segs[segs.length - 1].y = this.target.y + t.root.y * 0.5;
             
@@ -85,8 +97,8 @@ const Abyss = {
     
     spawnMagic(type, cx, cy) {
         if (type === 'O') {
-            this.shieldTmr = 180; 
-            this.vfx.push({ type: 'text', text: 'SHIELD!', x: this.core.x, y: this.core.y - 60, life: 60, color: '#0ff' });
+            this.shieldTmr += 180; 
+            this.vfx.push({ type: 'text', text: 'SHIELD UP!', x: this.core.x, y: this.core.y - 60, life: 60, color: '#0ff' });
             if (typeof playSnd !== 'undefined') playSnd('sel');
         } else if (type === '|') { 
             this.vfx.push({ type: 'text', text: 'METEOR!', x: cx - 30, y: cy - 30, life: 60, color: '#fa0' });
@@ -109,11 +121,44 @@ const Abyss = {
             return;
         }
         
+        this.tmr++;
+
+        // ==========================================
+        // TITLE STATE
+        // ==========================================
+        if (this.st === 'title') {
+            // タイトル画面のデモ用自動触手
+            this.target.x = 200 + Math.sin(this.tmr * 0.05) * 100;
+            this.target.y = 120 + Math.cos(this.tmr * 0.03) * 80;
+            for (let i = 0; i < 3; i++) this.updateIK();
+
+            if (typeof keysDown !== 'undefined' && keysDown.a) {
+                this.startGame();
+            }
+            return; // タイトル中はこれ以降の処理をしない
+        }
+
+        // ==========================================
+        // GAMEOVER STATE
+        // ==========================================
+        if (this.st === 'gameover') {
+            for (let i = 0; i < 3; i++) this.updateIK();
+            // VFXだけ更新（爆発などを見せるため）
+            this.updateVFX(1.0);
+            
+            if (this.tmr > 60 && typeof keysDown !== 'undefined' && keysDown.a) {
+                this.st = 'title';
+                this.tmr = 0;
+            }
+            return;
+        }
+
+        // ==========================================
+        // PLAY & SHOP STATE
+        // ==========================================
         let ts = (this.st === 'shop') ? 0.2 : 1.0;
-        this.tmr += ts;
         if (this.shieldTmr > 0) this.shieldTmr -= ts;
         
-        // --- 1. 左手(十字キー)で触手のターゲットを操作 ---
         let speed = 12;
         let isMoving = false;
         if (typeof keys !== 'undefined') {
@@ -125,7 +170,7 @@ const Abyss = {
         this.target.x = Math.max(0, Math.min(340, this.target.x)); 
         this.target.y = Math.max(0, Math.min(240, this.target.y));
         
-        let maxDist = 20 * 14; // 触手の最大長
+        let maxDist = 20 * 14; 
         let dx = this.target.x - this.core.x;
         let dy = this.target.y - this.core.y;
         let d = Math.hypot(dx, dy);
@@ -135,12 +180,13 @@ const Abyss = {
         }
         for (let i = 0; i < 3; i++) this.updateIK();
 
-        // --- 2. 右手とUI、★オルゴールの判定 ---
+        let isMeteorMax = (this.lv.meteor >= 3.0); 
+
+        // --- 右手とUI、オルゴールの判定 ---
         if (typeof pointer !== 'undefined') {
             if (pointer.active && !this.prevPointerActive) {
                 let px = pointer.x, py = pointer.y;
                 
-                // ★ オルゴール巻き上げ判定（左上の箱をタップ）
                 if (px < 60 && py < 60) {
                     this.winding = true;
                     pointer.path = [];
@@ -161,10 +207,10 @@ const Abyss = {
                         } else if (btnY === 2 && this.soul >= 50) {
                             this.soul -= 50; this.lv.tentacle += 0.5;
                             if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 3 && this.soul >= 80) { // ★ 触手分裂
+                        } else if (btnY === 3 && this.soul >= 80) { 
                             this.soul -= 80; this.addTentacle();
                             if(typeof playSnd !== 'undefined') playSnd('combo');
-                        } else if (btnY === 4 && this.soul >= 50) {
+                        } else if (btnY === 4 && !isMeteorMax && this.soul >= 50) { 
                             this.soul -= 50; this.lv.meteor += 0.5;
                             if(typeof playSnd !== 'undefined') playSnd('combo');
                         }
@@ -178,7 +224,7 @@ const Abyss = {
             }
             
             if (!pointer.active) {
-                this.winding = false; // 指を離したら巻き上げ終了
+                this.winding = false; 
             }
             
             if (!this.winding && !pointer.active && this.prevPointerActive && this.st === 'play') {
@@ -195,22 +241,22 @@ const Abyss = {
             this.prevPointerActive = pointer.active;
         }
 
-        // ★ オルゴールの処理
+        // オルゴールの処理
         if (this.winding) {
-            this.musicBox = Math.min(100, this.musicBox + 0.6); // 高速回復
-            if (this.tmr % 5 < 1 && typeof playSnd !== 'undefined') playSnd('sel'); // カチカチ音
+            this.musicBox = Math.min(100, this.musicBox + 0.6);
+            if (this.tmr % 5 < 1 && typeof playSnd !== 'undefined') playSnd('sel'); 
         } else {
-            this.musicBox -= 0.05 * ts; // 常に減り続ける（スロー中は減りも遅い）
+            this.musicBox -= 0.05 * ts; 
         }
         
-        // オルゴール切れ（即死）
+        // オルゴール切れ（即死）判定
         if (this.musicBox <= 0 && this.coreHp > 0) {
             this.coreHp = 0;
             this.vfx.push({ type: 'text', text: 'MIND CRUSHED...', x: 130, y: 120, life: 180, color: '#f00' });
             if (typeof screenShake !== 'undefined') screenShake(20);
         }
 
-        // --- 3. 敵の生成 ---
+        // --- 敵の生成 ---
         let diff = 1 + (this.tmr / 1800);
         if (Math.random() < (0.02 * diff * ts)) {
             let isBig = Math.random() < 0.15;
@@ -222,7 +268,7 @@ const Abyss = {
             });
         }
 
-        // --- 4. 邪眼（タレット）の射撃処理 ---
+        // --- 邪眼の射撃 ---
         for (let t of this.eyes) {
             t.tmr += ts;
             if (t.tmr > 60 && this.enemies.length > 0) {
@@ -253,12 +299,11 @@ const Abyss = {
             if (hit || p.life <= 0) this.projectiles.splice(i, 1);
         }
 
-        // --- 5. 敵の当たり判定と移動 ---
+        // --- 当たり判定と移動 ---
         for (let e of this.enemies) {
             if (e.hp <= 0) continue;
             let coreAngle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
 
-            // ① 触手（複数）の判定
             if (isMoving && e.hitCd <= 0) {
                 let hit = false;
                 for (let t of this.tentacles) {
@@ -272,11 +317,10 @@ const Abyss = {
                             hit = true; break;
                         }
                     }
-                    if (hit) break; // 1フレームにつき1回のみヒット
+                    if (hit) break; 
                 }
             }
 
-            // ② メテオの爆発判定
             for (let v of this.vfx) {
                 if (v.type === 'explosion' && v.life > v.maxLife - 2) { 
                     if (Math.hypot(e.x - v.x, e.y - v.y) < v.size) { 
@@ -285,7 +329,6 @@ const Abyss = {
                 }
             }
 
-            // ③ 眷属の突撃
             for (let s of this.swarms) {
                 if (s.life <= 0) continue;
                 let dist = Math.hypot(e.x - s.x, e.y - s.y);
@@ -297,16 +340,16 @@ const Abyss = {
                 }
             }
 
-            // ④ シールドの【完全弾き】判定！
+            let maxRings = Math.min(3, Math.ceil(this.shieldTmr / 180));
+            let shieldRadius = 50 + maxRings * 15; 
             let distToCore = Math.hypot(e.x - this.core.x, e.y - this.core.y);
-            if (this.shieldTmr > 0 && distToCore < 65) {
-                // シールド内に侵入しようとしたら、完全に外側に押し戻す！
-                e.x = this.core.x - Math.cos(coreAngle) * 65;
-                e.y = this.core.y - Math.sin(coreAngle) * 65;
-                e.hp -= 1 * ts; // ガリガリ削るダメージ
+            
+            if (this.shieldTmr > 0 && distToCore < shieldRadius) {
+                e.x = this.core.x - Math.cos(coreAngle) * shieldRadius;
+                e.y = this.core.y - Math.sin(coreAngle) * shieldRadius;
+                e.hp -= 1 * ts; 
                 if (Math.random() < 0.2) this.vfx.push({ type: 'spark', x: e.x, y: e.y, vx: 0, vy: 0, life: 5, maxLife: 5, color: '#0ff' });
             } 
-            // ⑤ コアへの到達（ダメージ）
             else if (distToCore < 30) {
                 this.coreHp -= e.atk; e.hp = 0; 
                 if (typeof screenShake !== 'undefined') screenShake(6);
@@ -317,7 +360,7 @@ const Abyss = {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             let e = this.enemies[i];
             if (e.hp <= 0) {
-                if (this.coreHp > 0) { // 死んでない時だけスコア加算
+                if (this.coreHp > 0) { 
                     this.score += (e.type === 'big' ? 50 : 10);
                     this.soul += (e.type === 'big' ? 10 : 2); 
                 }
@@ -332,16 +375,28 @@ const Abyss = {
             }
         }
 
-        if (this.coreHp <= 0 && this.enemies.length === 0) {
-            // リトライ処理
-            this.enemies = []; this.eyes = []; this.coreHp = 100; this.score = 0; this.soul = 0; this.tmr = 0; 
-            this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
-            this.tentacles = []; this.addTentacle();
-            this.musicBox = 100; this.winding = false;
-            this.st = 'play';
+        // --- ゲームオーバー判定 ---
+        if (this.coreHp <= 0 && this.st === 'play') {
+            this.st = 'gameover';
+            this.tmr = 0;
+            // 爆発エフェクト大量発生
+            for(let i=0; i<10; i++) {
+                this.vfx.push({ type: 'explosion', x: this.core.x + (Math.random()-0.5)*50, y: this.core.y + (Math.random()-0.5)*50, size: 50, life: 20+Math.random()*20, maxLife: 40 });
+            }
+            if (typeof BGM !== 'undefined') BGM.stop();
+            if (typeof playSnd !== 'undefined') playSnd('hit');
+            
+            // ★ スコア記録（main.jsのSaveSysを利用）
+            if (typeof SaveSys !== 'undefined') {
+                SaveSys.addLog('ｱﾋﾞｽ･ｼﾞｪﾈﾗﾙ', `激戦の末、スコア ${this.score} で散った…`);
+            }
         }
 
-        // VFXの更新
+        this.updateVFX(ts);
+    },
+    
+    // VFXと群れの更新処理を切り出し
+    updateVFX(ts) {
         for (let i = this.vfx.length - 1; i >= 0; i--) {
             let v = this.vfx[i];
             v.life -= ts;
@@ -378,19 +433,18 @@ const Abyss = {
         bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
 
-        // ★ 邪眼（タレット）の描画
+        // 邪眼
         for(let e of this.eyes) {
             ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill(); // 白目
+            ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill(); 
             
-            // 瞳孔が一番近い敵をギョロっと見る
             let target = this.enemies[0] || {x: 400, y: 120};
             let minDist = 999;
             for(let en of this.enemies) { let d = Math.hypot(en.x - e.x, en.y - e.y); if(d < minDist) { minDist = d; target = en; } }
             let angle = Math.atan2(target.y - e.y, target.x - e.x);
             
             ctx.fillStyle = '#a00';
-            ctx.beginPath(); ctx.arc(e.x + Math.cos(angle)*4, e.y + Math.sin(angle)*4, 4, 0, Math.PI*2); ctx.fill(); // 赤い瞳
+            ctx.beginPath(); ctx.arc(e.x + Math.cos(angle)*4, e.y + Math.sin(angle)*4, 4, 0, Math.PI*2); ctx.fill();
         }
         
         ctx.fillStyle = '#f00';
@@ -406,7 +460,6 @@ const Abyss = {
         ctx.fillStyle = '#f00';
         for(let s of this.swarms) { ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI*2); ctx.fill(); }
 
-        // ★ 複数触手の描画
         for (let t of this.tentacles) {
             let segs = t.segments;
             ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -428,16 +481,25 @@ const Abyss = {
         }
 
         if (this.shieldTmr > 0) {
-            ctx.strokeStyle = `rgba(0, 255, 255, ${this.shieldTmr / 180})`;
+            let maxRings = Math.min(3, Math.ceil(this.shieldTmr / 180));
             ctx.lineWidth = 4; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
-            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 65, this.tmr*0.1, this.tmr*0.1 + Math.PI*1.5); ctx.stroke();
-            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 80, -this.tmr*0.05, -this.tmr*0.05 + Math.PI*1.5); ctx.stroke();
+            for (let i = 0; i < maxRings; i++) {
+                let alpha = Math.min(1, (this.shieldTmr - i * 180) / 180);
+                if (alpha <= 0) continue;
+                ctx.strokeStyle = `rgba(0, 255, 255, ${alpha})`;
+                let sr = 50 + (i + 1) * 15;
+                ctx.beginPath(); ctx.arc(this.core.x, this.core.y, sr, this.tmr*0.1 + i, this.tmr*0.1 + i + Math.PI*1.5); ctx.stroke();
+                ctx.beginPath(); ctx.arc(this.core.x, this.core.y, sr + 15, -this.tmr*0.05 - i, -this.tmr*0.05 - i + Math.PI*1.5); ctx.stroke();
+            }
             ctx.shadowBlur = 0;
         }
 
-        ctx.fillStyle = '#f00'; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
-        ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 30 + Math.sin(this.tmr * 0.1) * 3, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 10, 0, Math.PI * 2); ctx.fill();
+        // コア
+        if (this.coreHp > 0) {
+            ctx.fillStyle = '#f00'; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
+            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 30 + Math.sin(this.tmr * 0.1) * 3, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 10, 0, Math.PI * 2); ctx.fill();
+        }
 
         ctx.globalCompositeOperation = 'lighter';
         for(let v of this.vfx) {
@@ -468,61 +530,95 @@ const Abyss = {
             ctx.stroke(); ctx.shadowBlur = 0;
         }
 
-        // --- ステータスUI ---
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
-        ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 70, 20);
-        ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
-        ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
-
-        // ★ 魔界のオルゴール (FNAF Box) UI描画
-        ctx.fillStyle = '#421'; ctx.fillRect(10, 10, 40, 40); // 箱
-        ctx.fillStyle = '#210'; ctx.fillRect(15, 15, 30, 30); // 穴
-        ctx.fillStyle = this.musicBox < 20 ? '#f00' : '#0a0';
-        ctx.fillRect(15, 45, 30, -(this.musicBox / 100) * 30); // ゲージ（下から上に伸びる）
-        ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('WIND!', 18, 55);
-        if (this.winding) {
-            ctx.fillStyle = '#ff0'; ctx.font = '12px monospace';
-            ctx.fillText('♪', 25 + Math.random()*5, 10 + Math.random()*5);
-        }
-
-        // --- SHOP(スロー)画面の描画 ---
-        if (this.st === 'shop') {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, 400, 240);
+        // ==========================================
+        // UI 描画 (ステート別)
+        // ==========================================
+        if (this.st === 'title') {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, 400, 240);
+            ctx.fillStyle = '#f00'; ctx.font = 'bold 30px monospace';
+            ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
+            ctx.fillText('ABYSS GENERAL', 80, 100);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace';
+            ctx.fillText('- 深 淵 の 魔 将 -', 135, 130);
             
-            ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-            ctx.fillText('-- CHRONO UPGRADE --', 110, 30);
-            
-            let items = [
-                { name: '邪眼召喚', cost: 30, desc: '血を吐く目玉を置く' },
-                { name: 'コア修復＆HP↑', cost: 40, desc: 'HP回復＆最大値UP' },
-                { name: '触手火力UP', cost: 50, desc: '触手のダメージ増加' },
-                { name: '触手分裂', cost: 80, desc: '★触手の本数が増加' },
-                { name: 'メテオ巨大化', cost: 50, desc: '爆発の範囲と威力UP' }
-            ];
-            
-            for (let i = 0; i < items.length; i++) {
-                let y = 50 + i * 30;
-                ctx.fillStyle = this.soul >= items[i].cost ? '#00a' : '#333';
-                ctx.fillRect(80, y, 240, 25);
-                ctx.strokeStyle = this.soul >= items[i].cost ? '#0ff' : '#555';
-                ctx.strokeRect(80, y, 240, 25);
-                
-                ctx.fillStyle = this.soul >= items[i].cost ? '#fff' : '#888';
-                ctx.font = '12px monospace';
-                ctx.fillText(items[i].name, 85, y + 17);
-                ctx.fillStyle = this.soul >= items[i].cost ? '#ff0' : '#888';
-                ctx.fillText(`${items[i].cost} 魂`, 280, y + 17);
+            if (this.tmr % 60 < 30) {
+                ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
+                ctx.fillText('PRESS [A] TO START', 120, 200);
             }
-            
-            ctx.fillStyle = '#a00'; ctx.fillRect(150, 200, 100, 30);
-            ctx.fillStyle = '#fff'; ctx.fillText('CLOSE', 180, 220);
-            
-        } else {
-            ctx.fillStyle = '#00a'; ctx.fillRect(340, 190, 60, 50);
-            ctx.strokeStyle = '#0ff'; ctx.strokeRect(340, 190, 60, 50);
-            ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
-            ctx.fillText('SHOP', 352, 215);
-            ctx.font = '10px monospace'; ctx.fillText('(SLOW)', 352, 230);
+        } 
+        else if (this.st === 'gameover') {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; ctx.fillRect(0, 0, 400, 240);
+            ctx.fillStyle = '#f00'; ctx.font = 'bold 40px monospace';
+            ctx.fillText('GAME OVER', 100, 100);
+            ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace';
+            ctx.fillText(`FINAL SCORE: ${this.score}`, 130, 140);
+            if (this.tmr > 60) {
+                ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
+                ctx.fillText('PRESS [A] TO RETURN', 135, 200);
+            }
+        }
+        else {
+            // PLAY & SHOP 共通UI
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
+            ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 70, 20);
+            ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
+            ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
+
+            // オルゴールUI
+            ctx.fillStyle = '#421'; ctx.fillRect(10, 10, 40, 40); 
+            ctx.fillStyle = '#210'; ctx.fillRect(15, 15, 30, 30); 
+            ctx.fillStyle = this.musicBox < 20 ? '#f00' : '#0a0';
+            ctx.fillRect(15, 45, 30, -(this.musicBox / 100) * 30); 
+            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('WIND!', 18, 55);
+            if (this.winding) {
+                ctx.fillStyle = '#ff0'; ctx.font = '12px monospace';
+                ctx.fillText('♪', 25 + Math.random()*5, 10 + Math.random()*5);
+            }
+
+            if (this.st === 'shop') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, 400, 240);
+                
+                ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
+                ctx.fillText('-- CHRONO UPGRADE --', 110, 30);
+                
+                let isMeteorMax = (this.lv.meteor >= 3.0); 
+                
+                let items = [
+                    { name: '邪眼召喚', cost: 30, desc: '血を吐く目玉を置く' },
+                    { name: 'コア修復＆HP↑', cost: 40, desc: 'HP回復＆最大値UP' },
+                    { name: '触手火力UP', cost: 50, desc: '触手のダメージ増加' },
+                    { name: '触手分裂', cost: 80, desc: '触手の本数が増加' },
+                    { name: 'メテオ巨大化', cost: isMeteorMax ? 'MAX' : 50, desc: '爆発の範囲と威力UP(最大Lv3)' } 
+                ];
+                
+                for (let i = 0; i < items.length; i++) {
+                    let y = 50 + i * 30;
+                    let canBuy = (items[i].cost !== 'MAX' && this.soul >= items[i].cost);
+                    ctx.fillStyle = canBuy ? '#00a' : '#333';
+                    ctx.fillRect(80, y, 240, 25);
+                    ctx.strokeStyle = canBuy ? '#0ff' : '#555';
+                    ctx.strokeRect(80, y, 240, 25);
+                    
+                    ctx.fillStyle = canBuy ? '#fff' : '#888';
+                    ctx.font = '12px monospace';
+                    ctx.fillText(items[i].name, 85, y + 17);
+                    ctx.fillStyle = canBuy ? '#ff0' : '#888';
+                    
+                    let costText = items[i].cost === 'MAX' ? '[MAX]' : `${items[i].cost} 魂`;
+                    ctx.fillText(costText, 280, y + 17);
+                }
+                
+                ctx.fillStyle = '#a00'; ctx.fillRect(150, 200, 100, 30);
+                ctx.fillStyle = '#fff'; ctx.fillText('CLOSE', 180, 220);
+                
+            } else {
+                ctx.fillStyle = '#00a'; ctx.fillRect(340, 190, 60, 50);
+                ctx.strokeStyle = '#0ff'; ctx.strokeRect(340, 190, 60, 50);
+                ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
+                ctx.fillText('SHOP', 352, 215);
+                ctx.font = '10px monospace'; ctx.fillText('(SLOW)', 352, 230);
+            }
         }
 
         if (typeof resetShake !== 'undefined') resetShake();
