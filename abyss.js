@@ -1,4 +1,4 @@
-// === ABYSS GENERAL (FINAL: Ultimate Edition) ===
+// === ABYSS GENERAL (FINAL: Ultimate Edition - Fixed) ===
 const Abyss = {
     st: 'title', // title, play, shop, gameover
     tmr: 0,
@@ -26,6 +26,12 @@ const Abyss = {
         this.tentacles = [];
         this.addTentacle();
         this.target = { x: 200, y: 120 };
+        
+        if (typeof pointer !== 'undefined') {
+            pointer.active = false;
+            this.prevPointerActive = false;
+            pointer.path = [];
+        }
         
         if (typeof BGM !== 'undefined') BGM.play('spell');
     },
@@ -127,15 +133,18 @@ const Abyss = {
         // TITLE STATE
         // ==========================================
         if (this.st === 'title') {
-            // タイトル画面のデモ用自動触手
             this.target.x = 200 + Math.sin(this.tmr * 0.05) * 100;
             this.target.y = 120 + Math.cos(this.tmr * 0.03) * 80;
             for (let i = 0; i < 3; i++) this.updateIK();
 
-            if (typeof keysDown !== 'undefined' && keysDown.a) {
+            // ★ タップ または Aボタン でスタート！
+            let tapped = (typeof pointer !== 'undefined' && pointer.active && !this.prevPointerActive);
+            if ((typeof keysDown !== 'undefined' && keysDown.a) || tapped) {
                 this.startGame();
             }
-            return; // タイトル中はこれ以降の処理をしない
+            
+            if (typeof pointer !== 'undefined') this.prevPointerActive = pointer.active;
+            return; 
         }
 
         // ==========================================
@@ -143,13 +152,17 @@ const Abyss = {
         // ==========================================
         if (this.st === 'gameover') {
             for (let i = 0; i < 3; i++) this.updateIK();
-            // VFXだけ更新（爆発などを見せるため）
             this.updateVFX(1.0);
             
-            if (this.tmr > 60 && typeof keysDown !== 'undefined' && keysDown.a) {
+            // ★ タップ または Aボタン でタイトルへ戻る！
+            let tapped = (typeof pointer !== 'undefined' && pointer.active && !this.prevPointerActive);
+            if (this.tmr > 60 && ((typeof keysDown !== 'undefined' && keysDown.a) || tapped)) {
                 this.st = 'title';
                 this.tmr = 0;
+                if (typeof pointer !== 'undefined') pointer.path = [];
             }
+            
+            if (typeof pointer !== 'undefined') this.prevPointerActive = pointer.active;
             return;
         }
 
@@ -241,7 +254,6 @@ const Abyss = {
             this.prevPointerActive = pointer.active;
         }
 
-        // オルゴールの処理
         if (this.winding) {
             this.musicBox = Math.min(100, this.musicBox + 0.6);
             if (this.tmr % 5 < 1 && typeof playSnd !== 'undefined') playSnd('sel'); 
@@ -249,14 +261,12 @@ const Abyss = {
             this.musicBox -= 0.05 * ts; 
         }
         
-        // オルゴール切れ（即死）判定
         if (this.musicBox <= 0 && this.coreHp > 0) {
             this.coreHp = 0;
             this.vfx.push({ type: 'text', text: 'MIND CRUSHED...', x: 130, y: 120, life: 180, color: '#f00' });
             if (typeof screenShake !== 'undefined') screenShake(20);
         }
 
-        // --- 敵の生成 ---
         let diff = 1 + (this.tmr / 1800);
         if (Math.random() < (0.02 * diff * ts)) {
             let isBig = Math.random() < 0.15;
@@ -268,7 +278,6 @@ const Abyss = {
             });
         }
 
-        // --- 邪眼の射撃 ---
         for (let t of this.eyes) {
             t.tmr += ts;
             if (t.tmr > 60 && this.enemies.length > 0) {
@@ -299,7 +308,6 @@ const Abyss = {
             if (hit || p.life <= 0) this.projectiles.splice(i, 1);
         }
 
-        // --- 当たり判定と移動 ---
         for (let e of this.enemies) {
             if (e.hp <= 0) continue;
             let coreAngle = Math.atan2(this.core.y - e.y, this.core.x - e.x);
@@ -375,18 +383,15 @@ const Abyss = {
             }
         }
 
-        // --- ゲームオーバー判定 ---
         if (this.coreHp <= 0 && this.st === 'play') {
             this.st = 'gameover';
             this.tmr = 0;
-            // 爆発エフェクト大量発生
             for(let i=0; i<10; i++) {
                 this.vfx.push({ type: 'explosion', x: this.core.x + (Math.random()-0.5)*50, y: this.core.y + (Math.random()-0.5)*50, size: 50, life: 20+Math.random()*20, maxLife: 40 });
             }
             if (typeof BGM !== 'undefined') BGM.stop();
             if (typeof playSnd !== 'undefined') playSnd('hit');
             
-            // ★ スコア記録（main.jsのSaveSysを利用）
             if (typeof SaveSys !== 'undefined') {
                 SaveSys.addLog('ｱﾋﾞｽ･ｼﾞｪﾈﾗﾙ', `激戦の末、スコア ${this.score} で散った…`);
             }
@@ -395,7 +400,6 @@ const Abyss = {
         this.updateVFX(ts);
     },
     
-    // VFXと群れの更新処理を切り出し
     updateVFX(ts) {
         for (let i = this.vfx.length - 1; i >= 0; i--) {
             let v = this.vfx[i];
@@ -433,7 +437,6 @@ const Abyss = {
         bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
 
-        // 邪眼
         for(let e of this.eyes) {
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill(); 
@@ -494,7 +497,6 @@ const Abyss = {
             ctx.shadowBlur = 0;
         }
 
-        // コア
         if (this.coreHp > 0) {
             ctx.fillStyle = '#f00'; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
             ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 30 + Math.sin(this.tmr * 0.1) * 3, 0, Math.PI * 2); ctx.fill();
@@ -530,9 +532,6 @@ const Abyss = {
             ctx.stroke(); ctx.shadowBlur = 0;
         }
 
-        // ==========================================
-        // UI 描画 (ステート別)
-        // ==========================================
         if (this.st === 'title') {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, 400, 240);
             ctx.fillStyle = '#f00'; ctx.font = 'bold 30px monospace';
@@ -544,7 +543,8 @@ const Abyss = {
             
             if (this.tmr % 60 < 30) {
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-                ctx.fillText('PRESS [A] TO START', 120, 200);
+                // ★ 文言を「TAP」に変更
+                ctx.fillText('TAP TO START', 140, 200);
             }
         } 
         else if (this.st === 'gameover') {
@@ -555,17 +555,16 @@ const Abyss = {
             ctx.fillText(`FINAL SCORE: ${this.score}`, 130, 140);
             if (this.tmr > 60) {
                 ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
-                ctx.fillText('PRESS [A] TO RETURN', 135, 200);
+                // ★ 文言を「TAP」に変更
+                ctx.fillText('TAP TO RETURN', 150, 200);
             }
         }
         else {
-            // PLAY & SHOP 共通UI
             ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
             ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 70, 20);
             ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
             ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
 
-            // オルゴールUI
             ctx.fillStyle = '#421'; ctx.fillRect(10, 10, 40, 40); 
             ctx.fillStyle = '#210'; ctx.fillRect(15, 15, 30, 30); 
             ctx.fillStyle = this.musicBox < 20 ? '#f00' : '#0a0';
@@ -578,7 +577,6 @@ const Abyss = {
 
             if (this.st === 'shop') {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, 400, 240);
-                
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
                 ctx.fillText('-- CHRONO UPGRADE --', 110, 30);
                 
