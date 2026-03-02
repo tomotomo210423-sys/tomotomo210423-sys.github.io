@@ -1,4 +1,4 @@
-// === ABYSS GENERAL (Phase 3.1: Gesture Magic Fixed) ===
+// === ABYSS GENERAL (Phase 3.2: No-Misfire Gestures) ===
 const Abyss = {
     st: 'intro',
     tmr: 0,
@@ -38,38 +38,36 @@ const Abyss = {
         }
     },
     
-    // ★ 軌跡認識アルゴリズムを超強化（激しく描いても認識しやすく！）
+    // ★ 誤爆ゼロのシンプル＆強力な軌跡認識！
     recognizeGesture(path) {
-        // スピードが速いと取得ポイントが少なくなるため、最低3点あれば判定を開始する
         if (path.length < 3) return null; 
         
         let minX = 999, maxX = -999, minY = 999, maxY = -999;
-        let lowestP = path[0];
         
         for (let p of path) {
             if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
             if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
-            if (p.y > lowestP.y) lowestP = p; // 一番下の座標を取得
         }
         
-        let w = maxX - minX; let h = maxY - minY;
+        let w = Math.max(1, maxX - minX); 
+        let h = Math.max(1, maxY - minY);
         let pStart = path[0]; let pEnd = path[path.length - 1];
         let distStartEnd = Math.hypot(pStart.x - pEnd.x, pStart.y - pEnd.y);
         
         // 描いたサイズが小さすぎる場合（ノイズ）は無視
         if (Math.max(w, h) < 20) return null;
 
-        // 【 O（丸）の判定 】
-        // 緩和：始点と終点のズレがサイズの60%以内なら丸とみなす。
-        if (distStartEnd < Math.max(w, h) * 0.6 && w > 20 && h > 20) return 'O';
+        // 【 |（縦線）の判定 】：メテオ（旧 V字）
+        // 縦の長さが横幅の1.5倍以上あれば、絶対に縦線とみなす
+        if (h > w * 1.5 && h > 30) return '|';
         
-        // 【 ―（横線）の判定 】
-        // 緩和：縦のブレがあっても、横幅が高さの1.5倍以上あれば横線とみなす。
+        // 【 ―（横線）の判定 】：眷属召喚
+        // 横幅が縦の長さの1.5倍以上あれば、絶対に横線とみなす
         if (w > h * 1.5 && w > 30) return '-';
 
-        // 【 V字 の判定 】
-        // 緩和：始点と終点が上半分にあり、一番下の谷が下40%の範囲にあればVとみなす。
-        if (pStart.y < minY + h * 0.6 && pEnd.y < minY + h * 0.6 && lowestP.y > maxY - h * 0.4) return 'V';
+        // 【 O（丸）の判定 】：シールド
+        // 縦線でも横線でもなく、始点と終点が近ければ丸とみなす
+        if (distStartEnd < Math.max(w, h) * 0.6 && w > 20 && h > 20) return 'O';
         
         return null;
     },
@@ -79,7 +77,7 @@ const Abyss = {
             this.shieldTmr = 180; 
             this.vfx.push({ type: 'text', text: 'ABYSS SHIELD!!', x: this.core.x, y: this.core.y - 50, life: 60 });
             if (typeof playSnd !== 'undefined') playSnd('sel');
-        } else if (type === 'V') {
+        } else if (type === '|') { // ★ 縦線に変更
             this.vfx.push({ type: 'text', text: 'METEOR STRIKE!!', x: cx - 50, y: cy - 30, life: 60 });
             this.vfx.push({ type: 'meteor', x: cx - 150, y: -50, tx: cx, ty: cy, life: 30, maxLife: 30 });
             if (typeof playSnd !== 'undefined') playSnd('jmp');
@@ -135,7 +133,7 @@ const Abyss = {
             this.prevPointerActive = pointer.active;
         }
 
-        // 3. VFXの更新
+        // VFXの更新
         for (let i = this.vfx.length - 1; i >= 0; i--) {
             let v = this.vfx[i];
             v.life--;
@@ -144,7 +142,6 @@ const Abyss = {
                 v.x += (v.tx - v.x) * 0.2; v.y += (v.ty - v.y) * 0.2;
                 if (v.life % 2 === 0) this.vfx.push({ type: 'spark', x: v.x + (Math.random()-0.5)*20, y: v.y + (Math.random()-0.5)*20, vx: 0, vy: -1, life: 15, maxLife: 15 });
                 
-                // ★ メテオ無限発生バグ修正：爆発を生成した瞬間に自身（meteor）を消滅させるように変更
                 if (v.life <= 0) { 
                     this.vfx.push({ type: 'explosion', x: v.tx, y: v.ty, size: 80, life: 20, maxLife: 20 });
                     if (typeof playSnd !== 'undefined') playSnd('hit');
@@ -156,11 +153,10 @@ const Abyss = {
                 v.y -= 0.5;
             }
             
-            // 全エフェクト共通の削除処理
-            if (v.life <= 0) this.vfx.splice(i, 1);
+            if (v.life <= 0 && v.type !== 'meteor') this.vfx.splice(i, 1);
         }
 
-        // 4. 眷属（スウォーム）の更新
+        // 眷属（スウォーム）の更新
         for (let i = this.swarms.length - 1; i >= 0; i--) {
             let s = this.swarms[i];
             s.life--; s.x += s.vx; s.y += s.vy + Math.sin(s.life * 0.2) * 2;
@@ -237,10 +233,10 @@ const Abyss = {
             ctx.stroke(); ctx.shadowBlur = 0;
         }
 
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.fillText('PHASE 3.1: GESTURE FIXED', 10, 20);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.fillText('PHASE 3.2: GESTURE PERFECTED', 10, 20);
         ctx.fillStyle = '#aaa'; ctx.font = '10px monospace';
-        ctx.fillText('画面に【 V 】を描く: メテオ！', 10, 35);
-        ctx.fillText('画面に【 O 】を描く: シールド！', 10, 50);
+        ctx.fillText('画面に【 | (縦線)】を描く: メテオ！', 10, 35);
+        ctx.fillText('画面に【 O (丸)  】を描く: シールド！', 10, 50);
         ctx.fillText('画面に【 ― (横線)】を描く: 眷属召喚！', 10, 65);
 
         if (typeof resetShake !== 'undefined') resetShake();
