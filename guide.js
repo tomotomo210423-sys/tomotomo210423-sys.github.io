@@ -1,4 +1,4 @@
-// === GUIDE APP (Phase 8: XY Scrolling) ===
+// === GUIDE APP (Phase 8.1: Musou Infinity Added) ===
 const Guide = {
   cur: 0,
   page: 0,
@@ -42,7 +42,7 @@ const Guide = {
         '手札のペアを 揃えて 捨てていき、',
         '先に 手札が【0枚】になった者の 勝利となる！',
         '最後まで【J】を持っていたら 負けじゃぞ。',
-        '------------------------------------------', // 長い線のテスト
+        '------------------------------------------', 
         '【通信のやり方】',
         '1人が【部屋を作る】で 部屋の名前を決める。',
         'もう1人が【部屋を探す】で その部屋に入るのじゃ。',
@@ -103,6 +103,30 @@ const Guide = {
         '溜まったジャックポットを 総取りできるぞ！'
       ] 
     },
+    // ★ 無限無双 を追加！
+    {
+      name: '無限無双',
+      text: [
+        '迫りくる 敵の大群を なぎ倒し',
+        'どこまで 生き残れるか 挑むのじゃ！',
+        '',
+        '【操作】',
+        '十字キー(スワイプ): プレイヤーの移動',
+        '※攻撃は すべて【オート】で 発動するぞ！',
+        '',
+        '【ジェムと レベルアップ】',
+        '敵を倒すと落とす ジェム(経験値)を',
+        '拾い集めると レベルアップじゃ！',
+        '時間が止まり 3つのスキルが 提示されるゆえ',
+        '好きなものを選んで 最強を目指すのじゃ！',
+        '',
+        '【コインと 永続強化(SHOP)】',
+        'たまに落ちる コインを集めれば',
+        'タイトル画面の【SHOP】から',
+        '基礎能力を ずっと強化できるぞ！',
+        'やればやるほど 確実に 強くなるのじゃ！'
+      ]
+    },
     { 
       name: '王様の間 (AIチャット)', 
       text: [
@@ -156,12 +180,13 @@ const Guide = {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
     
     if (this.page === 0) {
-      // メニュー画面（変更なし）
+      // メニュー画面
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【ゲーム解説館】', 40, 30);
       ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
       for (let i = 0; i < this.games.length; i++) {
         if (i === this.cur) { ctx.fillStyle = '#ff0'; ctx.fillRect(10, 50 + i * 22, 180, 18); ctx.fillStyle = '#000'; } 
-        else { ctx.fillStyle = i === 5 ? '#0ff' : '#aaa'; }
+        // ★ リストの一番最後（王様の間）だけシアン色にするように修正
+        else { ctx.fillStyle = i === this.games.length - 1 ? '#0ff' : '#aaa'; }
         ctx.fillText((i === this.cur ? '▶ ' : '  ') + this.games[i].name, 15, 63 + i * 22);
       }
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 読む  SELECT: 戻る', 45, 290);
