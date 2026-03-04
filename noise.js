@@ -4,7 +4,7 @@ const PAL = { '0':null, '1':'#000', '2':'#fff', '3':'#fca', '4':'#f00', '5':'#0f
 
 // 24x24 キャラクタードット絵
 const CHAR_SPRITES = {
-    'エコー': [ // ハッカー
+    'エコー': [ // お調子者のハッカー
         "000000000000000000000000","000000000111111000000000","000000011777777110000000","000000177777777771000000",
         "000001777777777777100000","000011777733333377110000","000181777333333337181000","000181111111111111181000",
         "000181111555555111181000","000181111555555111181000","000181773333333377181000","000011773333333377110000",
@@ -19,13 +19,21 @@ const CHAR_SPRITES = {
         "000000133133313310000000","000001333133313331000000","000001333133313331000000","000013333133313333100000",
         "000013333133313333100000","000013333133313333100000","000011111111111111100000","000000000000000000000000"
     ],
-    'ルナ': [ // メカニック少女
+    'ルナ': [ // 天才メカニック少女
         "000000000000000000000000","000000001111111000000000","000000017777777100000000","001100177777777710011000",
         "017711771111111771177100","017771715555555171777100","017771715555555171777100","001771733333333371771000",
         "000110131133311310110000","000000133333333310000000","000000133311133310000000","000000013333333100000000",
         "000000001111111000000000","00000001aa111aa100000000","0000001aaa222aaa10000000","000001aaaa222aaaa1000000",
         "000001aaaa222aaaa1000000","00001aaaaa222aaaaa100000","00001aaaaa111aaaaa100000","00001aaaaa131aaaaa100000",
         "000011111100011111000000","000000000000000000000000"
+    ],
+    'おやっさん': [ // 伝説の老スパイ
+        "000000000000000000000000","000000000111110000000000","000000001999991000000000","000000019999999100000000",
+        "000000199999999910000000","000000193333333910000000","000000131133311310000000","000000131133311310000000",
+        "000000133333333310000000","000000133311133311110000","000000199333339912410000","000000019933399111100000",
+        "000000001111111000000000","00000001bb111bb100000000","0000001bbbbbbbbb10000000","000001bbbbbbbbbbb1000000",
+        "000001bbbb888bbbb1000000","00001bbbbb888bbbbb100000","00001bbbbb888bbbbb100000","00001bbbbb111bbbbb100000",
+        "000011111000001111000000","000000000000000000000000"
     ],
     '司令官ノイズ': [ 
         "000000000000000000000000","000000000111111000000000","000000011444444110000000","000000144444444441000000",
@@ -50,44 +58,52 @@ const CHAR_SPRITES = {
     ]
 };
 
-// ★ 80%ギャグ全振りのB級映画風シナリオ
+// ★ アクション映画風シナリオ
 const SCENARIOS = [
     [
-        { c: 'SYSTEM', t: '西暦20XX年。世界から「音」を奪おうとする悪の組織『サイレンス』。彼らの野望を阻止すべく、1人の男が極秘基地に潜入した。これは、1本の映画のような物語である――' },
-        { c: 'エコー', t: 'ミュート、聞こえるか？ポップコーンは用意したぜ。作戦開始だ。' },
-        { c: 'エコー', t: 'だが最悪なニュースがある。お前のブーツがハッキングされた！歩くたびに爆音と巨大な文字が出る呪いの靴だ！ｗ' },
-        { c: 'マキシマム', t: 'ガハハ！ステルスなど軟弱者のすること！筋肉で壁を破壊して進め！（※壁は壊せません）' },
-        { c: 'ルナ', t: 'マキシマムさん無茶言わないで！ミュートさん、Aで暗殺、Bでダンボールです！青いスイッチを踏んで進んで！' },
-        { c: 'エコー', t: '映画みたいにクールに決めろよ！イピカイエー！' }
+        { c: 'SYSTEM', t: '西暦20XX年。世界から「音」を奪おうとする悪の組織『サイレンス』。彼らの野望を阻止すべく、1人の男が極秘基地に潜入した。' },
+        { c: 'エコー', t: '作戦開始だ。だが最悪なニュースがある。ハッキングで靴がイカれた。' },
+        { c: 'エコー', t: '歩くたびに爆音と【巨大な文字】が出る最悪の靴だ。前見えないだろ？ｗ' },
+        { c: 'マキシマム', t: 'ガハハ！足音など筋肉でかき消せばよい！正面突破だ！' },
+        { c: 'ルナ', t: 'マキシマムさん無茶言わないで！Aで暗殺、Bでダンボールです！' },
+        { c: 'ルナ', t: '青いスイッチを踏んで青い扉を開け、緑のゴールへ向かってください！' }
     ],
     [
-        { c: 'SYSTEM', t: '最初のエリアを突破したミュート。しかし、その爆音は敵の耳に確実に届いていた。' },
-        { c: '司令官ノイズ', t: '何だあのふざけた足音は！私の静寂な基地を荒らすネズミめ！' },
-        { c: 'エコー', t: 'やべぇ！ボスにバレたぞ！「俺、この任務が終わったら結婚するんだ…」って死亡フラグ立てとく？ｗ' },
+        { c: '司令官ノイズ', t: '侵入者め...何だあのふざけた足音は！私の静寂な基地を荒らすネズミめ！' },
+        { c: 'エコー', t: 'やべぇ！ボスにバレたぞ！ここから警備がレベル2だ。' },
         { c: 'マキシマム', t: '敵が増えただと！？ならばプロテインを飲んで全員なぎ倒せ！！' },
-        { c: 'ルナ', t: '赤いスイッチと扉の仕掛けが追加されました！映画みたいに死線をくぐり抜けてください！' }
+        { c: 'おやっさん', t: '坊主、油断するな。ここからは「赤いスイッチ」の仕掛けも追加される。頭を使え。' }
     ],
     [
-        { c: 'SYSTEM', t: 'さらに深部へ。そこには司令官の右腕が待ち受けていた。' },
         { c: '副官ソナー', t: 'フフ…騒がしいネズミね。私の可愛い『サイボーグ猟犬』の餌にしてあげるわ。' },
-        { c: 'エコー', t: '犬だ！しかも足が超速いぞ！まるでB級ホラー映画のクリーチャーだな！' },
-        { c: 'マキシマム', t: '犬だと！？ならば素手で首を絞めろ！！筋肉は裏切らない！！' }
+        { c: 'ルナ', t: '気をつけて！猟犬は視界は狭いですが、移動速度がものすごく速いです！' },
+        { c: 'マキシマム', t: '犬だと！？ならば素手で首を絞めろ！！筋肉は裏切らない！！' },
+        { c: 'おやっさん', t: '文字で前が見えないお前にとっては最悪の敵だ。背後を取れ。' }
     ],
     [
-        { c: 'SYSTEM', t: '基地の最深部。強固なパズルと親衛隊が待ち受ける。' },
         { c: '司令官ノイズ', t: 'ええい！なぜあんな騒がしい奴を捕まえられんのだ！！' },
-        { c: '副官ソナー', t: '緑の隔壁を封鎖！親衛隊を総動員します！' },
+        { c: '副官ソナー', t: '申し訳ありません！緑の隔壁を封鎖し、親衛隊を総動員します！' },
         { c: 'ルナ', t: '最終エリアです！3色のパズルが入り乱れています！' },
-        { c: 'エコー', t: 'アスタラビスタ、ベイビー！派手にキメてこいミュート！' }
+        { c: 'エコー', t: '地獄で会おうぜベイビー！派手にキメてこいミュート！' }
     ],
     [
-        { c: 'SYSTEM', t: '全てのパズルを解き、ミュートは機密データを奪取した。かくして世界に音が戻ったのである。' },
-        { c: 'エコー', t: 'ミッション・コンプリート！まるでハリウッド映画のラストシーンだな！' },
+        { c: 'エコー', t: 'データ奪取成功だ！ミッション・コンプリート！' },
         { c: '司令官ノイズ', t: 'バカな…あんなウルサイ奴に…！アイルビーバック……！ぐはぁっ！' },
         { c: 'マキシマム', t: '筋肉の勝利だな！！ガハハハ！' },
+        { c: 'おやっさん', t: 'よくやった坊主。伝説の誕生だな。やかましい伝説だがな。' },
         { c: 'ミュート', t: '……（親指を立てて溶鉱炉に沈む）' },
         { c: 'ルナ', t: '沈まないでください！！早く帰ってきて！エンドロール流しますよ！' }
     ]
+];
+
+// ★ プレイ中のランダム掛け合い（配列で複数セリフを連続表示）
+const COMM_CONV = [
+    [ {c:'エコー', t:'右見て、左見て、筋肉見ろ！'}, {c:'マキシマム', t:'素晴らしいアドバイスだ！'}, {c:'ルナ', t:'真面目にナビしてください！'} ],
+    [ {c:'おやっさん', t:'坊主、足音の文字で前が見えん時は壁を頼れ。'}, {c:'マキシマム', t:'壁は殴って壊すものだ！'} ],
+    [ {c:'ルナ', t:'ダンボールのO2ゲージに気をつけて！'}, {c:'エコー', t:'息止めてれば平気だろ？'}, {c:'ルナ', t:'死にますよ！？'} ],
+    [ {c:'エコー', t:'この作戦が終わったら、俺…'}, {c:'おやっさん', t:'バカヤロウ！その言葉は口にするな！死亡フラグだ！'} ],
+    [ {c:'マキシマム', t:'ミュート！プロテインは足りているか！？'}, {c:'エコー', t:'彼はスパイであってボディビルダーじゃないぞ。'} ],
+    [ {c:'副官ソナー', t:'そこら中で文字が光ってて目障りね。'}, {c:'エコー', t:'敵の通信に割り込むな！'} ]
 ];
 
 // ★ DATABASE (3カテゴリ分類)
@@ -95,61 +111,50 @@ const DB = [
     {
         cat: 'キャラクター',
         items: [
-            { title: 'ミュート', text: '主人公。呪いの靴のせいで歩くたびに爆音と文字が出る不憫な男。' },
-            { title: 'エコー', text: '相棒のハッカー。映画のセリフを引用して煽るのが趣味。' },
-            { title: 'マキシマム', text: '筋肉で全てを解決しようとする元・伝説のスパイ。ステルスの意味を理解していない。' },
-            { title: 'ルナ', text: '天才メカニックの少女。ミュートの装備をハッキングから守れず落ち込んでいる。' },
-            { title: '司令官ノイズ', text: '「サイレンス」のボス。静寂を愛するがゆえにミュートの足音に激怒している。' },
-            { title: '副官ソナー', text: '冷酷な女幹部。サイボーグ猟犬を操る。' }
+            { title: 'ミュート', text: '一切言葉を発さない寡黙なスパイ。呪いの靴のせいで歩くたびに爆音と文字が出る不憫な男。愛用の銃よりプロテインを好む。' },
+            { title: 'エコー', text: '相棒の若手ハッカー。B級映画のセリフを引用して煽るのが趣味。ミュートが苦労している状況を映画を観るように楽しんでいる。' },
+            { title: 'マキシマム', text: '筋肉で全てを解決しようとする元・伝説のスパイ。暗号解読はキーボードを粉砕して行い、潜入は壁を破壊して行う。' },
+            { title: 'ルナ', text: '飛び級で博士号を取得した天才メカニック。ミュートの装備をハッキングから守れず、毎晩徹夜でデバッグしている。' },
+            { title: 'おやっさん', text: 'かつて冷戦時代を生き抜いた伝説の男。今は通信室から葉巻を咥えて的確な指示を出す。' },
+            { title: '司令官ノイズ', text: '世界から音と娯楽を奪おうとする「サイレンス」のボス。静寂を愛するがゆえにミュートの足音に激怒している。' }
         ]
     },
     {
         cat: '世界観',
         items: [
-            { title: '呪いのステルス靴', text: 'ハッキングにより、歩くたびに爆音と「ドスッ」などの巨大文字ホログラムを放出する最悪の装備。' },
-            { title: '虹色ダンボール', text: '被ると敵をやり過ごせるが、密閉性が高く長く被ると酸欠になる。しかも虹色に光る。' }
+            { title: '呪いのステルス靴', text: 'ハッキングにより、歩くたびに「ドスッ」「バァーン」などの巨大文字ホログラムを放出し、使用者の視界を物理的に塞ぐ最悪の装備。' },
+            { title: '虹色ダンボール', text: '被ると敵をやり過ごせるが、密閉性が高く長く被ると酸欠になる。しかも内部はクラブ仕様でパリピな虹色に発光する。' }
         ]
     },
     {
         cat: '組織',
         items: [
-            { title: 'サイレンス', text: '世界から音と娯楽を奪おうとする悪の組織。無機質な基地を多数保有する。' },
-            { title: '親衛隊', text: '最深部を守るエリート兵士。視界が広く、足も速い。' },
-            { title: 'サイボーグ猟犬', text: 'ソナーが操る犬。視界は狭いが移動速度が異様に速い。' }
+            { title: 'サイレンス', text: '人類から音楽や娯楽を奪い、完全な静寂をもたらそうとする悪の組織。無機質な基地を多数保有する。' },
+            { title: 'サイボーグ猟犬', text: 'ソナーが操る機械の犬。視界は狭いが移動速度が異様に速く、音もなく背後から忍び寄る。' }
         ]
     }
 ];
 
-// プレイ中のランダム煽り通信
-const COMM_LINES = [
-  { c: 'エコー', t: '「この任務が終わったら結婚するんだ」…言ってみたかっただけｗ' },
-  { c: 'マキシマム', t: '見つかったら筋肉で解決しろ！！' },
-  { c: 'ルナ', t: 'ダンボールの中、息苦しいので長居は禁物ですよ！' },
-  { c: 'エコー', t: '地獄で会おうぜ、ベイビー！' },
-  { c: 'エコー', t: 'ポップコーン食いながら見てるから頑張れよ！' },
-  { c: 'マキシマム', t: 'プロテインは持ったか！？' },
-  { c: 'ルナ', t: '敵の視界に入らないように背後から近づいて！' },
-  { c: 'エコー', t: '「私は戻ってくる」って敵が言ってたぞ！' }
-];
-
 const Noise = {
-    st: 'title', tmr: 0, level: 0, 
-    dbCat: 0, dbItem: 0, // DB用カーソル
+    st: 'title', tmr: 0, level: 0, menuCur: 0, dbCat: 0, dbItem: 0,
     scIdx: 0, msgIdx: 0, strToShow: '',
     
     cam: { x: 0, y: 0 }, mapW: 200, mapH: 300,
     
     p: { x: 100, y: 280, r: 6, spd: 3.0, box: false },
-    o2: 100, o2Cd: 0, // ★ ダンボール弱体化用（酸素）
+    o2: 100, o2Cd: 0, 
     
     texts: [], enemies: [], walls: [], doors: [], switches: [], 
     goal: { x: 100, y: 20, r: 15 },
     stats: { kills: 0, noise: 0, boxTime: 0, time: 0 },
-    msg: '', msgLife: 0, commTmr: 100,
+    
+    // 通信システム用
+    msg: '', msgLife: 0, commTmr: 100, commQueue: [],
     
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss'); canvas.width = 200; canvas.height = 300;
-        this.st = 'title'; this.tmr = 0; this.level = 0; this.menuCur = 0; this.msg = ''; this.msgLife = 0;
+        this.st = 'title'; this.tmr = 0; this.level = 0; this.menuCur = 0; 
+        this.msg = ''; this.msgLife = 0; this.commQueue = [];
         if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
@@ -168,13 +173,12 @@ const Noise = {
         );
     },
 
-    // ★ ステージの複雑化
     loadLevel() {
         this.st = 'play'; this.p.box = false; this.o2 = 100; this.o2Cd = 0;
-        this.texts = []; this.tmr = 0; this.commTmr = 150;
+        this.texts = []; this.tmr = 0; this.commTmr = 150; this.commQueue = [];
         this.walls = []; this.doors = []; this.switches = []; this.enemies = [];
         
-        if (this.level === 0) { // L1: チュートリアル
+        if (this.level === 0) { // L1
             this.mapW = 200; this.mapH = 400; this.p.x = 100; this.p.y = 360;
             this.walls.push( {x:20, y:200, w:60, h:20}, {x:120, y:200, w:60, h:20} );
             this.doors.push( {x:80, y:200, w:40, h:20, col: 'blue', open:false} );
@@ -182,7 +186,7 @@ const Noise = {
             this.enemies.push( { x:100, y:260, path:[{x:40,y:260},{x:160,y:260}], pt: 0, spd: 1.0, dir: 0, wait: 0, type: 'soldier' } );
             this.goal = { x: 100, y: 60, r: 15 };
         } 
-        else if (this.level === 1) { // L2: 赤青パズル
+        else if (this.level === 1) { // L2
             this.mapW = 400; this.mapH = 300; this.p.x = 40; this.p.y = 260;
             this.walls.push( {x:100, y:20, w:20, h:120}, {x:100, y:180, w:20, h:100}, {x:240, y:20, w:20, h:200}, {x:180, y:120, w:60, h:20} );
             this.doors.push( {x:100, y:140, w:20, h:40, col: 'blue', open:false}, {x:240, y:220, w:20, h:60, col: 'red', open:false} );
@@ -193,19 +197,19 @@ const Noise = {
             );
             this.goal = { x: 340, y: 150, r: 15 };
         }
-        else if (this.level === 2) { // L3: 犬登場
+        else if (this.level === 2) { // L3
             this.mapW = 500; this.mapH = 400; this.p.x = 40; this.p.y = 360;
             this.walls.push( {x:150, y:150, w:200, h:100}, {x:20, y:200, w:90, h:20}, {x:390, y:200, w:90, h:20} );
             this.doors.push( {x:110, y:200, w:40, h:20, col: 'blue', open:false}, {x:350, y:200, w:40, h:20, col: 'red', open:false} );
             this.switches.push( {x: 80, y: 100, r:10, col: 'blue', active:false}, {x: 420, y: 320, r:10, col: 'red', active:false} );
             this.enemies.push(
-                {x:250, y:360, path:[{x:40,y:360},{x:460,y:360}], pt: 0, spd: 3.5, dir: 0, wait: 0, type: 'dog'}, // 高速犬
+                {x:250, y:360, path:[{x:40,y:360},{x:460,y:360}], pt: 0, spd: 3.5, dir: 0, wait: 0, type: 'dog'}, 
                 {x:250, y:40, path:[{x:460,y:40},{x:40,y:40}], pt: 0, spd: 3.5, dir: 0, wait: 0, type: 'dog'},
                 {x:250, y:100, path:[{x:100,y:100},{x:400,y:100}], pt: 0, spd: 1.5, dir: 0, wait: 0, type: 'soldier'}
             );
             this.goal = { x: 250, y: 200, r: 15 };
         }
-        else if (this.level === 3) { // L4: 巨大要塞 (緑追加)
+        else if (this.level === 3) { // L4
             this.mapW = 700; this.mapH = 500; this.p.x = 40; this.p.y = 460;
             this.walls.push( {x:150, y:20, w:20, h:380}, {x:350, y:100, w:20, h:380}, {x:550, y:20, w:20, h:380} );
             this.doors.push( {x:150, y:400, w:20, h:80, col: 'blue', open:false}, {x:350, y:20, w:20, h:80, col: 'red', open:false}, {x:550, y:400, w:20, h:80, col: 'green', open:false} );
@@ -217,7 +221,7 @@ const Noise = {
             );
             this.goal = { x: 650, y: 60, r: 15 };
         }
-        else { // L5: 最終親衛隊
+        else { // L5
             this.mapW = 800; this.mapH = 600; this.p.x = 40; this.p.y = 560;
             this.walls.push( {x:200, y:200, w:400, h:200}, {x:20, y:380, w:180, h:20}, {x:600, y:200, w:180, h:20} );
             this.doors.push( {x:100, y:200, w:80, h:20, col: 'blue', open:false}, {x:600, y:380, w:80, h:20, col: 'red', open:false} );
@@ -260,28 +264,29 @@ const Noise = {
         }
 
         // ================= DATABASE =================
-        if (this.st === 'db_cat') {
-            if (keysDown.down) { this.dbCat = (this.dbCat + 1) % DB.length; playSnd('sel'); }
-            if (keysDown.up) { this.dbCat = (this.dbCat - 1 + DB.length) % DB.length; playSnd('sel'); }
-            if (keysDown.a) { this.st = 'db_list'; this.dbItem = 0; playSnd('sel'); }
-            if (keysDown.b) { this.st = 'title'; playSnd('hit'); }
-            return;
-        }
-        if (this.st === 'db_list') {
-            let items = DB[this.dbCat].items;
-            if (keysDown.down) { this.dbItem = (this.dbItem + 1) % items.length; playSnd('sel'); }
-            if (keysDown.up) { this.dbItem = (this.dbItem - 1 + items.length) % items.length; playSnd('sel'); }
-            if (keysDown.a) { this.st = 'db_detail'; playSnd('sel'); }
-            if (keysDown.b) { this.st = 'db_cat'; playSnd('hit'); }
-            return;
-        }
-        if (this.st === 'db_detail') {
-            if (keysDown.b) { this.st = 'db_list'; playSnd('hit'); }
+        if (this.st.startsWith('db_')) {
+            if (this.st === 'db_cat') {
+                if (keysDown.down) { this.dbCat = (this.dbCat + 1) % DB.length; playSnd('sel'); }
+                if (keysDown.up) { this.dbCat = (this.dbCat - 1 + DB.length) % DB.length; playSnd('sel'); }
+                if (keysDown.a) { this.st = 'db_list'; this.dbItem = 0; playSnd('sel'); }
+                if (keysDown.b) { this.st = 'title'; playSnd('hit'); }
+            } else if (this.st === 'db_list') {
+                let items = DB[this.dbCat].items;
+                if (keysDown.down) { this.dbItem = (this.dbItem + 1) % items.length; playSnd('sel'); }
+                if (keysDown.up) { this.dbItem = (this.dbItem - 1 + items.length) % items.length; playSnd('sel'); }
+                if (keysDown.a) { this.st = 'db_detail'; playSnd('sel'); }
+                if (keysDown.b) { this.st = 'db_cat'; playSnd('hit'); }
+            } else if (this.st === 'db_detail') {
+                if (keysDown.b) { this.st = 'db_list'; playSnd('hit'); }
+            }
             return;
         }
 
         // ================= STORY =================
         if (this.st === 'story') {
+            // エラー回避ガード
+            if (!SCENARIOS[this.scIdx] || !SCENARIOS[this.scIdx][this.msgIdx]) return;
+
             let msg = SCENARIOS[this.scIdx][this.msgIdx];
             if (this.tmr % 2 === 0 && this.strToShow.length < msg.t.length) {
                 this.strToShow += msg.t[this.strToShow.length];
@@ -291,8 +296,12 @@ const Noise = {
                 if (this.strToShow.length < msg.t.length) { this.strToShow = msg.t; } 
                 else {
                     this.msgIdx++;
-                    if (this.msgIdx < SCENARIOS[this.scIdx].length) { this.setupMessage(); } 
-                    else { if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; } else { this.loadLevel(); } }
+                    if (this.msgIdx < SCENARIOS[this.scIdx].length) { 
+                        this.strToShow = ''; 
+                    } else {
+                        if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; } 
+                        else { this.loadLevel(); }
+                    }
                 }
             }
             return;
@@ -306,28 +315,35 @@ const Noise = {
 
         // ================= PLAY =================
         this.stats.time++;
-        if (this.msgLife > 0) this.msgLife--;
-
-        // ランダム通信
-        this.commTmr--;
-        if (this.commTmr <= 0) {
-            let l = COMM_LINES[Math.floor(Math.random() * COMM_LINES.length)];
-            this.msg = `【${l.c}】${l.t}`; this.msgLife = 200;
-            this.commTmr = 300 + Math.random() * 200;
-        }
         
-        // カメラ制御
+        // ★ 通信システム（キュー消化）
+        if (this.commQueue.length > 0) {
+            if (this.msgLife <= 0) {
+                let n = this.commQueue.shift();
+                this.msg = `【${n.c}】${n.t}`; 
+                this.msgLife = 120; // 2秒表示
+            }
+        } else {
+            this.commTmr--;
+            if (this.commTmr <= 0) {
+                let conv = COMM_CONV[Math.floor(Math.random() * COMM_CONV.length)];
+                this.commQueue = [...conv]; // 配列をコピーしてキューに積む
+                this.commTmr = 400 + Math.random() * 300;
+            }
+        }
+        if (this.msgLife > 0) this.msgLife--;
+        
         this.cam.x = Math.max(0, Math.min(this.mapW - 200, this.p.x - 100));
         this.cam.y = Math.max(0, Math.min(this.mapH - 300, this.p.y - 150));
         
-        // ★ ダンボール弱体化（O2システム）
+        // ダンボール弱体化（O2システム）
         let currentSpd = this.p.spd;
         if (keys.b && this.o2 > 0 && this.o2Cd <= 0) {
-            this.p.box = true; currentSpd *= 0.2; // 激遅
+            this.p.box = true; currentSpd *= 0.2; 
             this.o2 -= 0.8;
             this.stats.boxTime++;
             if (this.o2 <= 0) {
-                this.p.box = false; this.o2Cd = 120; // 2秒ペナルティ
+                this.p.box = false; this.o2Cd = 120; 
                 this.texts.push({x: this.p.x, y: this.p.y, text: '酸欠!!', col: '#0ff', life: 60, maxLife: 60, size: 20, rot: 0});
                 playSnd('hit');
             }
@@ -374,7 +390,8 @@ const Noise = {
         if (moved && !this.p.box && this.tmr % noiseInterval === 0) {
             let words = ['ドスッ!', 'バァーン!', 'スサッ', 'ドン!'];
             let cols = ['#f00', '#ff0', '#f0f', '#0ff'];
-            // ★ 見切れ防止：カメラ枠内にClamp
+            
+            // 見切れ防止（カメラ枠内にclamp）
             let cx = this.cam.x, cy = this.cam.y;
             let tx = this.p.x + (Math.random()-0.5)*80; let ty = this.p.y + (Math.random()-0.5)*80;
             tx = Math.max(cx + 30, Math.min(cx + 170, tx)); ty = Math.max(cy + 50, Math.min(cy + 250, ty));
@@ -390,8 +407,12 @@ const Noise = {
             if (t.life <= 0) this.texts.splice(i, 1);
         }
 
+        // ★ ゴール判定時のレベル進行修正
         if (Math.hypot(this.p.x - this.goal.x, this.p.y - this.goal.y) < this.goal.r + this.p.r) {
-            playSnd('combo'); this.startStory(this.level + 1); return;
+            playSnd('combo'); 
+            this.level++; 
+            this.startStory(this.level); 
+            return;
         }
 
         for (let e of this.enemies) {
@@ -410,7 +431,7 @@ const Noise = {
                         for (let w of activeWalls) { if (this.lineHitRect(e.x, e.y, this.p.x, this.p.y, w)) { hidden = true; break; } }
                         if (!hidden) {
                             this.st = 'gameover'; this.tmr = 0;
-                            this.msg = '【エコー】あーあ、見つかっちゃったよ。'; this.msgLife = 180;
+                            this.msg = '【司令官ノイズ】捕らえろォォ！！'; this.msgLife = 180;
                             playSnd('hit'); screenShake(15);
                             this.texts.push({ x: this.p.x, y: this.p.y, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 40, rot: 0, screenCenter: true });
                         }
@@ -441,8 +462,11 @@ const Noise = {
             ctx.fillStyle = '#f80'; ctx.font = 'bold 26px "Arial Black", sans-serif'; ctx.shadowBlur = 10; ctx.shadowColor = '#f00';
             ctx.fillText('NOISE', 55, 80); ctx.fillText('AGENT', 55, 110); ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('- 爆音スニーキング -', 45, 140);
-            ctx.fillStyle = this.menuCur === 0 ? '#0f0' : '#888'; ctx.fillText((this.menuCur === 0 ? '> ' : '  ') + 'PLAY STORY', 60, 200);
+            ctx.fillStyle = this.menuCur === 0 ? '#0f0' : '#888'; ctx.fillText((this.menuCur === 0 ? '> ' : '  ') + 'PLAY MOVIE', 60, 200);
             ctx.fillStyle = this.menuCur === 1 ? '#0f0' : '#888'; ctx.fillText((this.menuCur === 1 ? '> ' : '  ') + 'DATABASE', 60, 220);
+            
+            // 映画風レターボックス
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 25); ctx.fillRect(0, 275, 200, 25);
             return;
         }
 
@@ -458,7 +482,7 @@ const Noise = {
                 let items = DB[this.dbCat].items;
                 for(let i=0; i<items.length; i++) {
                     ctx.fillStyle = this.dbItem === i ? '#ff0' : '#aaa';
-                    ctx.fillText((this.dbItem === i ? '> ' : '  ') + items[i].title, 20, 80 + i * 20);
+                    ctx.fillText((this.dbItem === i ? '> ' : '  ') + items[i].title, 10, 75 + i * 20);
                 }
             } else if (this.st === 'db_detail') {
                 let item = DB[this.dbCat].items[this.dbItem];
@@ -467,9 +491,9 @@ const Noise = {
                 let textY = 90; let currentLine = '';
                 for (let i = 0; i < item.text.length; i++) {
                     currentLine += item.text[i];
-                    if (currentLine.length > 16) { ctx.fillText(currentLine, 15, textY); textY += 15; currentLine = ''; }
+                    if (currentLine.length > 18) { ctx.fillText(currentLine, 10, textY); textY += 15; currentLine = ''; }
                 }
-                ctx.fillText(currentLine, 15, textY);
+                ctx.fillText(currentLine, 10, textY);
             }
             ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText('A:決定  B:戻る  ↑↓:選択', 25, 280);
             return;
@@ -477,6 +501,8 @@ const Noise = {
 
         if (this.st === 'story') {
             let msg = SCENARIOS[this.scIdx][this.msgIdx];
+            if(!msg) return; // エラーガード
+            
             ctx.fillStyle = '#112'; ctx.fillRect(0,0,200,300);
             ctx.strokeStyle = '#334'; ctx.lineWidth = 1;
             for(let i=0; i<300; i+=10) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(200,i); ctx.stroke(); }
@@ -495,7 +521,8 @@ const Noise = {
                 if (spData) this.drawSpriteData(60, 40, spData, 3.5); 
 
                 ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 180, 180, 110);
-                ctx.strokeStyle = msg.c === 'マキシマム' ? '#f00' : (msg.c === 'ルナ' ? '#f0f' : '#0ff'); ctx.lineWidth = 2; ctx.strokeRect(10, 180, 180, 110);
+                ctx.strokeStyle = msg.c === 'マキシマム' ? '#f00' : (msg.c === 'ルナ' ? '#f0f' : (msg.c === 'おやっさん' ? '#ff0' : '#0ff')); 
+                ctx.lineWidth = 2; ctx.strokeRect(10, 180, 180, 110);
                 ctx.fillStyle = msg.c === 'マキシマム' ? '#f55' : (msg.c === 'ミュート' ? '#aaa' : '#0f0');
                 ctx.font = 'bold 12px monospace'; ctx.fillText(`【 ${msg.c} 】`, 15, 200);
 
@@ -544,7 +571,6 @@ const Noise = {
         for (let e of this.enemies) {
             let sightRadius = e.type === 'dog' ? 45 : 75;
             ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, sightRadius, e.dir - 0.6, e.dir + 0.6); ctx.fill();
-            
             ctx.fillStyle = e.type === 'dog' ? '#fa0' : '#0a0'; 
             ctx.beginPath(); ctx.arc(e.x, e.y, e.type === 'dog' ? 4 : 6, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.dir)*10, e.y + Math.sin(e.dir)*10); ctx.stroke();
@@ -564,7 +590,7 @@ const Noise = {
             ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.globalAlpha = t.life / t.maxLife; ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0); ctx.globalAlpha = 1.0; ctx.restore();
         }
         
-        ctx.restore(); // スクロール終了
+        ctx.restore(); 
 
         for (let t of this.texts) {
             if (!t.screenCenter) continue;
@@ -575,14 +601,12 @@ const Noise = {
         // ================= 映画風レターボックスUI =================
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 25); ctx.fillRect(0, 275, 200, 25);
         
-        // 上部ステータス
         ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
         ctx.fillText(`LV:${this.level + 1} KILLS:${this.stats.kills}`, 5, 16);
         ctx.fillStyle = '#444'; ctx.fillRect(110, 8, 80, 8);
         ctx.fillStyle = this.o2Cd > 0 ? '#f00' : '#0af'; ctx.fillRect(110, 8, 80 * (this.o2/100), 8);
         ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('O2', 95, 15);
 
-        // 下部字幕
         ctx.fillStyle = '#0ff'; ctx.font = '9px monospace';
         if (this.msgLife > 0 && this.msg !== '') {
             if (this.msg.length > 20) { ctx.fillText(this.msg.substring(0, 20), 5, 285); ctx.fillText(this.msg.substring(20), 5, 295); } 
@@ -605,7 +629,6 @@ const Noise = {
             ctx.fillStyle = tCol; ctx.font = 'bold 16px monospace'; ctx.fillText(title, 100, 185);
             if (this.tmr > 60) { ctx.fillStyle = '#ccc'; ctx.font = '10px monospace'; ctx.fillText('PRESS [A] TO RETURN', 100, 250); }
             ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-            
             ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 25); ctx.fillRect(0, 275, 200, 25);
         }
     }
