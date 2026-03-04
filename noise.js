@@ -1,192 +1,199 @@
-// === NOISE AGENT (Phase 4: Scroll Map, Puzzles & Database) ===
+// === NOISE AGENT (Phase 4: High-Res Pixel & DATABASE Edition) ===
 
-const PAL = { '0':null, '1':'#000', '2':'#fff', '3':'#fca', '4':'#f00', '5':'#0ff', '6':'#0a0', '7':'#ff0', '8':'#444', '9':'#888', 'a':'#00f', 'b':'#f0f', 'c':'#fa0', 'd':'#ccc' };
+const VoiceSys = {
+    voices: [], unlocked: false,
+    init() {
+        let loadV = () => { this.voices = speechSynthesis.getVoices().filter(v => v.lang.includes('ja')); };
+        loadV();
+        if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadV;
+        const unlock = () => {
+            if(!this.unlocked) {
+                let u = new SpeechSynthesisUtterance('');
+                u.volume = 0; speechSynthesis.speak(u); this.unlocked = true;
+            }
+            window.removeEventListener('touchstart', unlock); window.removeEventListener('mousedown', unlock);
+        };
+        window.addEventListener('touchstart', unlock, {passive: true}); window.addEventListener('mousedown', unlock, {passive: true});
+    },
+    speak(char, txt) {
+        if (Noise.st === 'play' || Noise.st === 'gameover') {
+            Noise.msg = char === 'ミュート' ? '……' : `エコー「${txt}」`;
+            Noise.msgLife = 180; 
+        }
+        speechSynthesis.cancel();
+        if (char === 'ミュート' || char === 'SYSTEM') return; 
+        try {
+            let u = new SpeechSynthesisUtterance(txt);
+            if (this.voices.length > 0) {
+                u.voice = this.voices.find(v => v.name.includes('Google') || v.name.includes('Male') || v.name.includes('Taro')) || this.voices[0];
+            }
+            if (char === 'エコー') { u.pitch = 1.3; u.rate = 1.3; } 
+            else if (char === '司令官ノイズ') { u.pitch = 0.5; u.rate = 0.9; } 
+            else { u.pitch = 1.0; u.rate = 1.0; }
+            u.volume = 1.0; speechSynthesis.speak(u);
+        } catch(e) { console.warn('Voice blocked'); } 
+    },
+    stop() { speechSynthesis.cancel(); }
+};
+
+const PAL = { '0':null, '1':'#000', '2':'#fff', '3':'#fca', '4':'#f00', '5':'#0ff', '6':'#0a0', '7':'#fa0', '8':'#444', '9':'#888' };
+
+// ★ ドット絵を24x24に高精細化（人間らしさUP）
 const CHAR_SPRITES = {
-    'エコー': [
-        "0000000000000000","0000111111110000","0001777777771000","0017777777777100",
-        "0017733333377100","0181333333331810","0181311111131810","0181315555131810",
-        "0011333333331100","0001333333331000","0000111111110000","0001666666661000",
-        "0016661111666100","0016661111666100","0011110000111100","0000000000000000"
+    'エコー': [ 
+        "000000000000000000000000","000000000111111000000000","000000011777777110000000","000000177777777771000000",
+        "000001777777777777100000","000011777733333377110000","000181777333333337181000","000181111111111111181000",
+        "000181111555555111181000","000181111555555111181000","000181773333333377181000","000011773333333377110000",
+        "000001773333333377100000","000000113333333311000000","000000001133331100000000","000000016611116610000000",
+        "000000166666666661000000","000001666666666666100000","000001666111111666100000","000016661333333166610000",
+        "000016661333333166610000","000016661111111166610000","000011110000000011110000","000000000000000000000000"
     ],
-    'クロエ': [ // ピンク髪のメカニック
-        "0000000000000000","0000bbbbbbbb0000","000bbbbbbbbbb000","00bb33333333bb00",
-        "00bb31333313bb00","00bb33333333bb00","000bb333333bb000","0002822222282000",
-        "0002222222222000","0002222222222000","0000222222220000","0000111111110000",
-        "0000888888880000","0000888888880000","0001111001111000","0000000000000000"
+    '司令官ノイズ': [ 
+        "000000000000000000000000","000000000111111000000000","000000011444444110000000","000000144444444441000000",
+        "000001444444444444100000","000011111111111111110000","000000133333333331000000","000000133333333331000000",
+        "000000131133331131000000","000000131133331131000000","000000133333333331000000","000000133311113331000000",
+        "000000013333333310000000","000000001111111100000000","000000018888888810000000","000000188888888881000000",
+        "000001888888888888100000","000001888788887888100000","000018888788887888810000","000018888788887888810000",
+        "000018888888888888810000","000018888888888888810000","000011111111111111110000","000000000000000000000000"
     ],
-    'ジャック': [ // 筋肉バンダナ
-        "0000000000000000","0000444444440000","0004444444444000","0033333333333300",
-        "0033313333133300","0033333333333300","0003333333333000","0000111111110000",
-        "0001666666661000","0016666666666100","0016666666666100","0000111111110000",
-        "0000888888880000","0000888888880000","0001111001111000","0000000000000000"
-    ],
-    '司令官ノイズ': [
-        "0000111111110000","0001444444441000","0011444444441100","0111111111111110",
-        "0003333333333000","0003113333113000","0003333333333000","0003333333333000",
-        "0003331111333000","0000333333330000","0000888888880000","0008888888888000",
-        "0088878888788800","0088878888788800","0088888888888800","0000000000000000"
-    ],
-    'ミュート': [
-        "0000000000000000","0000111111110000","0001111111111000","0011111111111100",
-        "0011111111111100","0011155115511100","0011155115511100","0011111111111100",
-        "0001111111111000","0001111111111000","0000111111110000","0000888888880000",
-        "0008888888888000","0088888888888800","0088888888888800","0000000000000000"
+    'ミュート': [ 
+        "000000000000000000000000","000000000111111000000000","000000011111111110000000","000000111111111111000000",
+        "000001111111111111100000","000001111111111111100000","000001111441144111100000","000001111441144111100000",
+        "000001111111111111100000","000001111111111111100000","000000111111111111000000","000000011111111110000000",
+        "000000001111111100000000","000000018888888810000000","000000188888888881000000","000001888888888888100000",
+        "000001888888888888100000","000018888888888888810000","000018888888888888810000","000018888888888888810000",
+        "000018888888888888810000","000018888888888888810000","000011111111111111110000","000000000000000000000000"
     ]
 };
 
-// 映画風ストーリー
 const SCENARIOS = [
     [
-        { c: 'エコー', t: 'ミュート、お前に良いニュースと悪いニュースがある。' },
-        { c: 'エコー', t: '良いニュースは、敵基地への潜入に成功したことだ！' },
-        { c: 'エコー', t: '悪いニュースは…お前のブーツのハッキングが直ってない事だ！ｗ' },
-        { c: 'クロエ', t: 'ごめんなさいミュート！歩くたびに爆音と文字が出るわ！' },
-        { c: 'クロエ', t: '代わりに私の特製「虹色ダンボール(Bボタン)」を使って！' },
-        { c: 'クロエ', t: 'ただしバッテリー制だから、ゲージ切れには気をつけてね！' }
+        { c: 'SYSTEM', t: '西暦20XX年。世界から「音」を奪おうとする悪の組織『サイレンス』。彼らの野望を阻止すべく、1人のエージェントが極秘基地に潜入した。' },
+        { c: 'エコー', t: '聞こえるかミュート？ついに潜入作戦開始だ。' },
+        { c: 'エコー', t: 'だが最悪なニュースがある。お前のブーツがハッキングされた！' },
+        { c: 'エコー', t: '歩くたびに爆音と【巨大な文字】が出る呪いの靴になっちまったんだ！ｗ' },
+        { c: 'ミュート', t: '……。' },
+        { c: 'エコー', t: '文字が邪魔で前が見えないだろうが、Aで暗殺、Bでダンボールだ！' },
+        { c: 'エコー', t: '青い【スイッチ】を踏んで扉を開け、緑のゴールを目指せ！' }
     ],
     [
-        { c: 'ジャック', t: 'こちらジャック。東ルートで敵と交戦中だ！派手にいくぜ！' },
-        { c: 'ジャック', t: '俺、この任務が終わったら…腹いっぱいピザを食うんだ…！' },
-        { c: 'エコー', t: 'おいバカ！見事な死亡フラグを建てるな！' },
-        { c: 'エコー', t: 'ミュート、このフロアは【黄色い鍵】を探さないと扉が開かないぞ！' }
+        { c: 'SYSTEM', t: '何とか最初のエリアを突破したミュート。しかし、そのやかましい足音は敵の耳に確実に届いていた。' },
+        { c: '司令官ノイズ', t: '侵入者め...ネズミが迷い込んだようだな。' },
+        { c: 'エコー', t: 'やべぇ！敵のボス「司令官ノイズ」に気づかれたぞ！' },
+        { c: '司令官ノイズ', t: 'そのやかましい足音...貴様、スパイの風上にも置けん奴だ！' },
+        { c: '司令官ノイズ', t: '警備を「レベル2」に引き上げろ！あのウルサイ奴を蜂の巣にしろ！' },
+        { c: 'エコー', t: '敵もスイッチも増えたぞ！ダンボール(B)を駆使して切り抜けろ！' }
     ],
     [
-        { c: '司令官ノイズ', t: 'ええい！なぜあんなパリピみたいに光るダンボールを捕まえられん！' },
-        { c: '司令官ノイズ', t: 'アサシン部隊「サイレント」を放て！静寂の恐怖を教えてやれ！' },
-        { c: 'エコー', t: 'やべぇぞ！黒い服の敵は視界が広くて速いプロだ！' },
-        { c: 'クロエ', t: '文字で前が見えない時は、立ち止まって文字が消えるのを待ってね！' }
+        { c: 'SYSTEM', t: '基地の最深部、機密データルームへと続く最終通路。強固なパズルと親衛隊が待ち受ける。' },
+        { c: '司令官ノイズ', t: 'ええい！なぜあんな騒がしい奴を捕まえられんのだ！！' },
+        { c: '司令官ノイズ', t: '機密データルームに親衛隊を配置しろ！絶対にここを通すな！' },
+        { c: 'エコー', t: '次が最終エリアだミュート！敵がウジャウジャいるぞ！' },
+        { c: 'エコー', t: '自分の足音の「文字」で前が見えなくなったら終わりだ。慎重に行けよ！' }
     ],
     [
-        { c: 'ジャック', t: 'ハァ…ハァ…なんとか生き延びたぜ。ピザの出前はまだか？' },
-        { c: 'エコー', t: 'ミュート！次が機密データのある最深部だ！' },
-        { c: 'エコー', t: '重装甲のバズが巡回してる！絶対に見つかるなよ！！' }
-    ],
-    [
+        { c: 'SYSTEM', t: '全ての敵を退け、ミュートは機密データの奪取に成功した。サイレンスの野望はここに潰えた。' },
         { c: 'エコー', t: 'ミッション・コンプリート！！機密データを奪取したぞ！' },
         { c: '司令官ノイズ', t: 'バカな...あんなうるさいフザケた奴に...私の基地が...！ぐはぁっ！' },
         { c: 'ミュート', t: '……（サムズアップ）' },
-        { c: 'エコー', t: 'さぁ帰ろうぜ！ジャックも無事だ！俺のおごりでピザパだ！' }
+        { c: 'エコー', t: 'さぁ帰ろうぜ、ミュート！俺のおごりでピザパだ！最高に笑える作戦だったぜ！' }
     ]
 ];
 
-const DB_DATA = [
-    { title: '【キャラクター図鑑】', items: [
-        { n: 'ミュート', t: '主人公。呪いの靴のせいで歩くたびに爆音と擬音語のホログラムが出てしまう。不憫。' },
-        { n: 'エコー', t: '相棒のハッカー。ミュートの悲惨な状況を完全に面白がっており、ひたすら煽ってくる。' },
-        { n: 'クロエ', t: '兵器開発担当。無駄に虹色に光るダンボールを開発した張本人。' },
-        { n: 'ジャック', t: '別ルートを潜入中の脳筋エージェント。すぐ死亡フラグを建てるが、なぜか死なない。' }
-    ]},
-    { title: '【敵対組織サイレンス】', items: [
-        { n: '司令官ノイズ', t: '世界から娯楽と音を奪おうとする悪のボス。実は名前がノイズ。' },
-        { n: 'アサシン・サイレント', t: '青い視界を持つ暗殺者。非常に素早く、執拗にプレイヤーを追う。' },
-        { n: '重装甲兵バズ', t: '超巨大な視界を持つ最終兵器。見つかったら最後。' }
-    ]}
-];
-
-// ★ 広大なレベルデータ設計
-const LEVELS = [
-    { // Level 1: チュートリアル (400x400)
-        w: 400, h: 400,
-        start: {x: 50, y: 350}, goal: {x: 350, y: 50},
-        walls: [ {x:0, y:200, w:250, h:40}, {x:150, y:80, w:40, h:120}, {x:-10, y:-10, w:420, h:10}, {x:-10, y:400, w:420, h:10}, {x:-10, y:0, w:10, h:400}, {x:400, y:0, w:10, h:400} ],
-        doors: [ {x:250, y:200, w:60, h:40, type:'switch', reqId:1, open:false} ],
-        switches: [ {x:50, y:100, r:15, id:1, active:false} ],
-        keys: [],
-        enemies: [ {x:200, y:300, path:[{x:100,y:300},{x:300,y:300}], pt:0, spd:1.0, type:'normal', wait:0} ]
-    },
-    { // Level 2: 鍵パズル (600x400)
-        w: 600, h: 400,
-        start: {x: 50, y: 350}, goal: {x: 550, y: 50},
-        walls: [ {x:200, y:0, w:40, h:300}, {x:400, y:100, w:40, h:300} ],
-        doors: [ {x:200, y:300, w:40, h:60, type:'key', reqId:1, open:false}, {x:400, y:40, w:40, h:60, type:'switch', reqId:2, open:false} ],
-        switches: [ {x:300, y:350, r:15, id:2, active:false} ],
-        keys: [ {x:100, y:50, r:10, id:1, taken:false} ],
-        enemies: [
-            {x:100, y:200, path:[{x:50,y:200},{x:150,y:200}], pt:0, spd:1.2, type:'normal', wait:0},
-            {x:300, y:100, path:[{x:300,y:50},{x:300,y:250}], pt:0, spd:1.5, type:'normal', wait:0},
-            {x:500, y:200, path:[{x:450,y:200},{x:550,y:200}], pt:0, spd:1.2, type:'normal', wait:0}
-        ]
-    },
-    { // Level 3: アサシン登場 (600x600)
-        w: 600, h: 600,
-        start: {x: 50, y: 550}, goal: {x: 550, y: 50},
-        walls: [ {x:0, y:200, w:400, h:40}, {x:200, y:400, w:400, h:40}, {x:200, y:0, w:40, h:100} ],
-        doors: [ {x:400, y:200, w:80, h:40, type:'key', reqId:1, open:false} ],
-        switches: [],
-        keys: [ {x:50, y:50, r:10, id:1, taken:false} ],
-        enemies: [
-            {x:200, y:300, path:[{x:50,y:300},{x:350,y:300}], pt:0, spd:2.0, type:'silent', wait:0}, // サイレント！
-            {x:400, y:500, path:[{x:250,y:500},{x:550,y:500}], pt:0, spd:1.5, type:'normal', wait:0},
-            {x:300, y:100, path:[{x:300,y:50},{x:300,y:150}], pt:0, spd:1.5, type:'normal', wait:0}
-        ]
-    },
-    { // Level 4: 最終防衛線 バズ登場 (800x400)
-        w: 800, h: 400,
-        start: {x: 50, y: 200}, goal: {x: 750, y: 200},
-        walls: [ {x:300, y:100, w:40, h:200}, {x:500, y:100, w:40, h:200} ],
-        doors: [ {x:300, y:50, w:40, h:50, type:'switch', reqId:1, open:false}, {x:500, y:300, w:40, h:50, type:'switch', reqId:2, open:false} ],
-        switches: [ {x:150, y:50, r:15, id:1, active:false}, {x:400, y:350, r:15, id:2, active:false} ],
-        keys: [],
-        enemies: [
-            {x:200, y:300, path:[{x:100,y:300},{x:250,y:300}], pt:0, spd:1.5, type:'silent', wait:0},
-            {x:400, y:200, path:[{x:350,y:200},{x:450,y:200}], pt:0, spd:2.5, type:'silent', wait:0},
-            {x:650, y:200, path:[{x:600,y:100},{x:600,y:300},{x:750,y:300},{x:750,y:100}], pt:0, spd:1.0, type:'buzz', wait:0} // バズ！
-        ]
-    }
+// ★ DATABASE設定
+const DB_ITEMS = [
+    { title: 'エージェント「ミュート」', text: '寡黙で優秀なスパイ。しかし呪いの靴のせいで歩くたびに爆音と擬音語のホログラムが出てしまい、常に視界が塞がれている不憫な男。' },
+    { title: 'ナビゲーター「エコー」', text: 'ミュートの相棒である天才若手ハッカー。親友が爆音を出して苦労している状況を完全に面白がっており、無駄な煽り通信を入れてくる。' },
+    { title: '司令官ノイズ', text: '世界から音と娯楽を奪おうとする組織「サイレンス」のボス。静寂を愛するがゆえに、ミュートのやかましい足音に激怒している。' },
+    { title: '虹色ダンボール', text: '被ると敵の視界をやり過ごせる最強のステルス装備。しかし内部はクラブ仕様になっており、パリピな虹色発光でプレイヤーの目を痛めつける。' }
 ];
 
 const Noise = {
     st: 'title', tmr: 0, level: 0,
-    scIdx: 0, msgIdx: 0, strToShow: '',
-    dbCur: 0, dbMode: 0, // DATABASE用
+    menuCur: 0, dbCur: 0, // カーソル
+    scIdx: 0, msgIdx: 0, charTimer: 0, strToShow: '',
     
-    lvl: null, // 現在のレベルデータ参照
-    p: { x: 0, y: 0, r: 6, spd: 3, box: false, energy: 100 },
-    cam: { x: 0, y: 0 },
-    texts: [], 
+    p: { x: 100, y: 280, r: 6, spd: 2.5, box: false },
+    texts: [], enemies: [], walls: [], 
+    doors: [], switches: [], 
+    goal: { x: 100, y: 20, r: 15 },
     stats: { kills: 0, noise: 0, boxTime: 0, time: 0 },
+    msg: '', msgLife: 0,
     
-    radioQ: [], msg: '', msgChar: '', msgLife: 0,
-
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss');
         canvas.width = 200; canvas.height = 300;
-        this.st = 'title'; this.tmr = 0; this.level = 0; this.dbCur = 0; this.dbMode = 0;
+        this.st = 'title'; this.tmr = 0; this.level = 0; this.menuCur = 0;
+        this.msg = ''; this.msgLife = 0;
+        VoiceSys.init();
         if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
-    pushRadio(c, t) { this.radioQ.push({c, t}); },
-
     startStory(sIdx) {
         this.st = 'story'; this.scIdx = sIdx; this.msgIdx = 0; this.tmr = 0;
-        this.strToShow = '';
-        if (typeof playSnd !== 'undefined') playSnd('sel');
+        this.setupMessage();
+    },
+
+    setupMessage() {
+        let m = SCENARIOS[this.scIdx][this.msgIdx];
+        this.strToShow = ''; this.charTimer = 0;
+        VoiceSys.speak(m.c, m.t); 
+    },
+
+    // 外枠の壁を追加（画面外逃げ防止）
+    addOuterWalls() {
+        this.walls.push(
+            {x: 0, y: 30, w: 200, h: 10},  // 上
+            {x: 0, y: 290, w: 200, h: 10}, // 下
+            {x: 0, y: 30, w: 10, h: 270},  // 左
+            {x: 190, y: 30, w: 10, h: 270} // 右
+        );
     },
 
     loadLevel() {
         this.st = 'play';
-        this.lvl = JSON.parse(JSON.stringify(LEVELS[this.level])); // ディープコピー
-        this.p.x = this.lvl.start.x; this.p.y = this.lvl.start.y;
-        this.p.box = false; this.p.energy = 100;
-        this.texts = []; this.radioQ = []; this.msgLife = 0;
-        this.tmr = 0;
+        this.p = { x: 100, y: 260, r: 6, spd: 2.5, box: false };
+        this.texts = []; this.tmr = 0;
+        this.walls = []; this.doors = []; this.switches = []; this.enemies = [];
+        this.addOuterWalls();
 
         if (this.level === 0) {
-            this.pushRadio('エコー', '十字キーで移動、Aで暗殺、Bで箱だ。');
-            this.pushRadio('クロエ', '青いスイッチを踏むと青い扉が開くわ！');
-        } else if (this.level === 1) {
-            this.pushRadio('エコー', '黄色い鍵を拾わないと扉が開かないぞ！');
-        } else if (this.level === 2) {
-            this.pushRadio('ジャック', '黒い服の奴には気をつけろ！視界が広いぞ！');
-        } else if (this.level === 3) {
-            this.pushRadio('エコー', 'デカい重装甲がいる！見つかったら終わりだ！');
+            this.walls.push( {x:10, y:120, w:80, h:20}, {x:130, y:120, w:60, h:20} );
+            this.doors.push( {x:90, y:120, w:40, h:20, id:1, open:false} );
+            this.switches.push( {x: 170, y: 260, r:10, id:1, active:false} );
+            this.enemies.push( { x:100, y:180, path:[{x:50,y:180},{x:150,y:180}], pt: 0, spd: 1.0, dir: 0, wait: 0 } );
+            this.goal = { x: 100, y: 60, r: 15 };
+        } 
+        else if (this.level === 1) {
+            this.p.x = 30; this.p.y = 260;
+            this.walls.push( {x:10, y:100, w:120, h:20}, {x:130, y:100, w:20, h:120}, {x:10, y:200, w:80, h:20} );
+            this.doors.push( {x: 90, y:200, w:40, h:20, id:1, open:false} );
+            this.switches.push( {x: 160, y:60, r:10, id:1, active:false} );
+            this.enemies.push(
+                {x:160, y:160, path:[{x:160,y:100},{x:160,y:260}], pt: 0, spd: 1.5, dir: 0, wait: 0},
+                {x:50, y:150, path:[{x:20,y:150},{x:100,y:150}], pt: 0, spd: 1.2, dir: 0, wait: 0}
+            );
+            this.goal = { x: 30, y: 60, r: 15 };
+        }
+        else if (this.level === 2) {
+            this.p.x = 30; this.p.y = 260;
+            this.walls.push( {x:60, y:40, w:20, h:100}, {x:60, y:140, w:130, h:20}, {x:10, y:210, w:120, h:20} );
+            this.doors.push( {x:130, y:210, w:40, h:20, id:1, open:false}, {x:170, y:140, w:20, h:20, id:2, open:false} );
+            this.switches.push( {x: 30, y: 60, r:10, id:1, active:false}, {x: 170, y: 260, r:10, id:2, active:false} );
+            this.enemies.push(
+                {x:100, y:250, path:[{x:10,y:250},{x:170,y:250}], pt: 0, spd: 1.5, dir: 0, wait: 0},
+                {x:100, y:180, path:[{x:40,y:180},{x:160,y:180}], pt: 0, spd: 1.8, dir: 0, wait: 0},
+                {x:100, y:100, path:[{x:80,y:100},{x:180,y:100}], pt: 0, spd: 1.8, dir: 0, wait: 0}
+            );
+            this.goal = { x: 170, y: 60, r: 15 };
         }
 
         if (typeof BGM !== 'undefined') BGM.stop();
+        VoiceSys.speak('エコー', '作戦開始だミュート！');
     },
 
     lineHitRect(x1, y1, x2, y2, rect) {
-        let steps = 15;
+        let steps = 10;
         for(let i = 0; i <= steps; i++) {
             let px = x1 + (x2 - x1) * (i / steps);
             let py = y1 + (y2 - y1) * (i / steps);
@@ -196,19 +203,21 @@ const Noise = {
     },
     
     update() {
-        if (keysDown.select && this.st !== 'title') { switchApp(Menu); return; }
+        if (keysDown.select) { VoiceSys.stop(); switchApp(Menu); return; }
         this.tmr++;
 
         // ================= TITLE =================
         if (this.st === 'title') {
-            if (keysDown.up || keysDown.down) { this.dbCur = this.dbCur === 0 ? 1 : 0; if(typeof playSnd !== 'undefined') playSnd('sel'); }
-            if (keysDown.a) {
-                if(typeof playSnd !== 'undefined') playSnd('jmp');
-                if (this.dbCur === 0) {
+            if (keysDown.down) { this.menuCur = 1; playSnd('sel'); }
+            if (keysDown.up) { this.menuCur = 0; playSnd('sel'); }
+            if (keysDown.a) { 
+                if (this.menuCur === 0) {
                     this.stats = { kills: 0, noise: 0, boxTime: 0, time: 0 };
-                    this.level = 0; this.startStory(0); 
+                    this.level = 0;
+                    if(typeof playSnd !== 'undefined') playSnd('jmp');
+                    this.startStory(0); 
                 } else {
-                    this.st = 'database'; this.dbCur = 0; this.dbMode = 0;
+                    this.st = 'database'; this.dbCur = 0; playSnd('sel');
                 }
             }
             return;
@@ -216,36 +225,27 @@ const Noise = {
 
         // ================= DATABASE =================
         if (this.st === 'database') {
-            if (keysDown.b) { 
-                if (this.dbMode === 1) { this.dbMode = 0; if(typeof playSnd !== 'undefined') playSnd('hit'); }
-                else { this.st = 'title'; this.dbCur = 1; if(typeof playSnd !== 'undefined') playSnd('hit'); }
-                return;
-            }
-            if (this.dbMode === 0) {
-                if (keysDown.up) { this.dbCur = (this.dbCur - 1 + DB_DATA.length) % DB_DATA.length; if(typeof playSnd !== 'undefined') playSnd('sel'); }
-                if (keysDown.down) { this.dbCur = (this.dbCur + 1) % DB_DATA.length; if(typeof playSnd !== 'undefined') playSnd('sel'); }
-                if (keysDown.a) { this.dbMode = 1; this.tmr = 0; if(typeof playSnd !== 'undefined') playSnd('jmp'); }
-            } else {
-                if (keysDown.down && this.tmr < DB_DATA[this.dbCur].items.length * 20) this.tmr += 10;
-                if (keysDown.up && this.tmr > 0) this.tmr -= 10;
-            }
+            if (keysDown.down) { this.dbCur = (this.dbCur + 1) % DB_ITEMS.length; playSnd('sel'); }
+            if (keysDown.up) { this.dbCur = (this.dbCur - 1 + DB_ITEMS.length) % DB_ITEMS.length; playSnd('sel'); }
+            if (keysDown.b) { this.st = 'title'; playSnd('hit'); }
             return;
         }
 
         // ================= STORY =================
         if (this.st === 'story') {
-            let m = SCENARIOS[this.scIdx][this.msgIdx];
-            if (this.tmr % 2 === 0 && this.strToShow.length < m.t.length) {
-                this.strToShow += m.t[this.strToShow.length];
+            let msg = SCENARIOS[this.scIdx][this.msgIdx];
+            if (this.tmr % 2 === 0 && this.strToShow.length < msg.t.length) {
+                this.strToShow += msg.t[this.strToShow.length];
                 if (this.strToShow.length % 3 === 0 && typeof playSnd !== 'undefined') playSnd('sel');
             }
             if (keysDown.a) {
-                if (this.strToShow.length < m.t.length) { this.strToShow = m.t; } 
+                if (this.strToShow.length < msg.t.length) { this.strToShow = msg.t; } 
                 else {
                     this.msgIdx++;
-                    if (this.msgIdx < SCENARIOS[this.scIdx].length) { this.strToShow = ''; this.tmr = 0; } 
+                    if (this.msgIdx < SCENARIOS[this.scIdx].length) { this.setupMessage(); } 
                     else {
-                        if (this.scIdx === 4) { this.st = 'result'; this.tmr = 0; } // END
+                        VoiceSys.stop();
+                        if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; } 
                         else { this.loadLevel(); }
                     }
                 }
@@ -253,36 +253,22 @@ const Noise = {
             return;
         }
 
-        // ================= GAMEOVER & RESULT =================
         if (this.st === 'gameover' || this.st === 'result') {
+            if (this.msgLife > 0) this.msgLife--;
             if (this.tmr > 60 && (keysDown.a || keysDown.b)) { this.st = 'title'; this.tmr = 0; }
             return;
         }
 
         // ================= PLAY =================
         this.stats.time++;
+        if (this.msgLife > 0) this.msgLife--;
         
-        // --- 字幕通信システム ---
-        if (this.msgLife > 0) {
-            this.msgLife--;
-        } else if (this.radioQ.length > 0) {
-            let rm = this.radioQ.shift();
-            this.msgChar = rm.c; this.msg = rm.t; this.msgLife = 150;
-            if(typeof playSnd !== 'undefined') playSnd('sel');
-        }
-
-        // --- ダンボール バッテリー管理 ---
-        if (keys.b && this.p.energy > 0) {
-            this.p.box = true;
-            this.p.energy -= 0.5; // 消費
+        this.p.box = keys.b;
+        if (this.p.box) {
             this.stats.boxTime++;
-            if (this.p.energy <= 0) { this.pushRadio('クロエ', 'バッテリー切れよ！オーバーヒート！'); if(typeof playSnd !== 'undefined') playSnd('hit'); }
-        } else {
-            this.p.box = false;
-            this.p.energy = Math.min(100, this.p.energy + 0.15); // ゆっくり回復
+            if (this.tmr % 180 === 0) VoiceSys.speak('エコー', Math.random() < 0.5 ? 'おいゴミ箱、敵が来てるぞ！' : 'ダンボール光ってて草');
         }
 
-        // --- プレイヤー移動 ---
         let moved = false; let vx = 0, vy = 0;
         let currentSpd = this.p.box ? this.p.spd * 0.4 : this.p.spd;
         if (keys.left)  { vx -= currentSpd; moved = true; }
@@ -293,49 +279,33 @@ const Noise = {
         
         let nx = this.p.x + vx; let ny = this.p.y + vy;
         let hitWall = false;
-        
-        let activeWalls = [...this.lvl.walls, ...this.lvl.doors.filter(d => !d.open)];
+        let activeWalls = [...this.walls, ...this.doors.filter(d => !d.open)];
         for (let w of activeWalls) {
             if (nx + this.p.r > w.x && nx - this.p.r < w.x + w.w && ny + this.p.r > w.y && ny - this.p.r < w.y + w.h) { hitWall = true; break; }
         }
         if (!hitWall) { this.p.x = nx; this.p.y = ny; }
-        this.p.x = Math.max(10, Math.min(this.lvl.w - 10, this.p.x));
-        this.p.y = Math.max(10, Math.min(this.lvl.h - 10, this.p.y));
+        // 安全のため最終制限
+        this.p.x = Math.max(10, Math.min(190, this.p.x));
+        this.p.y = Math.max(10, Math.min(290, this.p.y));
 
-        // --- カメラ追従 ---
-        this.cam.x = this.p.x - 100; this.cam.y = this.p.y - 150;
-        this.cam.x = Math.max(0, Math.min(this.lvl.w - 200, this.cam.x));
-        this.cam.y = Math.max(0, Math.min(this.lvl.h - 300, this.cam.y));
-
-        // --- パズル：スイッチ＆鍵 ---
-        for (let s of this.lvl.switches) {
+        for (let s of this.switches) {
             if (!s.active && Math.hypot(this.p.x - s.x, this.p.y - s.y) < s.r + this.p.r) {
                 s.active = true;
-                if(typeof playSnd !== 'undefined') playSnd('jmp');
-                this.texts.push({ x: s.x, y: s.y, text: 'CLICK!', col: '#0ff', life: 40, maxLife: 40, size: 20 });
-                for (let d of this.lvl.doors) { if (d.type === 'switch' && d.reqId === s.id) d.open = true; }
-            }
-        }
-        for (let k of this.lvl.keys) {
-            if (!k.taken && Math.hypot(this.p.x - k.x, this.p.y - k.y) < k.r + this.p.r) {
-                k.taken = true;
-                if(typeof playSnd !== 'undefined') playSnd('combo');
-                this.pushRadio('エコー', '鍵をゲットしたぜ！');
-                this.texts.push({ x: k.x, y: k.y, text: 'GET KEY!', col: '#ff0', life: 40, maxLife: 40, size: 20 });
-                for (let d of this.lvl.doors) { if (d.type === 'key' && d.reqId === k.id) d.open = true; }
+                if(typeof playSnd !== 'undefined') playSnd('sel');
+                VoiceSys.speak('エコー', 'よし、扉が開いたぞ！');
+                this.texts.push({ x: s.x, y: s.y, text: 'CLICK!', col: '#0ff', life: 40, maxLife: 40, size: 20, rot: 0 });
+                for (let d of this.doors) { if (d.id === s.id) d.open = true; }
             }
         }
 
-        // --- ステルスキル ---
         if (keysDown.a && !this.p.box) {
-            for (let i = this.lvl.enemies.length - 1; i >= 0; i--) {
-                let e = this.lvl.enemies[i];
-                if (Math.hypot(e.x - this.p.x, e.y - this.p.y) < (e.type==='buzz'? 35 : 25)) {
-                    this.lvl.enemies.splice(i, 1);
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                let e = this.enemies[i];
+                if (Math.hypot(e.x - this.p.x, e.y - this.p.y) < 25) {
+                    this.enemies.splice(i, 1);
                     this.stats.kills++;
-                    this.texts.push({ x: this.cam.x+100, y: this.cam.y+150, text: 'NICE KILL!!!', col: '#0f0', life: 90, maxLife: 90, size: 30, center: true });
-                    if (e.type === 'buzz') this.pushRadio('ジャック', 'うおぉ！あのデカブツを倒すとはな！');
-                    else this.pushRadio('エコー', 'ひゅーっ！ナイスキル！');
+                    this.texts.push({ x: 100, y: 150, text: 'NICE KILL!!!', col: '#0f0', life: 90, maxLife: 90, size: 30, rot: 0, center: true });
+                    VoiceSys.speak('エコー', 'ひゅーっ！ナイスキル！');
                     if(typeof playSnd !== 'undefined') playSnd('combo');
                     if(typeof screenShake !== 'undefined') screenShake(10);
                     break;
@@ -343,21 +313,18 @@ const Noise = {
             }
         }
         
-        // --- 📢 歩行ノイズ ---
         let noiseInterval = 15;
         if (moved && !this.p.box && this.tmr % noiseInterval === 0) {
             let words = ['ドスッ!', 'バァーン!', 'スサッ', 'ドン!'];
             let cols = ['#f00', '#ff0', '#f0f', '#0ff'];
             this.texts.push({
-                x: this.p.x + (Math.random()-0.5)*80,
-                y: this.p.y + (Math.random()-0.5)*80,
-                text: words[Math.floor(Math.random()*words.length)],
-                col: cols[Math.floor(Math.random()*cols.length)],
+                x: this.p.x + (Math.random()-0.5)*80, y: this.p.y + (Math.random()-0.5)*80,
+                text: words[Math.floor(Math.random()*words.length)], col: cols[Math.floor(Math.random()*cols.length)],
                 life: 60, maxLife: 60, size: 20 + Math.random()*20, rot: (Math.random()-0.5)*0.5
             });
             this.stats.noise++;
             if (typeof playSnd !== 'undefined') playSnd(Math.random() < 0.5 ? 'hit' : 'jmp'); 
-            if (this.stats.noise % 30 === 0) this.pushRadio('エコー', '文字で前が見えないだろ？ｗ');
+            if (this.stats.noise % 25 === 0) VoiceSys.speak('エコー', '足音デカすぎだろ！');
         }
         
         for (let i = this.texts.length - 1; i >= 0; i--) {
@@ -366,33 +333,28 @@ const Noise = {
             if (t.life <= 0) this.texts.splice(i, 1);
         }
 
-        // --- ゴール判定 ---
-        if (Math.hypot(this.p.x - this.lvl.goal.x, this.p.y - this.lvl.goal.y) < this.lvl.goal.r) {
-            this.level++;
+        // ゴール判定修正（r+rで確実に触れるように）
+        if (Math.hypot(this.p.x - this.goal.x, this.p.y - this.goal.y) < this.goal.r + this.p.r) {
             if(typeof playSnd !== 'undefined') playSnd('combo');
-            this.startStory(this.level);
+            this.startStory(this.level + 1);
             return;
         }
 
-        // --- 敵兵AIと視界 ---
-        for (let e of this.lvl.enemies) {
+        for (let e of this.enemies) {
             let target = e.path[e.pt];
             let dx = target.x - e.x, dy = target.y - e.y;
             let dist = Math.hypot(dx, dy);
             
             if (dist < 2) {
-                if (e.wait > 0) e.wait--;
-                else { e.pt = (e.pt + 1) % e.path.length; e.wait = 30; } 
+                if (e.wait > 0) e.wait--; else { e.pt = (e.pt + 1) % e.path.length; e.wait = 60; } 
             } else {
                 e.dir = Math.atan2(dy, dx);
-                e.x += Math.cos(e.dir) * e.spd;
-                e.y += Math.sin(e.dir) * e.spd;
+                e.x += Math.cos(e.dir) * e.spd; e.y += Math.sin(e.dir) * e.spd;
             }
 
             if (!this.p.box) {
                 let pdx = this.p.x - e.x, pdy = this.p.y - e.y;
-                let vRange = e.type === 'buzz' ? 120 : (e.type === 'silent' ? 100 : 60);
-                if (Math.hypot(pdx, pdy) < vRange) {
+                if (Math.hypot(pdx, pdy) < 60) {
                     let angleDiff = Math.abs(Math.atan2(pdy, pdx) - e.dir);
                     if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
                     
@@ -402,10 +364,10 @@ const Noise = {
                         
                         if (!hidden) {
                             this.st = 'gameover'; this.tmr = 0;
-                            this.pushRadio('エコー', 'あーあ、見つかっちゃった。俺のせいじゃないからなｗ');
+                            VoiceSys.speak('エコー', 'あーあ、見つかっちゃった。俺のせいじゃないからなｗ');
                             if(typeof playSnd !== 'undefined') playSnd('hit');
                             if(typeof screenShake !== 'undefined') screenShake(15);
-                            this.texts.push({ x: this.cam.x+100, y: this.cam.y+150, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 40, center: true });
+                            this.texts.push({ x: 100, y: 150, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 40, rot: 0, center: true });
                         }
                     }
                 }
@@ -415,8 +377,9 @@ const Noise = {
 
     drawSpriteData(x, y, data, scale) {
         if(!data) return;
-        for (let row = 0; row < 16; row++) {
-            for (let col = 0; col < 16; col++) {
+        for (let row = 0; row < 24; row++) {
+            if(!data[row]) continue;
+            for (let col = 0; col < 24; col++) {
                 let p = data[row][col];
                 if (PAL[p]) { ctx.fillStyle = PAL[p]; ctx.fillRect(x + col * scale, y + row * scale, scale, scale); }
             }
@@ -426,221 +389,142 @@ const Noise = {
     draw() {
         ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 200, 300);
         
-        // ================= TITLE =================
         if (this.st === 'title') {
             ctx.strokeStyle = '#0ff'; ctx.lineWidth = 1; ctx.globalAlpha = 0.2;
             for(let i=0; i<200; i+=10) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(100,300); ctx.stroke(); }
             ctx.globalAlpha = 1.0;
 
-            ctx.fillStyle = '#f80'; ctx.font = 'bold 28px "Arial Black", sans-serif';
-            ctx.shadowBlur = 15; ctx.shadowColor = '#f00';
-            ctx.fillText('NOISE', 45, 90); ctx.fillText('AGENT', 45, 125);
+            ctx.fillStyle = '#f80'; ctx.font = 'bold 26px "Arial Black", sans-serif';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#f00';
+            ctx.fillText('NOISE', 55, 80); ctx.fillText('AGENT', 55, 110);
             ctx.shadowBlur = 0;
 
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('- 爆音スニーキング -', 45, 150);
-
-            ctx.fillStyle = this.dbCur === 0 ? '#0f0' : '#888';
-            ctx.fillText((this.dbCur === 0 ? '▶ ' : '  ') + 'START MISSION', 45, 220);
-            ctx.fillStyle = this.dbCur === 1 ? '#0ff' : '#888';
-            ctx.fillText((this.dbCur === 1 ? '▶ ' : '  ') + 'DATABASE', 45, 240);
-            return;
-        }
-
-        // ================= DATABASE =================
-        if (this.st === 'database') {
-            ctx.fillStyle = '#002'; ctx.fillRect(0,0,200,300);
-            ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('【 DATABASE 】', 40, 25);
+            ctx.fillText('- 爆音スニーキング -', 45, 140);
             
-            if (this.dbMode === 0) {
-                for(let i=0; i<DB_DATA.length; i++) {
-                    ctx.fillStyle = this.dbCur === i ? '#ff0' : '#aaa';
-                    ctx.font = '12px monospace';
-                    ctx.fillText((this.dbCur===i?'▶ ':'  ')+DB_DATA[i].title, 10, 60 + i*30);
-                }
-                ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('A: 開く  B: 戻る', 50, 280);
-            } else {
-                let data = DB_DATA[this.dbCur].items;
-                ctx.fillStyle = '#ff0'; ctx.font = '12px monospace'; ctx.fillText(DB_DATA[this.dbCur].title, 10, 50);
-                
-                let y = 70 - this.tmr; // スクロール
-                for (let item of data) {
-                    if (y > 300) break;
-                    if (y > 40) {
-                        ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace'; ctx.fillText('■ ' + item.n, 10, y);
-                        ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-                        
-                        let words = item.t; let lineY = y + 15;
-                        while(words.length > 0) {
-                            ctx.fillText(words.substring(0, 16), 15, lineY);
-                            words = words.substring(16); lineY += 12;
-                        }
-                        y = lineY + 15;
-                    } else {
-                        y += 15 + Math.ceil(item.t.length/16)*12 + 15;
-                    }
-                }
-                ctx.fillStyle = '#000'; ctx.fillRect(0, 260, 200, 40);
-                ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('上下: スクロール  B: 戻る', 30, 280);
-            }
+            ctx.fillStyle = this.menuCur === 0 ? '#0f0' : '#888';
+            ctx.fillText((this.menuCur === 0 ? '> ' : '  ') + 'PLAY STORY', 60, 200);
+            ctx.fillStyle = this.menuCur === 1 ? '#0f0' : '#888';
+            ctx.fillText((this.menuCur === 1 ? '> ' : '  ') + 'DATABASE', 60, 220);
+            
             return;
         }
 
-        // ================= STORY =================
+        if (this.st === 'database') {
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【 DATABASE 】', 45, 30);
+            let item = DB_ITEMS[this.dbCur];
+            
+            ctx.fillStyle = '#ff0'; ctx.font = '10px monospace';
+            ctx.fillText(`< ${item.title} >`, 10, 60);
+            
+            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+            let textY = 90; let currentLine = '';
+            for (let i = 0; i < item.text.length; i++) {
+                currentLine += item.text[i];
+                if (currentLine.length > 16) { ctx.fillText(currentLine, 15, textY); textY += 15; currentLine = ''; }
+            }
+            ctx.fillText(currentLine, 15, textY);
+            
+            ctx.fillStyle = '#888'; ctx.fillText('↑↓:選択  B:戻る', 50, 280);
+            return;
+        }
+
         if (this.st === 'story') {
             let msg = SCENARIOS[this.scIdx][this.msgIdx];
             ctx.fillStyle = '#112'; ctx.fillRect(0,0,200,300);
             ctx.strokeStyle = '#334'; ctx.lineWidth = 1;
             for(let i=0; i<300; i+=10) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(200,i); ctx.stroke(); }
 
-            let spData = CHAR_SPRITES[msg.c];
-            if (spData) this.drawSpriteData(60, 40, spData, 5); 
+            if (msg.c === 'SYSTEM') {
+                ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+                let textY = 100; let currentLine = '';
+                for (let i = 0; i < this.strToShow.length; i++) {
+                    currentLine += this.strToShow[i];
+                    if (currentLine.length > 16) { ctx.fillText(currentLine, 20, textY); textY += 16; currentLine = ''; }
+                }
+                ctx.fillText(currentLine, 20, textY);
+                if (this.strToShow.length === msg.t.length && this.tmr % 30 < 15) ctx.fillText('▼', 90, 250);
+            } else {
+                let spData = CHAR_SPRITES[msg.c];
+                if (spData) this.drawSpriteData(60, 20, spData, 3.5); // 24x3.5 = 84px
 
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 180, 180, 110);
-            ctx.strokeStyle = msg.c === '司令官ノイズ' ? '#f00' : '#0ff';
-            ctx.lineWidth = 2; ctx.strokeRect(10, 180, 180, 110);
+                ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 180, 180, 110);
+                ctx.strokeStyle = msg.c === '司令官ノイズ' ? '#f00' : '#0ff';
+                ctx.lineWidth = 2; ctx.strokeRect(10, 180, 180, 110);
 
-            ctx.fillStyle = msg.c === '司令官ノイズ' ? '#f55' : (msg.c === 'ミュート' ? '#aaa' : '#0f0');
-            ctx.font = 'bold 12px monospace'; ctx.fillText(`【 ${msg.c} 】`, 15, 200);
+                ctx.fillStyle = msg.c === '司令官ノイズ' ? '#f55' : (msg.c === 'ミュート' ? '#aaa' : '#0f0');
+                ctx.font = 'bold 12px monospace'; ctx.fillText(`【 ${msg.c} 】`, 15, 200);
 
-            ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
-            let textY = 220; let currentLine = '';
-            for (let i = 0; i < this.strToShow.length; i++) {
-                currentLine += this.strToShow[i];
-                if (currentLine.length > 14) { ctx.fillText(currentLine, 20, textY); textY += 16; currentLine = ''; }
-            }
-            ctx.fillText(currentLine, 20, textY);
-
-            if (this.strToShow.length === msg.t.length && this.tmr % 30 < 15) {
-                ctx.fillStyle = '#ff0'; ctx.fillText('▼', 170, 280);
+                ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+                let textY = 220; let currentLine = '';
+                for (let i = 0; i < this.strToShow.length; i++) {
+                    currentLine += this.strToShow[i];
+                    if (currentLine.length > 14) { ctx.fillText(currentLine, 20, textY); textY += 16; currentLine = ''; }
+                }
+                ctx.fillText(currentLine, 20, textY);
+                if (this.strToShow.length === msg.t.length && this.tmr % 30 < 15) ctx.fillStyle = '#ff0'; ctx.fillText('▼', 170, 280);
             }
             return;
         }
 
-        // ================= PLAY & GAMEOVER =================
-        ctx.save();
-        ctx.translate(-this.cam.x, -this.cam.y); // ★ カメラ適用
-
-        // 広大な床テクスチャ
         ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
-        let sx = this.cam.x % 20; let sy = this.cam.y % 20;
-        for(let i = this.cam.x - sx; i < this.cam.x + 200; i += 20) { ctx.beginPath(); ctx.moveTo(i, this.cam.y); ctx.lineTo(i, this.cam.y+300); ctx.stroke(); }
-        for(let i = this.cam.y - sy; i < this.cam.y + 300; i += 20) { ctx.beginPath(); ctx.moveTo(this.cam.x, i); ctx.lineTo(this.cam.x+200, i); ctx.stroke(); }
+        for(let i=0; i<200; i+=20) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,300); ctx.stroke(); }
+        for(let i=0; i<300; i+=20) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(200,i); ctx.stroke(); }
 
-        // 壁と扉
-        for (let w of this.lvl.walls) {
-            ctx.fillStyle = '#111'; ctx.fillRect(w.x+5, w.y+5, w.w, w.h); // 影
-            ctx.fillStyle = '#555'; ctx.fillRect(w.x, w.y, w.w, w.h);
-            ctx.strokeStyle = '#000'; ctx.strokeRect(w.x, w.y, w.w, w.h);
-        }
-        for (let d of this.lvl.doors) {
+        ctx.fillStyle = '#555';
+        for (let w of this.walls) { ctx.fillRect(w.x, w.y, w.w, w.h); ctx.strokeStyle = '#000'; ctx.strokeRect(w.x, w.y, w.w, w.h); }
+        for (let d of this.doors) {
             if (!d.open) {
-                ctx.fillStyle = d.type === 'key' ? '#550' : '#05a'; 
-                ctx.fillRect(d.x, d.y, d.w, d.h);
-                ctx.strokeStyle = d.type === 'key' ? '#ff0' : '#0ff'; 
-                ctx.strokeRect(d.x, d.y, d.w, d.h);
+                ctx.fillStyle = '#05a'; ctx.fillRect(d.x, d.y, d.w, d.h);
+                ctx.strokeStyle = '#0ff'; ctx.strokeRect(d.x, d.y, d.w, d.h);
             }
         }
-
-        // スイッチと鍵
-        for (let s of this.lvl.switches) {
-            ctx.fillStyle = s.active ? '#0a0' : '#00f';
-            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+        for (let s of this.switches) {
+            ctx.fillStyle = s.active ? '#0a0' : '#00f'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle = s.active ? '#0f0' : '#0ff'; ctx.stroke();
         }
-        for (let k of this.lvl.keys) {
-            if (!k.taken) {
-                ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(k.x, k.y, k.r, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#000'; ctx.fillRect(k.x-2, k.y-4, 4, 8);
-            }
-        }
 
-        // ゴール
         ctx.fillStyle = `rgba(0, 255, 0, ${0.5 + Math.sin(this.tmr*0.1)*0.3})`;
-        ctx.beginPath(); ctx.arc(this.lvl.goal.x, this.lvl.goal.y, this.lvl.goal.r, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('GOAL', this.lvl.goal.x-12, this.lvl.goal.y+3);
+        ctx.beginPath(); ctx.arc(this.goal.x, this.goal.y, this.goal.r, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('GOAL', this.goal.x-12, this.goal.y+3);
 
-        // 敵
-        for (let e of this.lvl.enemies) {
-            let vCol = e.type === 'silent' ? 'rgba(0, 0, 255, 0.3)' : (e.type === 'buzz' ? 'rgba(255, 100, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)');
-            let vRange = e.type === 'buzz' ? 120 : (e.type === 'silent' ? 100 : 60);
-            let eSize = e.type === 'buzz' ? 12 : 6;
-            
-            ctx.fillStyle = vCol;
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, vRange, e.dir - 0.6, e.dir + 0.6); ctx.fill();
-            
-            ctx.fillStyle = e.type === 'silent' ? '#111' : (e.type === 'buzz' ? '#888' : '#0a0');
-            ctx.beginPath(); ctx.arc(e.x, e.y, eSize, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = e.type === 'silent' ? '#f00' : '#fff'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.dir)*10, e.y + Math.sin(e.dir)*10); ctx.stroke();
+        for (let e of this.enemies) {
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 60, e.dir - 0.6, e.dir + 0.6); ctx.fill();
+            ctx.fillStyle = '#0a0'; ctx.beginPath(); ctx.arc(e.x, e.y, 6, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.dir)*10, e.y + Math.sin(e.dir)*10); ctx.stroke();
         }
 
-        // プレイヤー
         if (this.p.box) {
-            let waveY = Math.sin(this.tmr * 0.2) * 2;
-            ctx.fillStyle = `hsl(${(this.tmr * 5) % 360}, 100%, 50%)`;
-            ctx.fillRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16);
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16);
+            let waveY = Math.sin(this.tmr * 0.2) * 2; ctx.fillStyle = `hsl(${(this.tmr * 5) % 360}, 100%, 50%)`;
+            ctx.fillRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16);
             ctx.fillStyle = '#000'; ctx.fillRect(this.p.x - 4, this.p.y - 2 + waveY, 8, 2);
         } else {
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.p.x, this.p.y, this.p.r, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.stroke();
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.p.x, this.p.y, this.p.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
         }
 
-        // 文字（カメラ適用内）
         for (let t of this.texts) {
             ctx.save();
-            if (t.center) { ctx.translate(t.x, t.y); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; } 
-            else { ctx.translate(t.x, t.y); ctx.textAlign = 'left'; }
-            ctx.rotate(t.rot);
-            ctx.fillStyle = t.col; ctx.font = `900 ${t.size}px "Arial Black", Impact, sans-serif`;
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
-            ctx.globalAlpha = t.life / t.maxLife; 
-            ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0);
-            ctx.globalAlpha = 1.0; ctx.restore();
+            if (t.center) { ctx.translate(100, 150); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; } else { ctx.translate(t.x, t.y); ctx.textAlign = 'left'; }
+            ctx.rotate(t.rot); ctx.fillStyle = t.col; ctx.font = `900 ${t.size}px "Arial Black", Impact, sans-serif`;
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.globalAlpha = t.life / t.maxLife; 
+            ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0); ctx.globalAlpha = 1.0; ctx.restore();
         }
 
-        ctx.restore(); // ★ カメラ適用解除 (UIレイヤーへ)
-
-        // --- バッテリー UI ---
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(5, 235, 100, 15);
-        ctx.fillStyle = this.p.energy < 30 ? '#f00' : '#0f0';
-        ctx.fillRect(5, 235, this.p.energy, 15);
-        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('BOX BATTERY', 10, 246);
-
-        // --- 字幕 UI ---
-        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 255, 200, 45);
-        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(2, 257, 196, 41);
+        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 260, 200, 40);
+        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(2, 262, 196, 36);
+        ctx.fillStyle = '#0ff'; ctx.font = '9px monospace';
         
         if (this.msgLife > 0 && this.msg !== '') {
-            ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace';
-            ctx.fillText(`【${this.msgChar}】`, 5, 270);
-            ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
-            if (this.msg.length > 18) {
-                ctx.fillText(this.msg.substring(0, 18), 10, 282);
-                ctx.fillText(this.msg.substring(18), 10, 293);
-            } else {
-                ctx.fillText(this.msg, 10, 282);
-            }
-        } else {
-            ctx.fillStyle = '#444'; ctx.font = '9px monospace'; ctx.fillText('NO SIGNAL...', 10, 275);
-        }
+            if (this.msg.length > 18) { ctx.fillText(this.msg.substring(0, 18), 10, 275); ctx.fillText(this.msg.substring(18), 10, 288); } 
+            else { ctx.fillText(this.msg, 10, 280); }
+        } else { ctx.fillStyle = '#444'; ctx.fillText('NO SIGNAL...', 10, 280); }
 
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,200,15);
-        ctx.fillStyle = '#0ff'; ctx.font = '10px monospace';
-        ctx.fillText(`LV:${this.level + 1}  KILLS:${this.stats.kills}`, 5, 11);
-
-        // ================= RESULT =================
         if (this.st === 'result') {
             ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0,0,200,300);
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            
-            ctx.fillStyle = '#0f0'; ctx.font = 'bold 20px monospace';
-            ctx.fillText('ALL CLEAR!!', 100, 50);
-            
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 20px monospace'; ctx.fillText('ALL CLEAR!!', 100, 50);
             ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
-            ctx.fillText(`KILLS : ${this.stats.kills}`, 100, 100);
-            ctx.fillText(`NOISES: ${this.stats.noise}`, 100, 120);
+            ctx.fillText(`KILLS : ${this.stats.kills}`, 100, 100); ctx.fillText(`NOISES: ${this.stats.noise}`, 100, 120);
             
             let title = "NORMAL SPY"; let tCol = '#fff';
             if (this.stats.kills === 0) { title = "GHOST (不殺)"; tCol = '#0ff'; }
@@ -648,13 +532,8 @@ const Noise = {
             else if (this.stats.noise > 150) { title = "NOISY NINJA"; tCol = '#f0f'; }
             
             ctx.fillStyle = '#f80'; ctx.fillText('YOUR RANK:', 100, 160);
-            ctx.fillStyle = tCol; ctx.font = 'bold 16px monospace';
-            ctx.fillText(title, 100, 185);
-            
-            if (this.tmr > 60) {
-                ctx.fillStyle = '#ccc'; ctx.font = '10px monospace';
-                ctx.fillText('PRESS [A] TO RETURN', 100, 250);
-            }
+            ctx.fillStyle = tCol; ctx.font = 'bold 16px monospace'; ctx.fillText(title, 100, 185);
+            if (this.tmr > 60) { ctx.fillStyle = '#ccc'; ctx.font = '10px monospace'; ctx.fillText('PRESS [A] TO RETURN', 100, 250); }
             ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         }
     }
