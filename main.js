@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Phase 7.1: Multi-Touch & 7in1 Edition) ===
+// === CORE SYSTEM (8in1 Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -128,11 +128,11 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// メニュー管理
+// メニュー管理 (8in1 に変更！)
 // ★============================================★
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', 'ローカルランキング', '設定', '王様の間'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ローカルランキング', '設定', '王様の間'], 
   holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
   update() {
@@ -149,7 +149,8 @@ const Menu = {
             typeof Rhythm !== 'undefined' ? Rhythm : null, 
             typeof Slot !== 'undefined' ? Slot : null, 
             typeof Musou !== 'undefined' ? Musou : null, 
-            typeof Abyss !== 'undefined' ? Abyss : null,
+            typeof Abyss !== 'undefined' ? Abyss : null, 
+            typeof Noise !== 'undefined' ? Noise : null, // ★追加
             typeof Ranking !== 'undefined' ? Ranking : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
@@ -159,12 +160,12 @@ const Menu = {
   },
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('7in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v10.0', 60, 40);
+    ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v11.0', 60, 40);
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
     for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
-        ctx.fillStyle = i === this.cur ? '#0f0' : (i === 7 ? '#f00' : '#aaa'); 
+        ctx.fillStyle = i === this.cur ? '#0f0' : (i === 8 ? '#f80' : '#aaa'); // ノイズエージェントはオレンジ
         ctx.font = '11px monospace'; 
         ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, startY + (i - drawStart) * 19); 
     }
@@ -255,7 +256,6 @@ const setBtn = (id, k) => {
 ['btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
 
-// ★ マルチタッチ対応：十字キーの判定
 const dpad = document.getElementById('dpad');
 let dpadActive = false;
 
@@ -265,16 +265,12 @@ const handleDpad = (ev) => {
   if (ev.type === 'touchstart' || ev.type === 'mousedown') { dpadActive = true; initAudio(); }
   
   let clientX, clientY;
-  // ★ targetTouchesを使うことで、十字キー上で発生したタッチだけを確実に拾う！
   if (ev.targetTouches && ev.targetTouches.length > 0) { 
-      clientX = ev.targetTouches[0].clientX; 
-      clientY = ev.targetTouches[0].clientY; 
+      clientX = ev.targetTouches[0].clientX; clientY = ev.targetTouches[0].clientY; 
   } else if (ev.touches && ev.touches.length > 0) { 
-      clientX = ev.touches[0].clientX; 
-      clientY = ev.touches[0].clientY; 
+      clientX = ev.touches[0].clientX; clientY = ev.touches[0].clientY; 
   } else { 
-      clientX = ev.clientX; 
-      clientY = ev.clientY; 
+      clientX = ev.clientX; clientY = ev.clientY; 
   }
   
   const rect = dpad.getBoundingClientRect();
@@ -301,55 +297,34 @@ if (dpad) {
   dpad.addEventListener('mousedown', handleDpad); window.addEventListener('mousemove', (ev) => { if (dpadActive) handleDpad(ev); }); window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
 }
 
-// ★ マルチタッチ対応：Canvas（右手）のタッチ判定
 const getPointerPos = (e) => {
-  // ★ Canvas上で発生したタッチだけを確実に拾う！
-  if (e.targetTouches && e.targetTouches.length > 0) {
-    return { clientX: e.targetTouches[0].clientX, clientY: e.targetTouches[0].clientY };
-  } else if (e.touches && e.touches.length > 0) {
-    return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
-  } else {
-    return { clientX: e.clientX, clientY: e.clientY };
-  }
+  if (e.targetTouches && e.targetTouches.length > 0) { return { clientX: e.targetTouches[0].clientX, clientY: e.targetTouches[0].clientY }; } 
+  else if (e.touches && e.touches.length > 0) { return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }; } 
+  else { return { clientX: e.clientX, clientY: e.clientY }; }
 };
 
 const handlePointerDown = (e) => {
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const pos = getPointerPos(e);
+  const rect = canvas.getBoundingClientRect(); const pos = getPointerPos(e);
   pointer.active = true;
-  pointer.x = (pos.clientX - rect.left) * (canvas.width / rect.width);
-  pointer.y = (pos.clientY - rect.top) * (canvas.height / rect.height);
+  pointer.x = (pos.clientX - rect.left) * (canvas.width / rect.width); pointer.y = (pos.clientY - rect.top) * (canvas.height / rect.height);
   pointer.path = [{x: pointer.x, y: pointer.y}];
 };
 
 const handlePointerMove = (e) => {
   if (!pointer.active) return;
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const pos = getPointerPos(e);
-  pointer.x = (pos.clientX - rect.left) * (canvas.width / rect.width);
-  pointer.y = (pos.clientY - rect.top) * (canvas.height / rect.height);
-  
+  const rect = canvas.getBoundingClientRect(); const pos = getPointerPos(e);
+  pointer.x = (pos.clientX - rect.left) * (canvas.width / rect.width); pointer.y = (pos.clientY - rect.top) * (canvas.height / rect.height);
   let last = pointer.path[pointer.path.length-1];
-  if (Math.hypot(pointer.x - last.x, pointer.y - last.y) > 5) {
-      pointer.path.push({x: pointer.x, y: pointer.y});
-  }
+  if (Math.hypot(pointer.x - last.x, pointer.y - last.y) > 5) { pointer.path.push({x: pointer.x, y: pointer.y}); }
 };
 
-const handlePointerUp = (e) => {
-  e.preventDefault();
-  pointer.active = false;
-};
+const handlePointerUp = (e) => { e.preventDefault(); pointer.active = false; };
 
-canvas.addEventListener('mousedown', handlePointerDown);
-canvas.addEventListener('mousemove', handlePointerMove);
-canvas.addEventListener('mouseup', handlePointerUp);
-canvas.addEventListener('mouseleave', handlePointerUp);
-canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
-canvas.addEventListener('touchmove', handlePointerMove, {passive: false});
-canvas.addEventListener('touchend', handlePointerUp, {passive: false});
-
+canvas.addEventListener('mousedown', handlePointerDown); canvas.addEventListener('mousemove', handlePointerMove);
+canvas.addEventListener('mouseup', handlePointerUp); canvas.addEventListener('mouseleave', handlePointerUp);
+canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canvas.addEventListener('touchmove', handlePointerMove, {passive: false}); canvas.addEventListener('touchend', handlePointerUp, {passive: false});
 
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
