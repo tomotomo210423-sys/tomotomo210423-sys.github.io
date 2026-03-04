@@ -1,8 +1,19 @@
-// === NOISE AGENT (Phase 9: Ultimate Cinematic & Puzzle Edition) ===
+// === NOISE AGENT (Phase 9: Cinematic, Giant Text & Ultimate Escape) ===
+
+// ★ 通信＆字幕システム（エラーの原因だった音声APIを完全排除）
+const CommSys = {
+    msg: '', msgLife: 0,
+    speak(char, txt) {
+        if (Noise.st === 'play' || Noise.st === 'gameover') {
+            this.msg = char === 'ミュート' ? '……' : `【${char}】 ${txt}`;
+            this.msgLife = 180; // 3秒表示
+        }
+    }
+};
 
 const PAL = { '0':null, '1':'#000', '2':'#fff', '3':'#fca', '4':'#f00', '5':'#0ff', '6':'#0a0', '7':'#fa0', '8':'#444', '9':'#888', 'a':'#05f', 'b':'#940', 'c':'#a0a' };
 
-// 24x24 高精細キャラクタードット絵
+// 24x24 キャラクタードット絵
 const CHAR_SPRITES = {
     'エコー': [ 
         "000000000000000000000000","000000000111111000000000","000000011777777110000000","000000177777777771000000",
@@ -58,38 +69,36 @@ const CHAR_SPRITES = {
     ]
 };
 
-// ★ 真面目さとバカバカしさが同居するシナリオ (全8幕)
+// ★ アクション映画風シナリオ (全8幕)
 const SCENARIOS = [
     [ // L0 -> L1
         { c: 'SYSTEM', t: '西暦20XX年。世界から「音」を奪おうとする悪の組織『サイレンス』に、1人の男が潜入した。' },
-        { c: 'エコー', t: '作戦開始だ。だが最悪なニュースがある。靴のステルス機能がハッキングされた。' },
-        { c: 'エコー', t: '歩くたびに爆音と【超巨大な文字】が出る最悪の靴だ。前見えないだろ？ｗ' },
+        { c: 'エコー', t: '作戦開始だ。だが最悪なニュースがある。靴がハッキングされた。' },
+        { c: 'エコー', t: '歩くたびに爆音と【超絶巨大な文字】が出る最悪の靴だ。前見えないだろ？ｗ' },
         { c: 'マキシマム', t: 'ガハハ！足音など筋肉でかき消せばよい！正面突破だ！' },
-        { c: 'ルナ', t: 'マキシマムさん無茶言わないで！Aで背後から暗殺、B長押しでダンボールです！' },
-        { c: 'ルナ', t: '青いスイッチを踏んで扉を開け、緑のゴールへ向かってください！' }
+        { c: 'ルナ', t: 'マキシマムさん無茶言わないで！Aで暗殺、B長押しでダンボールです！青いスイッチを踏んでください！' }
     ],
     [ // L1 -> L2
-        { c: '司令官ノイズ', t: '何だあのふざけた足音は！私の静寂な基地を荒らすネズミめ！' },
-        { c: 'エコー', t: 'やべぇボスにバレた！ここから監視カメラと赤い扉が追加されるぞ。' },
-        { c: 'おやっさん', t: '坊主、油断するな。「赤いスイッチ」と「青いスイッチ」を順番に踏んで道を開くんだ。' },
-        { c: 'マキシマム', t: '面倒な！壁を殴って壊せば一発ではないか！' }
+        { c: '司令官ノイズ', t: '侵入者め...何だあのふざけた足音は！警備をレベル2に引き上げろ！' },
+        { c: 'エコー', t: 'やべぇボスにバレた！「俺、この任務が終わったら結婚するんだ…」って死亡フラグ立てとく？' },
+        { c: 'おやっさん', t: '坊主、油断するな。ここからは「赤いスイッチ」の仕掛けも追加される。' },
+        { c: 'ルナ', t: 'ステージが広くなりました！しっかり迂回してパズルを解いてくださいね！' }
     ],
     [ // L2 -> L3
         { c: '副官ソナー', t: 'フフ…騒がしいネズミね。私の可愛い『サイボーグ猟犬』の餌にしてあげるわ。' },
         { c: 'ルナ', t: '猟犬は移動速度がものすごく速いです！あと【赤いレーザー】には絶対触れないで！' },
-        { c: 'エコー', t: '文字が邪魔で見えねぇ時は、「Aボタン空振り」で大声を出して敵を誘い出せ！' }
+        { c: 'ルナ', t: '今回から【黄色いハッキング端末】が登場します！近くで【Aボタンを長押し】して、100%までデータを抜いて！' },
+        { c: 'エコー', t: '文字が邪魔で見えねぇって？「Aボタン空振り」で大声を出して敵を誘い出せ！' }
     ],
     [ // L3 -> L4
-        { c: 'SYSTEM', t: 'ミュートは基地の通信ハブエリアへ到達した。' },
-        { c: 'ルナ', t: 'ここからは【黄色いハッキング端末】が登場します！' },
-        { c: 'ルナ', t: '端末の近くで【Aボタンを長押し】して、100%までデータを抜かないとゴールが開きません！' },
-        { c: 'エコー', t: '今回は【紫のワープパッド】を使って、4つの小部屋を回る必要があるぜ。' }
+        { c: '司令官ノイズ', t: 'ええい！なぜあんな騒がしい奴を捕まえられんのだ！！' },
+        { c: 'マキシマム', t: '情報端末が4つもあるだと！？筋肉で全て粉砕してやる！' },
+        { c: 'ルナ', t: '壊さないでください！全部ハッキングしないと進めません！迷路になってますから気をつけて！' }
     ],
     [ // L4 -> L5
-        { c: '司令官ノイズ', t: 'ええい！なぜあんな騒がしい奴を捕まえられんのだ！！' },
         { c: '副官ソナー', t: '緑の隔壁を封鎖！親衛隊を総動員します！' },
-        { c: 'おやっさん', t: '坊主、次が親衛隊の最終防衛ラインだ。死ぬほど敵がいるぞ。' },
-        { c: 'エコー', t: 'ここが正念場だな。地獄で会おうぜベイビー！' }
+        { c: 'おやっさん', t: '坊主、次が親衛隊の最終防衛ラインだ。死ぬほど敵がいるし、道も複雑だぞ。' },
+        { c: 'エコー', t: 'B級映画なら、ここらで主人公がピンチになる展開だな。アスタラビスタ、ベイビー！' }
     ],
     [ // L5 -> L6
         { c: 'SYSTEM', t: '親衛隊を退けたミュートの前に、ついに組織のボスが立ちはだかる。' },
@@ -102,19 +111,20 @@ const SCENARIOS = [
         { c: 'SYSTEM', t: '見事司令官を打倒したミュート。しかし、基地は自爆装置が作動した！' },
         { c: '司令官ノイズ', t: 'ガハッ…道連れだ…基地ごと吹き飛べ！！' },
         { c: 'ルナ', t: '基地が爆発します！！制限時間は60秒！早く脱出して！！' },
-        { c: 'エコー', t: '全力で走れミュート！もう文字で前が見えなくても気合で避けろ！' }
+        { c: 'エコー', t: '全力で走れミュート！もう文字で前が見えなくても気合で避けろ！' },
+        { c: 'マキシマム', t: '筋肉を信じて限界を超えろォォ！！' }
     ],
     [ // END
         { c: 'SYSTEM', t: '爆発の炎を背に、ミュートは間一髪で生還した。' },
         { c: 'エコー', t: 'ミッション・コンプリート！ハリウッド映画顔負けの脱出だったぜ！' },
         { c: 'マキシマム', t: '筋肉の勝利だな！！ガハハハ！' },
         { c: 'おやっさん', t: 'よくやった坊主。伝説の誕生だな。やかましい伝説だがな。' },
-        { c: 'ミュート', t: '……（親指を立てて親友たちに笑いかける）' },
-        { c: 'ルナ', t: 'お疲れ様でしたミュートさん！さぁ、祝勝会ですよ！' }
+        { c: 'ミュート', t: '……（親指を立てて溶鉱炉に沈む）' },
+        { c: 'ルナ', t: '沈まないでください！！早く帰ってきて！エンドロール流しますよ！' }
     ]
 ];
 
-// ★ プレイ中のランダム通信（20パターン以上）
+// ★ プレイ中のランダム通信（映画パロディとメタ発言の大増量）
 const COMM_CONV = [
     [ {c:'エコー', t:'右見て、左見て、筋肉見ろ！'}, {c:'マキシマム', t:'素晴らしいアドバイスだ！'}, {c:'ルナ', t:'真面目にナビしてください！'} ],
     [ {c:'おやっさん', t:'坊主、足音の文字で前が見えん時は壁を頼れ。'}, {c:'マキシマム', t:'壁は殴って壊すものだ！'} ],
@@ -132,13 +142,12 @@ const COMM_CONV = [
     [ {c:'エコー', t:'俺、昨日徹夜でFPSやってたから超眠いんだわ。'}, {c:'ルナ', t:'命かかってるんですよ！？'} ],
     [ {c:'副官ソナー', t:'ネズミ一匹にどんだけ手間取ってるの！'} ],
     [ {c:'マキシマム', t:'ダンボールは燃えるゴミに出せ！！'} ],
-    [ {c:'エコー', t:'なあ、あの犬サイボーグって撫でたら怒るかな？'}, {c:'ルナ', t:'腕ごと噛みちぎられますよ。'} ],
-    [ {c:'おやっさん', t:'敵の視界は赤いエリアだ。それ以外は安全だと思え。'} ],
-    [ {c:'エコー', t:'「私は戻ってくる」って敵が言ってたぞ！'}, {c:'マキシマム', t:'溶鉱炉に沈めてやれ！！'} ],
-    [ {c:'ルナ', t:'レーザーに当たると即座に見つかります！タイミングを読んで！'} ]
+    [ {c:'エコー', t:'俺がもし死んだら、ブラウザの履歴を消しておいてくれ。'} ],
+    [ {c:'ルナ', t:'レーザーには気をつけて！丸焦げになりますよ！'} ],
+    [ {c:'おやっさん', t:'敵の背中を取れ。漢は背中で語るものだ。'} ]
 ];
 
-// ★ DATABASE
+// ★ DATABASE (3カテゴリ分類)
 const DB = [
     {
         cat: 'キャラクター',
@@ -155,19 +164,18 @@ const DB = [
     {
         cat: '世界観',
         items: [
-            { title: '呪いのステルス靴', text: '歩くたびに「ドスッ」「バァーン」などの巨大文字ホログラムを放出し、使用者の視界を物理的に塞ぐ最悪の装備。アプデで文字がさらに巨大化した。' },
+            { title: '呪いのステルス靴', text: '歩くたびに「ドスッ」「バァーン」などの超巨大文字ホログラムを放出し、使用者の視界を物理的に塞ぐ最悪の装備。アプデで文字が最大200pxに巨大化した。' },
             { title: '虹色ダンボール', text: '被ると敵をやり過ごせるが、密閉性が高く長く被ると酸欠になる。しかも内部はクラブ仕様でパリピな虹色に発光する。' },
             { title: 'Aボタンの叫び', text: '敵がいない場所でAボタンを押すと、ミュートが「HEY!!」と叫び敵を誘い出すデコイ機能。文字がデカすぎてプレイヤー自身の視界も塞がる。' },
-            { title: 'ハッキング端末', text: '機密データが入った黄色い端末。Aボタン長押しでダウンロードできるが、その間は完全に無防備になる。' },
-            { title: 'ワープパッド', text: '乗ると別の場所に瞬間移動する紫色の装置。ハブエリアで多用される。' }
+            { title: 'ハッキング端末', text: '機密データが入った黄色い端末。Aボタン長押しでダウンロードできるが、その間は完全に無防備になる。' }
         ]
     },
     {
         cat: '組織',
         items: [
             { title: 'サイレンス', text: '人類から音楽や娯楽を奪い、完全な静寂をもたらそうとする悪の組織。無機質な基地を多数保有する。' },
+            { title: '親衛隊', text: '最深部を守るエリート兵士。視界が広く、足も速い。' },
             { title: 'サイボーグ猟犬', text: 'ソナーが操る機械の犬。視界は狭いが移動速度が異様に速く、音もなく背後から忍び寄る。' },
-            { title: '監視カメラ', text: '黄色い視界を回転させる無敵の防衛システム。破壊不能。' },
             { title: 'レーザーフェンス', text: '一定間隔で点滅する赤い防衛システム。触れると即座に発見されゲームオーバーとなる。' }
         ]
     }
@@ -178,14 +186,14 @@ const Noise = {
     scIdx: 0, msgIdx: 0, strToShow: '',
     cam: { x: 0, y: 0 }, mapW: 200, mapH: 300,
     p: { x: 100, y: 280, r: 6, spd: 3.0, box: false }, o2: 100, o2Cd: 0, 
-    
-    texts: [], enemies: [], walls: [], doors: [], switches: [], terminals: [], lasers: [], cameras: [], warps: [],
+    texts: [], enemies: [], walls: [], doors: [], switches: [], terminals: [], lasers: [],
     goal: { x: 100, y: 20, r: 15 }, stats: { kills: 0, noise: 0, boxTime: 0, time: 0 },
-    msg: '', msgLife: 0, commTmr: 100, commQueue: [], escapeTimer: -1, 
+    commTmr: 100, escapeTimer: -1, 
     
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss'); canvas.width = 200; canvas.height = 300;
-        this.st = 'title'; this.tmr = 0; this.level = 0; this.menuCur = 0; this.msg = ''; this.msgLife = 0; this.commQueue = [];
+        this.st = 'title'; this.tmr = 0; this.level = 0; this.menuCur = 0; 
+        CommSys.msg = ''; CommSys.msgLife = 0; this.commQueue = [];
         if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
@@ -200,122 +208,100 @@ const Noise = {
     eL(x,y,pts,spd,type) { this.enemies.push({x,y,path:pts,pt:0,spd,dir:0,wait:0,type}); },
     tL(x,y) { this.terminals.push({x,y,r:20,progress:0,hacked:false}); },
     lL(x,y,w,h,maxTmr) { this.lasers.push({x,y,w,h,tmr:0,maxTmr}); },
-    cL(x,y,r,fov,spd,dir) { this.cameras.push({x,y,r,fov,spd,dir}); },
-    wpL(x,y,tx,ty) { this.warps.push({x,y,tx,ty,cd:0}); },
 
     addOuterWalls() {
         this.wL(0,0,this.mapW,20); this.wL(0,this.mapH-20,this.mapW,20);
         this.wL(0,0,20,this.mapH); this.wL(this.mapW-20,0,20,this.mapH);
     },
 
-    // ★ 完璧な導線とギミックを備えた全7ステージ
+    // ★ 全7ステージの超過酷マップ設計（詰みポイント完全排除・障害物マシマシ）
     loadLevel() {
         this.st = 'play'; this.p.box = false; this.o2 = 100; this.o2Cd = 0;
         this.texts = []; this.tmr = 0; this.commTmr = 150; this.commQueue = [];
-        this.walls = []; this.doors = []; this.switches = []; this.enemies = []; 
-        this.terminals = []; this.lasers = []; this.cameras = []; this.warps = [];
+        this.walls = []; this.doors = []; this.switches = []; this.enemies = []; this.terminals = []; this.lasers = [];
         this.escapeTimer = -1;
         
         if (this.level === 0) { // L1: チュートリアル
             this.mapW=400; this.mapH=600; this.p.x=200; this.p.y=500;
             this.wL(0,300,160,40); this.wL(240,300,160,40); 
             this.dL(160,300,80,40,'blue',1); this.sL(320,450,'blue',1);
+            this.wL(100,150,200,40); // 障害物
             this.eL(200,400,[{x:40,y:400},{x:360,y:400}], 1.2, 'soldier');
-            this.goal = {x:200, y:100, r:20};
+            this.goal = {x:200, y:80, r:20};
         } 
-        else if (this.level === 1) { // L2: カメラ潜入 ＆ 赤青パズル (詰み修正版)
-            this.mapW=600; this.mapH=500; this.p.x=50; this.p.y=450;
-            this.wL(280,0,40,200); this.wL(280,300,40,200);
-            this.dL(280,200,40,100,'red',1); 
-            this.wL(0,240,100,40); this.dL(100,240,80,40,'blue',2); this.wL(180,240,100,40);
-            
-            // 完璧な導線スイッチ
-            this.sL(150,400,'blue',2); 
-            this.sL(100,100,'red',1);  
-            
-            this.cL(450, 250, 150, 0.8, 0.03, 0); // 監視カメラ追加
-            
+        else if (this.level === 1) { // L2: 赤青パズル・大迂回
+            this.mapW=600; this.mapH=500; this.p.x=100; this.p.y=400;
+            this.wL(260,20,40,200); this.wL(260,320,40,160);
+            this.dL(260,220,40,100,'red',1); 
+            this.wL(20,240,100,40); this.dL(120,240,80,40,'blue',2); this.wL(200,240,60,40);
+            this.wL(400,150,40,200); // 右側の障害物
+            this.sL(500,400,'blue',2); this.sL(100,100,'red',1);
             this.eL(400,350,[{x:320,y:350},{x:550,y:350}], 1.5, 'soldier');
             this.eL(150,150,[{x:50,y:150},{x:250,y:150}], 1.5, 'soldier');
-            this.goal = {x:500, y:100, r:20};
+            this.goal = {x:500, y:80, r:20};
         }
-        else if (this.level === 2) { // L3: レーザーと猟犬
-            this.mapW=600; this.mapH=600; this.p.x=50; this.p.y=500;
+        else if (this.level === 2) { // L3: レーザーと犬
+            this.mapW=600; this.mapH=600; this.p.x=100; this.p.y=500;
             this.wL(0,380,450,40); this.wL(150,180,450,40);
             this.lL(450,380,150,10,120); this.lL(450,410,150,10,120); 
             this.lL(0,180,150,10,100); this.lL(0,210,150,10,100); 
-            this.eL(300,480,[{x:100,y:480},{x:500,y:480}], 3.5, 'dog');
-            this.eL(300,280,[{x:500,y:280},{x:100,y:280}], 3.5, 'dog');
+            this.eL(300,480,[{x:100,y:480},{x:500,y:480}], 4.0, 'dog');
+            this.eL(300,280,[{x:500,y:280},{x:100,y:280}], 4.0, 'dog');
             this.tL(50, 280); 
             this.goal = {x:500, y:80, r:20};
         }
-        else if (this.level === 3) { // L4: ワープ・ハッキング・ハブ
-            this.mapW=600; this.mapH=600; this.p.x=100; this.p.y=300;
-            // 十字の壁で4つの小部屋と中央を分ける
-            this.wL(280, 0, 40, 200); this.wL(280, 400, 40, 200);
-            this.wL(0, 280, 200, 40); this.wL(400, 280, 200, 40);
-            this.wL(200,200,200,40); this.wL(200,360,200,40);
-            this.wL(200,240,40,120); this.wL(360,240,40,120);
-            
-            this.tL(100,100); this.tL(500,100); this.tL(100,500); this.tL(500,500);
-            
-            this.wpL(100, 250, 100, 150); this.wpL(100, 150, 100, 250); 
-            this.wpL(100, 350, 100, 450); this.wpL(100, 450, 100, 350); 
-            this.wpL(500, 250, 500, 150); this.wpL(500, 150, 500, 250); 
-            this.wpL(500, 350, 500, 450); this.wpL(500, 450, 500, 350); 
-            
-            this.wpL(300, 150, 300, 300); this.wpL(300, 300, 300, 150); // 中央ゴール部屋へのワープ
-            
-            this.eL(150,100,[{x:50,y:100},{x:150,y:100}], 2.0, 'soldier'); 
-            this.eL(450,100,[{x:450,y:100},{x:550,y:100}], 2.0, 'soldier'); 
-            this.eL(150,500,[{x:50,y:500},{x:150,y:500}], 3.5, 'dog');     
-            this.eL(450,500,[{x:450,y:500},{x:550,y:500}], 3.5, 'dog');     
-            
-            this.goal = {x:300, y:300, r:20};
+        else if (this.level === 3) { // L4: 端末迷路
+            this.mapW=800; this.mapH=600; this.p.x=400; this.p.y=500;
+            this.wL(200,150,40,300); this.wL(560,150,40,300);
+            this.wL(350,150,100,40); this.wL(350,410,100,40);
+            this.tL(100,100); this.tL(700,100); this.tL(100,500); this.tL(700,500);
+            this.eL(400,260,[{x:300,y:260},{x:500,y:260}], 2.0, 'soldier');
+            this.eL(400,340,[{x:500,y:340},{x:300,y:340}], 2.0, 'soldier');
+            this.eL(120,300,[{x:120,y:150},{x:120,y:450}], 4.5, 'dog');
+            this.eL(680,300,[{x:680,y:450},{x:680,y:150}], 4.5, 'dog');
+            this.goal = {x:400, y:80, r:20};
         }
-        else if (this.level === 4) { // L5: 3色要塞 (再設計版)
+        else if (this.level === 4) { // L5: 3色要塞と親衛隊
             this.mapW=800; this.mapH=800; this.p.x=100; this.p.y=700;
-            this.wL(200,0,40,600); this.dL(200,600,40,100,'red',1); 
-            this.wL(500,0,40,600); this.dL(500,600,40,100,'green',3);
-            this.wL(240,400,100,40); this.wL(420,400,80,40);
-            this.dL(340,400,80,40,'blue',2);
-            
-            this.sL(100,100,'red',1); this.sL(400,700,'blue',2); this.sL(350,100,'green',3);   
-            
-            this.eL(100,400,[{x:50,y:400},{x:150,y:400}], 2.0, 'soldier');
-            this.eL(350,250,[{x:260,y:250},{x:480,y:250}], 3.0, 'dog');
-            this.eL(650,400,[{x:560,y:400},{x:760,y:400}], 2.0, 'soldier');
-            this.lL(240,500,260,10,80); 
-            
-            this.goal = {x:650, y:100, r:20};
+            this.wL(240,20,40,580); this.wL(520,220,40,560);
+            this.dL(240,600,40,140,'red',1); this.dL(520,60,40,160,'blue',2);
+            this.wL(280,380,240,40); this.dL(360,380,80,40,'green',3);
+            this.sL(100,100,'red',1); this.sL(400,600,'blue',2); this.sL(700,700,'green',3);
+            this.eL(150,400,[{x:50,y:400},{x:200,y:400}], 2.5, 'soldier');
+            this.eL(650,400,[{x:580,y:400},{x:750,y:400}], 5.0, 'dog');
+            this.eL(400,250,[{x:300,y:250},{x:500,y:250}], 2.5, 'soldier');
+            this.lL(280,280,240,10,80); 
+            this.goal = {x:700, y:100, r:20};
         }
         else if (this.level === 5) { // L6: ボス戦
             this.mapW=600; this.mapH=600; this.p.x=300; this.p.y=550;
             this.wL(150,150,60,60); this.wL(390,150,60,60); this.wL(150,390,60,60); this.wL(390,390,60,60); 
             this.eL(300,300,[{x:300,y:300}], 0, 'boss');
             this.eL(300,100,[{x:100,y:100},{x:500,y:100},{x:500,y:500},{x:100,y:500}], 4.0, 'dog');
-            this.goal = {x:-100,y:-100,r:1}; 
+            this.goal = {x:-100,y:-100,r:1}; // ボス撃破でクリア
         }
-        else if (this.level === 6) { // L7: 崩壊脱出 (カメラとレーザーの嵐)
-            this.mapW=400; this.mapH=1500; this.p.x=200; this.p.y=1400;
-            this.escapeTimer = 3600; // 60秒
-            for(let y=150; y<1300; y+=250) {
+        else if (this.level === 6) { // L7: 崩壊脱出 (60秒)
+            this.mapW=400; this.mapH=1600; this.p.x=200; this.p.y=1500;
+            this.escapeTimer = 3600; 
+            for(let y=150; y<1400; y+=200) {
                 let gap = 60 + Math.random()*200;
-                this.wL(0,y,gap-40,40); this.wL(gap+60,y,400-(gap+60),40);
-                this.eL(200,y+125,[{x:50,y:y+125},{x:350,y:y+125}], 4.5, 'dog');
-                this.lL(0,y+200,400,10,60); 
-                this.cL(200, y+50, 120, 0.5, 0.05, Math.random()*Math.PI);
+                this.wL(20,y,gap-40,40); this.wL(gap+60,y,360-(gap+60),40);
+                this.eL(200,y+100,[{x:50,y:y+100},{x:350,y:y+100}], 5.0, 'dog');
+                this.lL(20,y+160,360,10,50); 
             }
-            this.goal = {x:200, y:50, r:30};
+            this.goal = {x:200, y:60, r:30};
         }
-
         this.addOuterWalls();
     },
 
+    // ==========================================
+    // メイン更新処理 (update)
+    // ==========================================
     update() {
         if (keysDown.select) { switchApp(Menu); return; }
         this.tmr++;
 
+        // --- タイトル ---
         if (this.st === 'title') {
             if (keysDown.down) { this.menuCur = 1; playSnd('sel'); }
             if (keysDown.up) { this.menuCur = 0; playSnd('sel'); }
@@ -326,6 +312,7 @@ const Noise = {
             return;
         }
 
+        // --- データベース ---
         if (this.st.startsWith('db_')) {
             if (this.st === 'db_cat') {
                 if (keysDown.down) { this.dbCat = (this.dbCat + 1) % DB.length; playSnd('sel'); }
@@ -344,6 +331,7 @@ const Noise = {
             return;
         }
 
+        // --- ストーリー（ノベル） ---
         if (this.st === 'story') {
             if (!SCENARIOS[this.scIdx] || !SCENARIOS[this.scIdx][this.msgIdx]) return;
             let msg = SCENARIOS[this.scIdx][this.msgIdx];
@@ -365,8 +353,9 @@ const Noise = {
             return;
         }
 
+        // --- ゲームオーバー ＆ リザルト ---
         if (this.st === 'gameover' || this.st === 'result') {
-            if (this.msgLife > 0) this.msgLife--;
+            if (CommSys.msgLife > 0) CommSys.msgLife--;
             if (this.tmr > 60 && (keysDown.a || keysDown.b)) { this.st = 'title'; this.tmr = 0; }
             return;
         }
@@ -374,19 +363,20 @@ const Noise = {
         // ================= PLAY =================
         this.stats.time++;
         
+        // 脱出タイマー
         if (this.escapeTimer > 0) {
             this.escapeTimer--;
             if (this.escapeTimer <= 0) {
-                this.st = 'gameover'; this.tmr = 0;
-                this.msg = '【ルナ】基地が爆発しました！！'; this.msgLife = 180;
+                CommSys.speak('エコー', '基地が爆発した！！');
                 playSnd('hit'); screenShake(30);
-                this.texts.push({ x: this.p.x, y: this.p.y, text: 'TIME OVER', col: '#f00', life: 120, maxLife: 120, size: 50, rot: 0, screenCenter: true });
-                return;
+                this.texts.push({ x: this.p.x, y: this.p.y, text: 'TIME OVER', col: '#f00', life: 120, maxLife: 120, size: 60, rot: 0, screenCenter: true });
+                this.st = 'gameover'; this.tmr = 0; return;
             }
         }
 
+        // 通信システム進行
         if (this.commQueue.length > 0) {
-            if (this.msgLife <= 0) { let n = this.commQueue.shift(); this.msg = `【${n.c}】${n.t}`; this.msgLife = 180; }
+            if (CommSys.msgLife <= 0) { let n = this.commQueue.shift(); CommSys.speak(n.c, n.t); }
         } else {
             this.commTmr--;
             if (this.commTmr <= 0) {
@@ -394,19 +384,19 @@ const Noise = {
                 this.commQueue = [...conv]; this.commTmr = 300 + Math.random() * 300;
             }
         }
-        if (this.msgLife > 0) this.msgLife--;
+        if (CommSys.msgLife > 0) CommSys.msgLife--;
         
+        // カメラ追従
         this.cam.x = Math.max(0, Math.min(this.mapW - 200, this.p.x - 100));
         this.cam.y = Math.max(0, Math.min(this.mapH - 300, this.p.y - 150));
         
+        // ダンボールO2システム
         let currentSpd = this.p.spd;
         if (keys.b && this.o2 > 0 && this.o2Cd <= 0) {
-            this.p.box = true; currentSpd *= 0.2; 
-            this.o2 -= 0.8; this.stats.boxTime++;
+            this.p.box = true; currentSpd *= 0.2; this.o2 -= 0.8; this.stats.boxTime++;
             if (this.o2 <= 0) {
                 this.p.box = false; this.o2Cd = 120; 
-                this.texts.push({x: this.p.x, y: this.p.y, text: '酸欠!!', col: '#0ff', life: 60, maxLife: 60, size: 40, rot: 0, mapCenter: true});
-                playSnd('hit');
+                this.texts.push({x: this.p.x, y: this.p.y, text: '酸欠!!', col: '#0ff', life: 60, maxLife: 60, size: 30, rot: 0}); playSnd('hit');
             }
         } else {
             this.p.box = false;
@@ -414,6 +404,7 @@ const Noise = {
             if (this.o2Cd > 0) this.o2Cd--;
         }
 
+        // 移動と壁判定
         let moved = false; let vx = 0, vy = 0;
         if (keys.left)  { vx -= currentSpd; moved = true; }
         if (keys.right) { vx += currentSpd; moved = true; }
@@ -427,25 +418,16 @@ const Noise = {
         for (let w of activeWalls) { if (nx + this.p.r > w.x && nx - this.p.r < w.x + w.w && ny + this.p.r > w.y && ny - this.p.r < w.y + w.h) { hitWall = true; break; } }
         if (!hitWall) { this.p.x = nx; this.p.y = ny; }
 
+        // スイッチ
         for (let s of this.switches) {
             if (!s.active && Math.hypot(this.p.x - s.x, this.p.y - s.y) < s.r + this.p.r) {
                 s.active = true; playSnd('sel');
-                this.texts.push({ x: s.x, y: s.y, text: 'CLICK!', col: s.col === 'blue' ? '#0ff' : (s.col === 'red' ? '#f00' : '#0f0'), life: 40, maxLife: 40, size: 30, rot: 0, mapCenter: true });
+                this.texts.push({ x: s.x, y: s.y, text: 'CLICK!', col: s.col === 'blue' ? '#0ff' : (s.col === 'red' ? '#f00' : '#0f0'), life: 40, maxLife: 40, size: 30, rot: 0 });
                 for (let d of this.doors) { if (d.col === s.col) d.open = true; }
             }
         }
 
-        // ワープ処理
-        for (let w of this.warps) {
-            if (w.cd > 0) w.cd--;
-            else if (Math.hypot(this.p.x - w.x, this.p.y - w.y) < 15 + this.p.r) {
-                this.p.x = w.tx; this.p.y = w.ty; w.cd = 60; 
-                for(let ow of this.warps) { if(Math.hypot(this.p.x - ow.x, this.p.y - ow.y) < 20) ow.cd = 60; }
-                playSnd('combo');
-                this.texts.push({ x: this.p.x, y: this.p.y, text: 'WARP!', col: '#f0f', life: 40, maxLife: 40, size: 40, rot: 0, mapCenter: true });
-            }
-        }
-
+        // ハッキング
         let isHacking = false; let nearTerminal = false;
         for (let t of this.terminals) {
             if (!t.hacked && Math.hypot(this.p.x - t.x, this.p.y - t.y) < t.r + this.p.r + 20) {
@@ -455,14 +437,15 @@ const Noise = {
                     if (this.tmr % 5 === 0) playSnd('sel');
                     if (t.progress >= 100) {
                         t.hacked = true; playSnd('combo');
-                        this.texts.push({ x: t.x, y: t.y - 20, text: 'HACKED!!', col: '#0f0', life: 60, maxLife: 60, size: 50, rot: 0, mapCenter: true });
-                        this.msg = '【ルナ】ダウンロード完了です！'; this.msgLife = 120;
+                        this.texts.push({ x: t.x, y: t.y - 20, text: 'HACKED!!', col: '#0f0', life: 60, maxLife: 60, size: 50, rot: 0 });
+                        CommSys.speak('ルナ', 'ダウンロード完了です！');
                     }
                 }
             }
         }
 
-        if (keysDown.a && !this.p.box && !nearTerminal) {
+        // ★ Aボタン (暗殺 or デコイ)
+        if (keysDown.a && !this.p.box && !isHacking) {
             let killed = false;
             for (let i = this.enemies.length - 1; i >= 0; i--) {
                 let e = this.enemies[i];
@@ -483,91 +466,91 @@ const Noise = {
             }
             if (!killed) { 
                 let shout = ['HEY!!', 'MUSCLE!!', 'HERE!!'][Math.floor(Math.random()*3)];
-                this.texts.push({ x: this.p.x, y: this.p.y, text: shout, col: '#ff0', life: 60, maxLife: 60, size: 120, rot: (Math.random()-0.5), mapCenter: true });
+                this.texts.push({ x: this.p.x, y: this.p.y, text: shout, col: '#ff0', life: 60, maxLife: 60, size: 140, rot: (Math.random()-0.5) });
                 this.stats.noise += 5; playSnd('jmp'); screenShake(5);
                 for (let e of this.enemies) { if (e.type !== 'boss' && Math.hypot(e.x - this.p.x, e.y - this.p.y) < 250) e.inv = { x: this.p.x, y: this.p.y, tmr: 120 }; }
             }
         }
         
-        let noiseInterval = 15;
-        if (moved && !this.p.box && this.tmr % noiseInterval === 0) {
-            let words = ['ドスッ!', 'バァーン!', 'スサッ', 'ドン!', 'ピチャ', 'ドガッ'];
-            let cols = ['#f00', '#ff0', '#f0f', '#0ff', '#f80'];
-            let size = 60 + Math.random()*80; // ★ さらに巨大化
+        // ★ 歩行文字の超絶巨大化 (最大200px)
+        if (moved && !this.p.box && this.tmr % 15 === 0) {
+            let words = ['ドスッ!', 'バァーン!', 'スサッ', 'ドン!'];
+            let cols = ['#f00', '#ff0', '#f0f', '#0ff'];
             let cx = this.cam.x, cy = this.cam.y;
-            let mX = size * 0.6, mY = size * 0.5;
             let tx = this.p.x + (Math.random()-0.5)*80; let ty = this.p.y + (Math.random()-0.5)*80;
-            // 画面見切れ防止
-            tx = Math.max(cx + mX, Math.min(cx + 200 - mX, tx)); 
-            ty = Math.max(cy + mY + 25, Math.min(cy + 300 - mY - 25, ty));
+            tx = Math.max(cx + 50, Math.min(cx + 150, tx)); ty = Math.max(cy + 80, Math.min(cy + 220, ty));
 
-            this.texts.push({ x: tx, y: ty, text: words[Math.floor(Math.random()*words.length)], col: cols[Math.floor(Math.random()*cols.length)], life: 60, maxLife: 60, size: size, rot: (Math.random()-0.5)*0.5, mapCenter: true });
+            this.texts.push({ x: tx, y: ty, text: words[Math.floor(Math.random()*words.length)], col: cols[Math.floor(Math.random()*cols.length)], life: 60, maxLife: 60, size: 80 + Math.random()*120, rot: (Math.random()-0.5)*0.5 });
             this.stats.noise++; playSnd(Math.random() < 0.5 ? 'hit' : 'jmp'); 
         }
         
         for (let i = this.texts.length - 1; i >= 0; i--) {
             let t = this.texts[i]; t.life--;
-            if (!t.screenCenter && !t.mapCenter) t.y -= 0.3; 
+            if (!t.screenCenter) t.y -= 0.3; 
             if (t.life <= 0) this.texts.splice(i, 1);
         }
 
+        // ゴール判定
         let canGoal = this.terminals.every(t => t.hacked);
         if (canGoal && this.goal.r > 0 && Math.hypot(this.p.x - this.goal.x, this.p.y - this.goal.y) < this.goal.r + this.p.r) {
             playSnd('combo'); this.level++; this.startStory(this.level); return;
         }
 
-        for (let e of this.enemies) {
-            if (e.type === 'boss') { e.dir += 0.03; } 
-            else {
-                if (e.inv && e.inv.tmr > 0) { 
-                    let dx = e.inv.x - e.x, dy = e.inv.y - e.y;
-                    if (Math.hypot(dx, dy) > 5) { e.dir = Math.atan2(dy, dx); e.x += Math.cos(e.dir) * e.spd; e.y += Math.sin(e.dir) * e.spd; }
-                    e.inv.tmr--;
-                } else {
-                    let target = e.path[e.pt]; let dx = target.x - e.x, dy = target.y - e.y; let dist = Math.hypot(dx, dy);
-                    if (dist < 2) { if (e.wait > 0) e.wait--; else { e.pt = (e.pt + 1) % e.path.length; e.wait = 60; } } 
-                    else { e.dir = Math.atan2(dy, dx); e.x += Math.cos(e.dir) * e.spd; e.y += Math.sin(e.dir) * e.spd; }
-                }
-            }
+        // ★ 敵とレーザーの視界判定（見つかったら専用処理で抜ける）
+        let spotted = false;
 
-            if (!this.p.box) {
-                let pdx = this.p.x - e.x, pdy = this.p.y - e.y;
-                let sightRadius = e.type === 'dog' ? 45 : (e.type === 'boss' ? 200 : 85); 
-                let fov = e.type === 'boss' ? 0.8 : 0.6;
-                if (Math.hypot(pdx, pdy) < sightRadius) {
-                    let angleDiff = Math.abs(Math.atan2(pdy, pdx) - e.dir);
-                    if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-                    if (angleDiff < fov) { 
-                        let hidden = false;
-                        for (let w of activeWalls) { if (this.lineHitRect(e.x, e.y, this.p.x, this.p.y, w)) { hidden = true; break; } }
-                        if (!hidden) {
-                            this.st = 'gameover'; this.tmr = 0;
-                            this.msg = '【司令官ノイズ】捕らえろォォ！！'; this.msgLife = 180;
-                            playSnd('hit'); screenShake(15);
-                            this.texts.push({ x: this.p.x, y: this.p.y, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 70, rot: 0, screenCenter: true });
+        // レーザー
+        for(let l of this.lasers) {
+            l.tmr++; let isOn = (l.tmr % l.maxTmr) > (l.maxTmr / 2);
+            if (isOn && !this.p.box && this.p.x > l.x && this.p.x < l.x+l.w && this.p.y > l.y && this.p.y < l.y+l.h) { spotted = true; break; }
+        }
+
+        // 敵
+        if (!spotted) {
+            for (let e of this.enemies) {
+                if (e.type === 'boss') { e.dir += 0.03; } 
+                else {
+                    if (e.inv && e.inv.tmr > 0) { 
+                        let dx = e.inv.x - e.x, dy = e.inv.y - e.y;
+                        if (Math.hypot(dx, dy) > 5) { e.dir = Math.atan2(dy, dx); e.x += Math.cos(e.dir) * e.spd; e.y += Math.sin(e.dir) * e.spd; }
+                        e.inv.tmr--;
+                    } else {
+                        let target = e.path[e.pt]; let dx = target.x - e.x, dy = target.y - e.y; let dist = Math.hypot(dx, dy);
+                        if (dist < 2) { if (e.wait > 0) e.wait--; else { e.pt = (e.pt + 1) % e.path.length; e.wait = 60; } } 
+                        else { e.dir = Math.atan2(dy, dx); e.x += Math.cos(e.dir) * e.spd; e.y += Math.sin(e.dir) * e.spd; }
+                    }
+                }
+
+                if (!this.p.box) {
+                    let pdx = this.p.x - e.x, pdy = this.p.y - e.y;
+                    let sightRadius = e.type === 'dog' ? 50 : (e.type === 'boss' ? 220 : 90); 
+                    let fov = e.type === 'boss' ? 0.8 : 0.6;
+                    if (Math.hypot(pdx, pdy) < sightRadius) {
+                        let angleDiff = Math.abs(Math.atan2(pdy, pdx) - e.dir);
+                        if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                        if (angleDiff < fov) { 
+                            let hidden = false;
+                            for (let w of activeWalls) { if (this.lineHitRect(e.x, e.y, this.p.x, this.p.y, w)) { hidden = true; break; } }
+                            if (!hidden) { spotted = true; break; }
                         }
                     }
                 }
             }
         }
-        
-        for (let c of this.cameras) {
-            c.dir += c.spd;
-            if (!this.p.box && Math.hypot(this.p.x - c.x, this.p.y - c.y) < c.r) {
-                let angleDiff = Math.abs(Math.atan2(this.p.y - c.y, this.p.x - c.x) - c.dir);
-                if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-                if (angleDiff < c.fov) {
-                    let hidden = false;
-                    for (let w of activeWalls) { if (this.lineHitRect(c.x, c.y, this.p.x, this.p.y, w)) { hidden = true; break; } }
-                    if (!hidden) {
-                        this.st = 'gameover'; this.tmr = 0; this.msg = '【司令官ノイズ】カメラがネズミを捉えたぞ！'; this.msgLife = 180;
-                        playSnd('hit'); screenShake(15); this.texts.push({ x: this.p.x, y: this.p.y, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 70, rot: 0, screenCenter: true });
-                    }
-                }
-            }
+
+        // 見つかった時のゲームオーバー移行処理
+        if (spotted) {
+            this.st = 'gameover'; this.tmr = 0;
+            CommSys.speak('司令官ノイズ', '捕らえろォォ！！');
+            playSnd('hit'); screenShake(15);
+            this.texts.push({ x: this.p.x, y: this.p.y, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 70, rot: 0, screenCenter: true });
+            return; // ★ これでエラー回避完了
         }
     },
 
+    // ==========================================
+    // 描画処理 (draw)
+    // ==========================================
     drawSpriteData(x, y, data, scale) {
         if(!data) return;
         for (let row = 0; row < 24; row++) {
@@ -670,10 +653,10 @@ const Noise = {
         for(let i=0; i<=this.mapW; i+=20) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,this.mapH); ctx.stroke(); }
         for(let i=0; i<=this.mapH; i+=20) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(this.mapW,i); ctx.stroke(); }
 
-        for (let w of this.warps) {
-            ctx.fillStyle = `rgba(200, 0, 255, ${0.5 + Math.sin(this.tmr*0.2)*0.3})`;
-            ctx.beginPath(); ctx.arc(w.x, w.y, 15, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('WARP', w.x-10, w.y+3);
+        for(let l of this.lasers) {
+            let isOn = (l.tmr % l.maxTmr) > (l.maxTmr / 2);
+            ctx.fillStyle = isOn ? `rgba(255, 0, 0, ${0.5 + Math.random()*0.3})` : 'rgba(255, 0, 0, 0.1)';
+            ctx.fillRect(l.x, l.y, l.w, l.h);
         }
 
         for (let t of this.terminals) {
@@ -700,13 +683,6 @@ const Noise = {
             ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
         }
 
-        for(let l of this.lasers) {
-            let isOn = (l.tmr % l.maxTmr) > (l.maxTmr / 2);
-            if (isOn) {
-                ctx.fillStyle = `rgba(255, 0, 0, ${0.5 + Math.random()*0.3})`; ctx.fillRect(l.x, l.y, l.w, l.h);
-            } else { ctx.fillStyle = 'rgba(255, 0, 0, 0.1)'; ctx.fillRect(l.x, l.y, l.w, l.h); }
-        }
-
         let canGoal = this.terminals.every(t => t.hacked);
         if (this.goal.r > 0) {
             ctx.fillStyle = canGoal ? `rgba(0, 255, 0, ${0.5 + Math.sin(this.tmr*0.1)*0.3})` : `rgba(255, 0, 0, 0.5)`;
@@ -714,14 +690,8 @@ const Noise = {
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(canGoal ? 'GOAL' : 'LOCK', this.goal.x-12, this.goal.y+3);
         }
 
-        for (let c of this.cameras) {
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)'; ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.arc(c.x, c.y, c.r, c.dir - c.fov, c.dir + c.fov); ctx.fill();
-            ctx.fillStyle = '#444'; ctx.beginPath(); ctx.arc(c.x, c.y, 8, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(c.x + Math.cos(c.dir)*4, c.y + Math.sin(c.dir)*4, 3, 0, Math.PI*2); ctx.fill();
-        }
-
         for (let e of this.enemies) {
-            let sightRadius = e.type === 'dog' ? 45 : (e.type === 'boss' ? 200 : 85);
+            let sightRadius = e.type === 'dog' ? 50 : (e.type === 'boss' ? 220 : 90);
             let fov = e.type === 'boss' ? 0.8 : 0.6;
             ctx.fillStyle = e.type === 'boss' ? 'rgba(255, 0, 255, 0.3)' : 'rgba(255, 0, 0, 0.3)'; 
             ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, sightRadius, e.dir - fov, e.dir + fov); ctx.fill();
@@ -730,7 +700,6 @@ const Noise = {
             ctx.beginPath(); ctx.arc(e.x, e.y, e.type === 'dog' ? 4 : (e.type === 'boss' ? 15 : 6), 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.lineWidth = e.type === 'boss' ? 4 : 2; 
             ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.dir)*(e.type==='boss'?25:10), e.y + Math.sin(e.dir)*(e.type==='boss'?25:10)); ctx.stroke();
-            
             if(e.inv && e.inv.tmr > 0) { ctx.fillStyle = '#ff0'; ctx.font = '12px monospace'; ctx.fillText('?', e.x-5, e.y-15); }
         }
 
@@ -742,13 +711,10 @@ const Noise = {
             ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.p.x, this.p.y, this.p.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
         }
 
-        // マップ配置の文字（中央揃えで描画）
         for (let t of this.texts) {
             if (t.screenCenter) continue;
             ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.rot); ctx.fillStyle = t.col; ctx.font = `900 ${t.size}px "Arial Black", Impact, sans-serif`;
-            ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.globalAlpha = t.life / t.maxLife; 
-            if(t.mapCenter) { ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; }
-            ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0); ctx.globalAlpha = 1.0; ctx.restore();
+            ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.globalAlpha = t.life / t.maxLife; ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0); ctx.globalAlpha = 1.0; ctx.restore();
         }
         ctx.restore(); 
 
@@ -758,6 +724,7 @@ const Noise = {
             ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.globalAlpha = t.life / t.maxLife; ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0); ctx.globalAlpha = 1.0; ctx.restore();
         }
 
+        // ================= 映画風レターボックスUI =================
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 25); ctx.fillRect(0, 275, 200, 25);
         
         ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
@@ -769,9 +736,9 @@ const Noise = {
         if (this.escapeTimer > 0) { ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText(`TIME: ${Math.ceil(this.escapeTimer/60)}`, 130, 35); }
 
         ctx.fillStyle = '#0ff'; ctx.font = '9px monospace';
-        if (this.msgLife > 0 && this.msg !== '') {
-            if (this.msg.length > 20) { ctx.fillText(this.msg.substring(0, 20), 5, 285); ctx.fillText(this.msg.substring(20), 5, 295); } 
-            else { ctx.fillText(this.msg, 5, 290); }
+        if (CommSys.msgLife > 0 && CommSys.msg !== '') {
+            if (CommSys.msg.length > 20) { ctx.fillText(CommSys.msg.substring(0, 20), 5, 285); ctx.fillText(CommSys.msg.substring(20), 5, 295); } 
+            else { ctx.fillText(CommSys.msg, 5, 290); }
         }
 
         if (this.st === 'result') {
@@ -784,7 +751,7 @@ const Noise = {
             let title = "NORMAL SPY"; let tCol = '#fff';
             if (this.stats.kills === 0) { title = "GHOST (不殺)"; tCol = '#0ff'; }
             else if (this.stats.boxTime > this.stats.time / 2) { title = "BOX LOVER"; tCol = '#ff0'; }
-            else if (this.stats.noise > 300) { title = "NOISY NINJA"; tCol = '#f0f'; }
+            else if (this.stats.noise > 400) { title = "NOISY NINJA"; tCol = '#f0f'; }
             
             ctx.fillStyle = '#f80'; ctx.fillText('YOUR RANK:', 100, 160);
             ctx.fillStyle = tCol; ctx.font = 'bold 16px monospace'; ctx.fillText(title, 100, 185);
