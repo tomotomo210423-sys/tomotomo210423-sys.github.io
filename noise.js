@@ -215,6 +215,16 @@ const Noise = {
         this.wL(0,0,20,this.mapH); this.wL(this.mapW-20,0,20,this.mapH);
     },
 
+    // ★ 追加：敵の視線と壁の当たり判定（エラー原因の解消）
+    lineHitRect(x1, y1, x2, y2, rect) {
+        let dist = Math.hypot(x2 - x1, y2 - y1); let steps = Math.ceil(dist / 5);
+        for (let i = 0; i <= steps; i++) {
+            let px = x1 + (x2 - x1) * (i / steps); let py = y1 + (y2 - y1) * (i / steps);
+            if (px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h) return true;
+        }
+        return false;
+    },
+
     // ★ 全7ステージの超過酷＆詰み無しマップ設計
     loadLevel() {
         this.st = 'play'; this.p.box = false; this.o2 = 100; this.o2Cd = 0;
@@ -760,7 +770,7 @@ const Noise = {
         ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
         ctx.fillText(`LV:${this.level + 1} KILLS:${this.stats.kills}`, 5, 16);
         ctx.fillStyle = '#444'; ctx.fillRect(110, 8, 80, 8);
-        ctx.fillStyle = this.o2Cd > 0 ? '#f00' : '#0af'; ctx.fillRect(110, 8, 80 * (this.o2/100), 8);
+        ctx.fillStyle = this.o2Cd > 0 ? '#f00' : '#0af'; ctx.fillRect(110, 80 * (this.o2/100), 8);
         ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('O2', 95, 15);
 
         if (this.escapeTimer > 0) { ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText(`TIME: ${Math.ceil(this.escapeTimer/60)}`, 130, 35); }
