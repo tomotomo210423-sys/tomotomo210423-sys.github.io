@@ -15,33 +15,59 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100dvh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100dvh; }
 
-#gameboy { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 20px; display: flex; flex-direction: column; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.3), 5px 5px 25px rgba(0,0,0,0.9); position: relative; opacity: 1; transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
-#screen-container { flex: 1; background: #444; margin: 15px 15px 5px 15px; border-radius: 10px 10px 40px 10px; display: flex; justify-content: center; align-items: center; padding: 10px; border: 3px solid #777; box-shadow: inset 3px 3px 12px rgba(0,0,0,0.6); position: relative; overflow: hidden; z-index: 5; transition: all 0.8s; }
+/* 筐体本体：マットブラックボディ ＋ グリーンのサイバーエッジ */
+#gameboy { 
+  width: 100%; max-width: 450px; height: 100%; max-height: 900px; 
+  background: linear-gradient(135deg, #333 0%, #111 100%); 
+  border-radius: 20px; display: flex; flex-direction: column; 
+  box-shadow: inset -3px -3px 10px rgba(0,0,0,0.8), inset 3px 3px 10px rgba(255,255,255,0.1), 0 0 30px rgba(0,255,100,0.3); 
+  border: 1px solid #444; position: relative; opacity: 1; transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); 
+}
+
+/* 画面枠：ダークガラス風 */
+#screen-container { 
+  flex: 1; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); 
+  margin: 15px 15px 5px 15px; border-radius: 10px 10px 20px 10px; 
+  display: flex; justify-content: center; align-items: center; padding: 10px; 
+  border: 2px solid #222; box-shadow: inset 0px 5px 15px rgba(0,0,0,0.9), 0 2px 0 rgba(255,255,255,0.1); 
+  position: relative; overflow: hidden; z-index: 5; transition: all 0.8s; 
+}
+/* 画面のガラス反射エフェクト */
+#screen-container::after {
+  content: ''; position: absolute; top: 0; left: -50%; width: 200%; height: 100%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 100%);
+  transform: rotate(-10deg); pointer-events: none;
+}
 
 /* スロットモード */
-#gameboy.mode-slot { background: linear-gradient(135deg, #aa0000 0%, #440000 100%); border-radius: 15px 15px 50px 50px; box-shadow: inset -5px -5px 15px rgba(0,0,0,0.5), 0 0 30px rgba(255,50,50,0.8); }
-#gameboy.mode-slot #screen-container { background: #111; border-color: #ffd700; box-shadow: inset 0 0 20px rgba(255,215,0,0.4); border-radius: 5px; margin: 25px 20px 10px 20px; }
-#gameboy.mode-slot #controls { background: linear-gradient(135deg, #880000 0%, #330000 100%); border-radius: 0 0 50px 50px; }
+#gameboy.mode-slot { 
+  background: linear-gradient(135deg, #600 0%, #200 100%); border-radius: 15px 15px 50px 50px; 
+  box-shadow: inset -5px -5px 15px rgba(0,0,0,0.8), inset 3px 3px 10px rgba(255,100,100,0.2), 0 0 40px rgba(255,50,50,0.6); 
+}
+#gameboy.mode-slot #screen-container { background: #100; border-color: #ffd700; box-shadow: inset 0 0 20px rgba(255,215,0,0.2); margin: 25px 20px 10px 20px; }
+#gameboy.mode-slot #controls { background: transparent; }
 #gameboy.mode-slot #classic-controls { opacity: 0; transform: translateY(100px); pointer-events: none; }
 #gameboy.mode-slot #slot-controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
 /* アビス・ジェネラル横画面モード */
 #gameboy.mode-abyss {
   max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row-reverse;
-  background: linear-gradient(135deg, #111 0%, #300 100%); box-shadow: inset -5px -5px 15px rgba(0,0,0,0.8), 0 0 40px rgba(255,0,0,0.5); border-radius: 20px;
+  background: linear-gradient(135deg, #1a0022 0%, #000 100%); 
+  box-shadow: inset -5px -5px 15px rgba(0,0,0,0.9), inset 3px 3px 10px rgba(200,0,255,0.1), 0 0 40px rgba(150,0,255,0.5); 
+  border-radius: 20px;
 }
-#gameboy.mode-abyss #screen-container { margin: 15px 15px 15px 0; background: #000; border-color: #500; border-radius: 5px; box-shadow: inset 0 0 20px rgba(255,0,0,0.6); }
+#gameboy.mode-abyss #screen-container { margin: 15px 15px 15px 0; background: #000; border-color: #60a; box-shadow: inset 0 0 30px rgba(100,0,200,0.5); }
 #gameboy.mode-abyss #controls { width: 160px; height: 100%; border-radius: 20px 0 0 20px; background: transparent; }
 #gameboy.mode-abyss #dpad { top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
 #gameboy.mode-abyss #action-buttons { opacity: 0; pointer-events: none; }
 #gameboy.mode-abyss #sys-buttons { bottom: 15px; width: 100%; }
-#gameboy.mode-abyss #sys-buttons .s-btn { background: #500; }
+#gameboy.mode-abyss #sys-buttons .s-btn { background: #306; }
 #gameboy.mode-abyss #gameCanvas { aspect-ratio: 400 / 240; box-shadow: none; border-radius: 0; }
 
 #boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
 #boot.hidden { opacity: 0; }
-.boot-text { font-size: 10px; margin: 4px 0; text-shadow: 0 0 5px #0f0; }
-.boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; box-shadow: 0 0 10px #0f0; }
+.boot-text { font-size: 10px; margin: 4px 0; }
+.boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
 .boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
 
 #gameCanvas { 
@@ -51,32 +77,57 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 }
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 
-#controls { height: 300px; position: relative; background: linear-gradient(135deg, #d8d8d8 0%, #c0c0c0 100%); border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: all 0.8s; }
+#controls { height: 300px; position: relative; background: transparent; border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: all 0.8s; }
 #classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
 
 .d-btn, .a-btn, .s-btn { touch-action: none; -webkit-tap-highlight-color: transparent; }
 #dpad { position: absolute; left: 35px; top: 35px; width: 150px; height: 150px; }
-.d-btn { position: absolute; background: #333; border-radius: 4px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5); cursor: pointer; }
-.d-btn:active { background: #111; transform: translateY(2px); }
+
+/* 十字キー（つや消しブラック） */
+.d-btn { 
+  position: absolute; background: #222; border-radius: 4px; 
+  box-shadow: inset -2px -2px 5px rgba(0,0,0,0.8), inset 2px 2px 5px rgba(255,255,255,0.1), 0 5px 10px rgba(0,0,0,0.5); 
+  cursor: pointer; border: 1px solid #111;
+}
+.d-btn:active { background: #111; transform: translateY(2px); box-shadow: inset 2px 2px 5px rgba(0,0,0,0.9); }
 #btn-up { top: 0; left: 50px; width: 50px; height: 50px; border-radius: 5px 5px 0 0; }
 #btn-down { bottom: 0; left: 50px; width: 50px; height: 50px; border-radius: 0 0 5px 5px; }
 #btn-left { top: 50px; left: 0; width: 50px; height: 50px; border-radius: 5px 0 0 5px; }
 #btn-right { top: 50px; right: 0; width: 50px; height: 50px; border-radius: 0 5px 5px 0; }
-.d-center { top: 50px; left: 50px; width: 50px; height: 50px; background: #333; position: absolute; }
+.d-center { top: 50px; left: 50px; width: 50px; height: 50px; background: #222; position: absolute; box-shadow: none; border:none; z-index: 2;}
 
 #action-buttons { position: absolute; right: 25px; top: 55px; width: 160px; height: 120px; transform: rotate(-15deg); }
-.a-btn { position: absolute; width: 70px; height: 70px; background: #b00; border-radius: 50%; color: #faa; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; box-shadow: inset -2px -2px 5px rgba(0,0,0,0.5), 3px 3px 6px rgba(0,0,0,0.4); cursor: pointer; }
-.a-btn:active { background: #800; transform: translateY(2px); }
-#btn-b { left: 0; bottom: 0; } #btn-a { right: 0; top: 0; }
-.btn-label { position: absolute; font-size: 16px; color: #555; font-weight: bold; pointer-events: none; }
+.a-btn { 
+  position: absolute; width: 70px; height: 70px; border-radius: 50%; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; 
+  cursor: pointer; border: 2px solid #111;
+}
+/* A: ルビーレッド */
+#btn-a { 
+  background: radial-gradient(circle at 30% 30%, #ff4444, #990000); color: #fff; text-shadow: 0 0 5px #fff;
+  box-shadow: inset -4px -4px 10px rgba(0,0,0,0.6), inset 2px 2px 8px rgba(255,255,255,0.5), 0 6px 12px rgba(0,0,0,0.8); right: 0; top: 0;
+}
+#btn-a:active { background: #770000; transform: translateY(4px); box-shadow: inset 2px 2px 10px rgba(0,0,0,0.9); }
+
+/* B: サファイアブルー */
+#btn-b { 
+  background: radial-gradient(circle at 30% 30%, #4444ff, #000099); color: #fff; text-shadow: 0 0 5px #fff;
+  box-shadow: inset -4px -4px 10px rgba(0,0,0,0.6), inset 2px 2px 8px rgba(255,255,255,0.5), 0 6px 12px rgba(0,0,0,0.8); left: 0; bottom: 0;
+}
+#btn-b:active { background: #000077; transform: translateY(4px); box-shadow: inset 2px 2px 10px rgba(0,0,0,0.9); }
+
+.btn-label { position: absolute; font-size: 16px; color: #aaa; font-family: 'Courier New', Courier, monospace; font-weight: bold; letter-spacing: 2px; pointer-events: none; }
 #label-b { left: 25px; bottom: -28px; } #label-a { right: 25px; top: -28px; }
 
 #sys-buttons { position: absolute; bottom: 35px; width: 100%; display: flex; justify-content: center; z-index: 30; }
 .s-btn-wrap { text-align: center; }
-.s-btn { width: 70px; height: 20px; background: #555; border-radius: 10px; box-shadow: inset -1px -1px 3px rgba(0,0,0,0.5); transform: rotate(-15deg); cursor: pointer; }
-.s-btn:active { background: #333; }
-.s-label { font-size: 12px; color: #555; font-weight: bold; margin-top: 8px; transition: color 0.5s; }
-#gameboy.mode-slot .s-label { color: #ccc; }
+/* SELECT: メタリックグレー */
+.s-btn { 
+  width: 70px; height: 20px; background: #222; border-radius: 10px; 
+  box-shadow: inset -2px -2px 5px rgba(0,0,0,0.8), inset 2px 2px 5px rgba(255,255,255,0.1), 0 4px 6px rgba(0,0,0,0.5); 
+  transform: rotate(-15deg); cursor: pointer; border: 1px solid #111;
+}
+.s-btn:active { background: #111; transform: rotate(-15deg) translateY(2px); box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8); }
+.s-label { font-size: 12px; color: #aaa; font-weight: bold; margin-top: 8px; transition: color 0.5s; }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
 
 #slot-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transform: translateY(100px); pointer-events: none; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; padding-bottom: 30px; }
@@ -94,7 +145,7 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   <div id="screen-container">
     <div id="boot">
       <div class="boot-text">8in1 RETRO SYSTEM</div>
-      <div class="boot-text">ULTIMATE EDITION</div>
+      <div class="boot-text">SYSTEM BOOTING...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
       <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
     </div>
@@ -159,9 +210,7 @@ const bootInterval = setInterval(() => {
 <script src="king.js"></script>
 <script src="musou.js"></script>
 <script src="abyss.js"></script>
-<script src="noise.js"></script>
-
-<script>
+<script src="noise.js"></script> <script>
 window.onload = () => {
   activeApp = Menu;
   activeApp.init();
