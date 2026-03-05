@@ -1,6 +1,7 @@
 // === TETRIVADER V2 (Remake & Action Edition) ===
 
-const Tetrivader = {
+// オブジェクト名を main.js の呼び出し名と完全に一致させました
+const Tetri = {
     // 状態管理
     st: 'title', tmr: 0, score: 0, hiScore: 0,
     shipIdx: 0, diff: 0, 
