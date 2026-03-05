@@ -128,11 +128,11 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// メニュー管理 (8in1 に変更！)
+// メニュー管理 (ローカルランキング削除版)
 // ★============================================★
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ローカルランキング', '設定', '王様の間'], 
+  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', '設定', '王様の間'], 
   holdTimer: 0,
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
   update() {
@@ -150,8 +150,7 @@ const Menu = {
             typeof Slot !== 'undefined' ? Slot : null, 
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
-            typeof Noise !== 'undefined' ? Noise : null, // ★追加
-            typeof Ranking !== 'undefined' ? Ranking : null, 
+            typeof Noise !== 'undefined' ? Noise : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -165,7 +164,7 @@ const Menu = {
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
     for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
-        ctx.fillStyle = i === this.cur ? '#0f0' : (i === 8 ? '#f80' : '#aaa'); // ノイズエージェントはオレンジ
+        ctx.fillStyle = i === this.cur ? '#0f0' : (i === 8 ? '#f80' : '#aaa'); 
         ctx.font = '11px monospace'; 
         ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, startY + (i - drawStart) * 19); 
     }
@@ -173,12 +172,21 @@ const Menu = {
   }
 };
 
+// ★============================================★
+// 設定画面
+// ★============================================★
 const Settings = {
   cur: 0, init() { this.cur = 0; },
   update() {
     if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
     if (keysDown.up) { this.cur = 0; playSnd('sel'); } if (keysDown.down) { this.cur = 1; playSnd('sel'); }
-    if (keysDown.a) { if (this.cur === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } else { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } }
+    if (keysDown.a) { 
+        if (this.cur === 0) { 
+            activeApp = NameInput; activeApp.name = SaveSys.data.playerName; activeApp.init(); 
+        } else { 
+            SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); 
+        } 
+    }
   },
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
@@ -187,28 +195,65 @@ const Settings = {
   }
 };
 
-const Ranking = {
-  mode: 'n', input: false, name: '', c: 0, mc: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
-  init() { if (!this.input) this.mode = 'n'; this.c = 0; this.mc = 0; },
+// ★============================================★
+// 名前入力画面 (旧ランキングから分離)
+// ★============================================★
+const NameInput = {
+  name: '', c: 0, mc: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
+  init() { this.c = 0; this.mc = 0; },
   update() {
-    if (!this.input && (keysDown.select || keysDown.b)) { switchApp(Menu); return; } if (this.input && keysDown.select) { this.input = false; switchApp(Menu); return; }
-    if (!this.input) { if (keysDown.left || keysDown.right) { this.mode = this.mode === 'n' ? 'h' : 'n'; playSnd('sel'); } if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.c = 0; this.mc = 0; playSnd('jmp'); } } else {
-      if (this.mc === 0) { if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else if (this.mc === 1) { if (keysDown.up) { this.mc = 0; playSnd('sel'); } if (keysDown.down) { this.mc = 2; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else { if (keysDown.up) { this.mc = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Menu); } }
+    if (keysDown.select) { switchApp(Settings); return; }
+    
+    if (this.mc === 0) { 
+        if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } 
+        if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } 
+        if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } 
+        if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } 
+        if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } 
+        if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } 
+    } 
+    else if (this.mc === 1) { 
+        if (keysDown.up) { this.mc = 0; playSnd('sel'); } 
+        if (keysDown.down) { this.mc = 2; playSnd('sel'); } 
+        if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } 
+    } 
+    else { 
+        if (keysDown.up) { this.mc = 1; playSnd('sel'); } 
+        if (keysDown.a && this.name.length > 0) { 
+            SaveSys.data.playerName = this.name; 
+            SaveSys.save(); 
+            playSnd('combo'); 
+            switchApp(Settings); 
+        } 
     }
   },
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
-    if (!this.input) {
-      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mode === 'n' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'h' ? '[HARD]' : '<HARD>'), 120, 40);
-      const rank = this.mode === 'n' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
-      for (let i = 0; i < 10; i++) { ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa'; if (rank[i]) { ctx.fillText(`${String(i+1).padStart(2,' ')}. ${rank[i].name.padEnd(10,' ')} ${String(rank[i].score).padStart(6,' ')}`, 15, 76 + i * 18); } else { ctx.fillText(`${String(i+1).padStart(2,' ')}. ----------  ----`, 15, 76 + i * 18); } }
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
-    } else {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
-      for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.c && this.mc === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
-      ctx.fillStyle = this.mc === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.mc === 1 ? '#fff' : '#666'; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.mc === 1 ? '#fff' : '#ccc'; ctx.fillText('DELETE', 30, 191);
-      const okEn = this.name.length > 0; ctx.fillStyle = this.mc === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.mc === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.mc === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
+    ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); 
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); 
+    
+    ctx.font = '11px monospace';
+    for (let i = 0; i < this.chars.length; i++) { 
+        const x = 15 + (i % 10) * 17; 
+        const y = 90 + Math.floor(i / 10) * 18; 
+        if (i === this.c && this.mc === 0) { 
+            ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; 
+        } else { 
+            ctx.fillStyle = '#aaa'; 
+        } 
+        ctx.fillText(this.chars[i], x, y); 
     }
+    
+    ctx.fillStyle = this.mc === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); 
+    ctx.strokeStyle = this.mc === 1 ? '#fff' : '#666'; ctx.strokeRect(25, 175, 70, 22); 
+    ctx.fillStyle = this.mc === 1 ? '#fff' : '#ccc'; ctx.fillText('DELETE', 30, 191);
+    
+    const okEn = this.name.length > 0; 
+    ctx.fillStyle = this.mc === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); 
+    ctx.strokeStyle = this.mc === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); 
+    ctx.fillStyle = this.mc === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
+    
+    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
   }
 };
 
