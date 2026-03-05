@@ -11,6 +11,9 @@ const Tetri = {
     starFall: false, starX: 0, starY: 0,
     danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0,
     
+    // ★ EXPERT限定シールド
+    shields: 0,
+
     playSE(id) { if(typeof playSnd === 'function') playSnd(id); },
     shakeCam(val) { if(typeof screenShake === 'function') screenShake(val); },
 
@@ -85,6 +88,10 @@ const Tetri = {
         this.st = 'play'; this.tmr = 0; this.score = 0;
         this.px = 100; this.bullets = []; this.blocks = []; this.parts = [];
         this.danmakuMode = false; this.starFall = false;
+        
+        // ★ EXPERT限定：初期シールド付与
+        this.shields = (this.diff === 2) ? 1 : 0;
+        
         if(typeof BGM !== 'undefined') BGM.play('action');
     },
 
@@ -184,7 +191,6 @@ const Tetri = {
                 if (b.type === 'accel') b.vy += 0.05;
                 b.x += b.vx; b.y += b.vy;
                 
-                // 自機との当たり判定
                 if (Math.abs(b.x - this.px) < 6 && Math.abs(b.y - this.py) < 6) {
                     this.playerHit = true;
                     this.playSE('hit');
@@ -201,7 +207,6 @@ const Tetri = {
                 this.danmakuMode = false;
                 this.danmakuBullets = [];
                 if (!this.playerHit) {
-                    // ★ ここが修正されたスコア2倍処理！
                     this.score *= 2; 
                     this.playSE('combo');
                     for(let k=0; k<20; k++) this.parts.push({x: 100, y: 150, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 40, maxLife: 40, col: '#ff0', type: 'shard'});
@@ -210,13 +215,12 @@ const Tetri = {
                 this.playerHit = false;
             }
             
-            // 演出用パーティクル更新
             for (let i = this.parts.length - 1; i >= 0; i--) {
                 let p = this.parts[i];
                 p.x += p.vx; p.y += p.vy; p.life--;
                 if (p.life <= 0) this.parts.splice(i, 1);
             }
-            return; // 弾幕モード中は通常のブロック処理を行わない
+            return; 
         }
 
         // ================= PLAY (通常モード) =================
@@ -233,7 +237,15 @@ const Tetri = {
         if (keysDown.a) {
             let bCol = this.SHIPS_INFO[this.shipIdx].col;
             if (bCol === 'rainbow') bCol = `hsl(${(this.tmr*15)%360}, 100%, 60%)`;
-            this.bullets.push({ x: this.px, y: this.py - 10, vy: -9, col: bCol });
+            
+            // ★ EXPERT限定：ツインブラスター (2発同時発射)
+            if (this.diff === 2) {
+                this.bullets.push({ x: this.px - 6, y: this.py - 10, vy: -9, col: bCol });
+                this.bullets.push({ x: this.px + 6, y: this.py - 10, vy: -9, col: bCol });
+            } else {
+                this.bullets.push({ x: this.px, y: this.py - 10, vy: -9, col: bCol });
+            }
+            
             this.playSE('sel');
             this.parts.push({ x: this.px, y: this.py - 12, vx: 0, vy: 0, life: 6, maxLife: 6, col: '#fff', type: 'flash' });
         }
@@ -249,7 +261,6 @@ const Tetri = {
 
         let fallBonus = keys.b ? 4.0 : 0;
 
-        // スターの落下処理
         if (this.starFall) {
             this.starY += 1.5 + fallBonus;
             
@@ -268,7 +279,7 @@ const Tetri = {
                 this.starFall = false;
                 this.scoreBeforeDanmaku = this.score;
                 this.danmakuMode = true;
-                this.danmakuTimer = 600; // 約10秒間
+                this.danmakuTimer = 600; 
                 this.danmakuBullets = [];
                 this.playerHit = false;
                 this.playSE('combo');
@@ -276,7 +287,6 @@ const Tetri = {
             }
         }
 
-        // ブロック処理
         for (let i = this.blocks.length - 1; i >= 0; i--) {
             let blk = this.blocks[i];
             blk.tmr++;
@@ -323,13 +333,38 @@ const Tetri = {
 
             if (blk.dead) { this.blocks.splice(i, 1); continue; }
 
+            // ★ 防衛ライン越え判定（シールド処理を追加）
             if (blk.y + blk.h > 280) {
-                this.st = 'gameover'; this.tmr = 0;
-                this.playSE('hit'); this.shakeCam(25);
-                for(let k=0; k<40; k++) {
-                    this.parts.push({ x: this.px, y: this.py, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 50, maxLife: 50, col: '#f80', type: 'shard' });
+                if (this.shields > 0) {
+                    // シールド発動！(ボム効果)
+                    this.shields--;
+                    this.playSE('combo');
+                    this.shakeCam(20);
+                    
+                    // 画面内の全ブロックを破壊
+                    for (let b of this.blocks) {
+                        let pCol = b.type === 'meteor' ? '#f00' : (b.type === 'slide' ? '#0f0' : b.c);
+                        for(let k=0; k<8; k++) {
+                            this.parts.push({ x: b.x + b.w/2, y: b.y + b.h/2, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 30, maxLife: 30, col: pCol, type: 'shard' });
+                        }
+                        this.score += 10;
+                    }
+                    this.blocks = []; // 全消去
+                    
+                    // シールドブレイクのド派手なエフェクト
+                    for(let k=0; k<25; k++) {
+                        this.parts.push({ x: 100, y: 280, vx: (Math.random()-0.5)*15, vy: -(Math.random()*6 + 2), life: 40, maxLife: 40, col: '#0ff', type: 'shard' });
+                    }
+                    break; // ループを抜ける
+                } else {
+                    // 通常のゲームオーバー処理
+                    this.st = 'gameover'; this.tmr = 0;
+                    this.playSE('hit'); this.shakeCam(25);
+                    for(let k=0; k<40; k++) {
+                        this.parts.push({ x: this.px, y: this.py, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 50, maxLife: 50, col: '#f80', type: 'shard' });
+                    }
+                    if(typeof BGM !== 'undefined') BGM.stop();
                 }
-                if(typeof BGM !== 'undefined') BGM.stop();
             }
         }
 
@@ -382,7 +417,7 @@ const Tetri = {
             ctx.shadowBlur = 0;
             
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('- REMAKE V2.2 -', 100, 145);
+            ctx.fillText('- REMAKE V2.3 -', 100, 145);
             
             if (this.tmr % 50 < 25) { ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace'; ctx.fillText('PRESS [A] TO START', 100, 220); }
             ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`HI-SCORE: ${this.hiScore}`, 100, 280);
@@ -415,7 +450,13 @@ const Tetri = {
             for (let i = 0; i < 3; i++) {
                 ctx.fillStyle = this.diff === i ? this.diffSet[i].col : '#555';
                 ctx.font = this.diff === i ? 'bold 18px monospace' : '13px monospace';
-                ctx.fillText((this.diff === i ? '▶ ' : '') + this.diffSet[i].name, 100, 125 + i * 45);
+                ctx.fillText((this.diff === i ? '▶ ' : '') + this.diffSet[i].name, 100, 115 + i * 45);
+                
+                // ★ EXPERTの特権をUIに表示
+                if (i === 2 && this.diff === 2) {
+                    ctx.fillStyle = '#ff0'; ctx.font = '9px monospace';
+                    ctx.fillText('W-SHOT / AUTO-SHIELD', 100, 130 + i * 45);
+                }
             }
             
             ctx.fillStyle = '#888'; ctx.font = '11px monospace'; ctx.fillText('A: 出撃   B: 戻る', 100, 285);
@@ -423,7 +464,6 @@ const Tetri = {
             return;
         }
 
-        // ================= DANMAKU MODE 描画 =================
         if (this.danmakuMode) {
             ctx.fillStyle = '#200'; ctx.fillRect(0, 0, 200, 300);
             ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText('DANMAKU MODE!', 40, 30); 
@@ -457,9 +497,20 @@ const Tetri = {
         }
 
         // ================= PLAY / GAMEOVER =================
-        ctx.strokeStyle = '#f00'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(0, 280); ctx.lineTo(200, 280); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,0,0,0.3)'; ctx.fillRect(0, 280, 200, 20);
+        // ★ 防衛ライン (シールド状態を描画反映)
+        if (this.shields > 0) {
+            ctx.strokeStyle = '#0ff'; ctx.lineWidth = 3;
+            ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+            ctx.beginPath(); ctx.moveTo(0, 280); ctx.lineTo(200, 280); ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.2)'; ctx.fillRect(0, 280, 200, 20);
+            ctx.fillStyle = '#0ff'; ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center'; ctx.fillText('AUTO SHIELD ACTIVE', 100, 293); ctx.textAlign = 'left';
+        } else {
+            ctx.strokeStyle = '#f00'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, 280); ctx.lineTo(200, 280); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,0,0,0.3)'; ctx.fillRect(0, 280, 200, 20);
+        }
 
         if (this.starFall) this.drawStar(this.starX, this.starY);
 
