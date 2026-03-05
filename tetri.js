@@ -1,84 +1,82 @@
 // === TETRIVADER V2 (Remake & Action Edition) ===
 
-const playSE = (id) => { if(typeof playSnd === 'function') playSnd(id); };
-const shakeCam = (val) => { if(typeof screenShake === 'function') screenShake(val); };
-
-const PAL = { '0':null, '1':'#000', '2':'#fff', '3':'#ff0', '4':'#f00', '5':'#0ff', '6':'#0f0', '7':'#f80', '8':'#888', '9':'#ccc', 'a':'#f0f', 'b':'#840', 'c':'#ff8', 'd':'#00f' };
-
-// ★ 全8種の自機ドット絵（16x16）
-const SHIPS_INFO = [
-    { name: '標準 (FIGHTER)', col: '#fff' },
-    { name: 'バナナ', col: '#ff0' },
-    { name: 'ペペロンチーノ', col: '#f00' },
-    { name: '大砲', col: '#888' },
-    { name: '虹色のゴリラ', col: 'rainbow' }, // 特殊処理
-    { name: '黄金のトマト', col: '#ff0' },  // 特殊エフェクト
-    { name: 'サンマ人参', col: '#0ff' },
-    { name: '悟りブロッコリー', col: '#0f0' } // お任せ枠
-];
-
-const SPRITES = [
-    [ // 0: Fighter
-        "0000000220000000","0000000220000000","0000002222000000","0000022442200000",
-        "0000222442220000","0002222222222000","0022222222222200","0220222222220220",
-        "0200022222200020","0000022002200000"
-    ],
-    [ // 1: Banana
-        "0000000000000030","0000000000000330","0000000000033300","0000000003330000",
-        "0000000333000000","0000033300000000","0003330000000000","0033300000000000",
-        "0330000000000000","0000000000000000"
-    ],
-    [ // 2: Peperoncino
-        "0000000000000000","0000000000000000","0000000040000000","000000cccc000000",
-        "00000cc4ccc00000","0000cccccc400000","0000cccccccc0000","0002222222222000",
-        "0000222222220000","0000000000000000"
-    ],
-    [ // 3: Cannon
-        "0000000000000000","0000008888000000","0000008888000000","0000008888000000",
-        "0000008888000000","0000118888110000","0001918888191000","0001918888191000",
-        "0000118888110000","0000000000000000"
-    ],
-    [ // 4: Gorilla (ベースは白、描画時に虹色化)
-        "0000000000000000","0000002222000000","0000022222200000","0000221221220000",
-        "0002222222222000","0022222222222200","0022222222222200","0022022222202200",
-        "0022022222202200","0000000000000000"
-    ],
-    [ // 5: Tomato
-        "0000000660000000","0000006666000000","0000033333000000","0000333333300000",
-        "0003333333330000","0003333333330000","0003333333330000","0000333333300000",
-        "0000033333000000","0000000000000000"
-    ],
-    [ // 6: Sanma Carrot
-        "0000000500000000","0000005250000000","0000055555000000","0000055555000000",
-        "0000077777000000","0000077777000000","0000077777000000","0000007770000000",
-        "0000000700000000","0000000000000000"
-    ],
-    [ // 7: Broccoli (お任せ枠)
-        "0000006666000000","0000666666660000","0006666666666000","0000666666660000",
-        "0000006666000000","0000077777700000","0000771771770000","0000777777770000",
-        "0000077777700000","0000770000770000"
-    ]
-];
-
-// テトリスブロックの形状定義
-const TETROMINOS = [
-  [[1,1,1,1]], // I
-  [[1,1],[1,1]], // O
-  [[0,1,0],[1,1,1]], // T
-  [[1,0,0],[1,1,1]], // L
-  [[0,0,1],[1,1,1]], // J
-  [[1,1,0],[0,1,1]], // S
-  [[0,1,1],[1,1,0]]  // Z
-];
-
 const Tetrivader = {
+    // 状態管理
     st: 'title', tmr: 0, score: 0, hiScore: 0,
     shipIdx: 0, diff: 0, 
-    
     px: 100, py: 260,
     bullets: [], blocks: [], parts: [], stars: [],
     
-    // 難易度設定 (NORMAL / HARD / EXPERT)
+    // ★ 外部との衝突を防ぐため、すべてオブジェクト内に収納！
+    playSE(id) { if(typeof playSnd === 'function') playSnd(id); },
+    shakeCam(val) { if(typeof screenShake === 'function') screenShake(val); },
+
+    PAL: { '0':null, '1':'#000', '2':'#fff', '3':'#ff0', '4':'#f00', '5':'#0ff', '6':'#0f0', '7':'#f80', '8':'#888', '9':'#ccc', 'a':'#f0f', 'b':'#840', 'c':'#ff8', 'd':'#00f' },
+
+    SHIPS_INFO: [
+        { name: '標準 (FIGHTER)', col: '#fff' },
+        { name: 'バナナ', col: '#ff0' },
+        { name: 'ペペロンチーノ', col: '#f00' },
+        { name: '大砲', col: '#888' },
+        { name: '虹色のゴリラ', col: 'rainbow' }, 
+        { name: '黄金のトマト', col: '#ff0' },  
+        { name: 'サンマ人参', col: '#0ff' },
+        { name: '悟りブロッコリー', col: '#0f0' } 
+    ],
+
+    SPRITES: [
+        [ // 0: Fighter
+            "0000000220000000","0000000220000000","0000002222000000","0000022442200000",
+            "0000222442220000","0002222222222000","0022222222222200","0220222222220220",
+            "0200022222200020","0000022002200000"
+        ],
+        [ // 1: Banana
+            "0000000000000030","0000000000000330","0000000000033300","0000000003330000",
+            "0000000333000000","0000033300000000","0003330000000000","0033300000000000",
+            "0330000000000000","0000000000000000"
+        ],
+        [ // 2: Peperoncino
+            "0000000000000000","0000000000000000","0000000040000000","000000cccc000000",
+            "00000cc4ccc00000","0000cccccc400000","0000cccccccc0000","0002222222222000",
+            "0000222222220000","0000000000000000"
+        ],
+        [ // 3: Cannon
+            "0000000000000000","0000008888000000","0000008888000000","0000008888000000",
+            "0000008888000000","0000118888110000","0001918888191000","0001918888191000",
+            "0000118888110000","0000000000000000"
+        ],
+        [ // 4: Gorilla
+            "0000000000000000","0000002222000000","0000022222200000","0000221221220000",
+            "0002222222222000","0022222222222200","0022222222222200","0022022222202200",
+            "0022022222202200","0000000000000000"
+        ],
+        [ // 5: Tomato
+            "0000000660000000","0000006666000000","0000033333000000","0000333333300000",
+            "0003333333330000","0003333333330000","0003333333330000","0000333333300000",
+            "0000033333000000","0000000000000000"
+        ],
+        [ // 6: Sanma Carrot
+            "0000000500000000","0000005250000000","0000055555000000","0000055555000000",
+            "0000077777000000","0000077777000000","0000077777000000","0000007770000000",
+            "0000000700000000","0000000000000000"
+        ],
+        [ // 7: Broccoli 
+            "0000006666000000","0000666666660000","0006666666666000","0000666666660000",
+            "0000006666000000","0000077777700000","0000771771770000","0000777777770000",
+            "0000077777700000","0000770000770000"
+        ]
+    ],
+
+    TETROMINOS: [
+      [[1,1,1,1]], // I
+      [[1,1],[1,1]], // O
+      [[0,1,0],[1,1,1]], // T
+      [[1,0,0],[1,1,1]], // L
+      [[0,0,1],[1,1,1]], // J
+      [[1,1,0],[0,1,1]], // S
+      [[0,1,1],[1,1,0]]  // Z
+    ],
+
     diffSet: [
         { name: 'NORMAL', spd: 0.8, intv: 90, gimmick: false, col: '#0ff' },
         { name: 'HARD',   spd: 1.4, intv: 60, gimmick: false, col: '#f00' },
@@ -101,7 +99,7 @@ const Tetrivader = {
     },
 
     spawnTetromino() {
-        let shape = TETROMINOS[Math.floor(Math.random() * TETROMINOS.length)];
+        let shape = this.TETROMINOS[Math.floor(Math.random() * this.TETROMINOS.length)];
         let sx = Math.random() * 140 + 20;
         let sy = -40;
         
@@ -138,25 +136,25 @@ const Tetrivader = {
 
         // ================= TITLE =================
         if (this.st === 'title') {
-            if (keysDown.a) { this.st = 'ship_select'; playSE('jmp'); }
+            if (keysDown.a) { this.st = 'ship_select'; this.playSE('jmp'); }
             return;
         }
 
         // ================= SHIP SELECT =================
         if (this.st === 'ship_select') {
-            if (keysDown.right) { this.shipIdx = (this.shipIdx + 1) % 8; playSE('sel'); }
-            if (keysDown.left) { this.shipIdx = (this.shipIdx - 1 + 8) % 8; playSE('sel'); }
-            if (keysDown.a) { this.st = 'diff_select'; playSE('jmp'); }
-            if (keysDown.b) { this.st = 'title'; playSE('hit'); }
+            if (keysDown.right) { this.shipIdx = (this.shipIdx + 1) % 8; this.playSE('sel'); }
+            if (keysDown.left) { this.shipIdx = (this.shipIdx - 1 + 8) % 8; this.playSE('sel'); }
+            if (keysDown.a) { this.st = 'diff_select'; this.playSE('jmp'); }
+            if (keysDown.b) { this.st = 'title'; this.playSE('hit'); }
             return;
         }
 
         // ================= DIFFICULTY SELECT =================
         if (this.st === 'diff_select') {
-            if (keysDown.down) { this.diff = (this.diff + 1) % 3; playSE('sel'); }
-            if (keysDown.up) { this.diff = (this.diff - 1 + 3) % 3; playSE('sel'); }
-            if (keysDown.a) { this.startGame(); playSE('combo'); }
-            if (keysDown.b) { this.st = 'ship_select'; playSE('hit'); }
+            if (keysDown.down) { this.diff = (this.diff + 1) % 3; this.playSE('sel'); }
+            if (keysDown.up) { this.diff = (this.diff - 1 + 3) % 3; this.playSE('sel'); }
+            if (keysDown.a) { this.startGame(); this.playSE('combo'); }
+            if (keysDown.b) { this.st = 'ship_select'; this.playSE('hit'); }
             return;
         }
 
@@ -184,10 +182,10 @@ const Tetrivader = {
 
         // 弾発射 (A押しっぱなしで連射)
         if (keys.a && this.tmr % 6 === 0) {
-            let bCol = SHIPS_INFO[this.shipIdx].col;
+            let bCol = this.SHIPS_INFO[this.shipIdx].col;
             if (bCol === 'rainbow') bCol = `hsl(${(this.tmr*10)%360}, 100%, 50%)`;
             this.bullets.push({ x: this.px, y: this.py - 10, vy: -8, col: bCol });
-            playSE('sel');
+            this.playSE('sel');
             
             // マズルフラッシュ
             this.parts.push({ x: this.px, y: this.py - 12, vx: 0, vy: 0, life: 5, maxLife: 5, col: '#fff', type: 'flash' });
@@ -215,7 +213,7 @@ const Tetrivader = {
 
             let currentSpd = dSet.spd + fallBonus;
 
-            // ★ 変則ムーブ処理
+            // 変則ムーブ処理
             if (blk.type === 'slide') {
                 blk.y += currentSpd;
                 blk.x = blk.bx + Math.sin(blk.tmr * 0.1) * 30;
@@ -241,7 +239,7 @@ const Tetrivader = {
                 if (b.x > blk.x && b.x < blk.x + blk.w && b.y > blk.y && b.y < blk.y + blk.h) {
                     blk.dead = true;
                     this.bullets.splice(j, 1);
-                    playSE('hit'); shakeCam(3);
+                    this.playSE('hit'); this.shakeCam(3);
                     
                     // 破壊エフェクト
                     let pCol = blk.type === 'meteor' ? '#f00' : (blk.type === 'slide' ? '#0f0' : '#0ff');
@@ -265,7 +263,7 @@ const Tetrivader = {
             // 防衛ライン(y=280)を越えたらゲームオーバー
             if (blk.y + blk.h > 280) {
                 this.st = 'gameover'; this.tmr = 0;
-                playSE('hit'); shakeCam(20);
+                this.playSE('hit'); this.shakeCam(20);
                 for(let k=0; k<30; k++) {
                     this.parts.push({ x: this.px, y: this.py, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 40, maxLife: 40, col: '#f80', type: 'shard' });
                 }
@@ -288,7 +286,7 @@ const Tetrivader = {
                 let p = data[row][col];
                 if (p !== '0') {
                     if (isRainbow) ctx.fillStyle = `hsl(${(this.tmr*5 + row*10)%360}, 100%, 50%)`;
-                    else ctx.fillStyle = PAL[p] || '#fff';
+                    else ctx.fillStyle = this.PAL[p] || '#fff';
                     ctx.fillRect(x + col * scale - (data[row].length*scale)/2, y + row * scale - (data.length*scale)/2, scale, scale);
                 }
             }
@@ -328,10 +326,10 @@ const Tetrivader = {
             
             // 自機を大きく描画
             let isRainbow = (this.shipIdx === 4);
-            this.drawSpriteData(100, 140, SPRITES[this.shipIdx], 4, isRainbow);
+            this.drawSpriteData(100, 140, this.SPRITES[this.shipIdx], 4, isRainbow);
             
             ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
-            ctx.fillText(SHIPS_INFO[this.shipIdx].name, 100, 220);
+            ctx.fillText(this.SHIPS_INFO[this.shipIdx].name, 100, 220);
             
             ctx.fillStyle = '#ff0'; ctx.font = '16px monospace';
             if (this.tmr % 30 < 15) { ctx.fillText('◀', 20, 140); ctx.fillText('▶', 180, 140); }
@@ -401,7 +399,7 @@ const Tetrivader = {
         // 自機 (ゲームオーバー時は描画しない)
         if (this.st === 'play') {
             let isRainbow = (this.shipIdx === 4);
-            this.drawSpriteData(this.px, this.py, SPRITES[this.shipIdx], 2, isRainbow);
+            this.drawSpriteData(this.px, this.py, this.SPRITES[this.shipIdx], 2, isRainbow);
         }
 
         // UI
