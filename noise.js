@@ -1,20 +1,11 @@
-// === NOISE AGENT (Ultimate Cinematic & Escape Edition) ===
+// === NOISE AGENT (Ultimate Cinematic & Escape Edition - FINAL) ===
 
 const playSE = (id) => { if(typeof playSnd === 'function') playSnd(id); };
 const shakeCam = (val) => { if(typeof screenShake === 'function') screenShake(val); };
 
-const CommSys = {
-    msg: '', msgLife: 0,
-    speak(char, txt) {
-        if (Noise.st === 'play' || Noise.st === 'gameover') {
-            this.msg = char === 'ミュート' ? '……' : `【${char}】 ${txt}`;
-            this.msgLife = 180; 
-        }
-    }
-};
-
 const PAL = { '0':null, '1':'#000', '2':'#fff', '3':'#fca', '4':'#f00', '5':'#0ff', '6':'#0a0', '7':'#fa0', '8':'#444', '9':'#888', 'a':'#05f', 'b':'#940', 'c':'#a0a' };
 
+// 24x24 キャラクタードット絵
 const CHAR_SPRITES = {
     'エコー': [ 
         "000000000000000000000000","000000000111111000000000","000000011777777110000000","000000177777777771000000",
@@ -60,6 +51,13 @@ const CHAR_SPRITES = {
         "000000133333333100000000","000000133111133100000000","000000133333333100000000","000000013333331000000000",
         "000000001111110000000000","000000011111111000000000","000000111111111100000000","000001111111111110000000",
         "000011111111111111000000","000011111111111111000000","000011111100111111000000","000000000000000000000000"
+    ],
+    'ミュート': [ 
+        "000000000000000000000000","000000000111111000000000","000000011111111110000000","000000111111111111000000",
+        "000001111111111111100000","000001111441144111100000","000001111441144111100000","000001111111111111100000",
+        "000000111111111111000000","000000011111111110000000","000000001111111100000000","000000018888888810000000",
+        "000000188888888881000000","000001888888888888100000","000018888888888888810000","000018888888888888810000",
+        "000018888888888888810000","000018888888888888810000","000011111111111111110000","000000000000000000000000"
     ]
 };
 
@@ -80,7 +78,7 @@ const SCENARIOS = [
     [
         { c: '副官ソナー', t: 'フフ…騒がしいネズミね。私の可愛い『サイボーグ猟犬』の餌にしてあげるわ。' },
         { c: 'ルナ', t: '猟犬は移動速度がものすごく速いです！あと【赤いレーザー】には絶対触れないで！' },
-        { c: 'ルナ', t: '今回から【黄色いハッキング端末】が登場します！近くで【Aボタンを長押し】して、100%までデータを抜いて！' },
+        { c: 'ルナ', t: '今回から【黄色いハッキング端末】が登場します！近くで【Aボタンを長押し】してデータを抜いて！' },
         { c: 'エコー', t: '文字が邪魔で見えねぇって？「Aボタン空振り」で大声を出して敵を誘い出せ！' }
     ],
     [
@@ -113,6 +111,7 @@ const SCENARIOS = [
         { c: 'エコー', t: 'ミッション・コンプリート！ハリウッド映画顔負けの脱出だったぜ！' },
         { c: 'マキシマム', t: '筋肉の勝利だな！！ガハハハ！' },
         { c: 'おやっさん', t: 'よくやった坊主。伝説の誕生だな。やかましい伝説だがな。' },
+        { c: 'ミュート', t: '……（親指を立てて溶鉱炉に沈む）' },
         { c: 'ルナ', t: '沈まないでください！！早く帰ってきて！エンドロール流しますよ！' }
     ]
 ];
@@ -185,10 +184,19 @@ const Noise = {
     goal: { x: 100, y: 20, r: 15 }, stats: { kills: 0, noise: 0, boxTime: 0, time: 0 },
     commTmr: 100, commQueue: [], escapeTimer: -1, 
     
+    // ★ 内部に組み込まれた安全な通信処理
+    msg: '', msgLife: 0,
+    speak(char, txt) {
+        if (this.st === 'play' || this.st === 'gameover') {
+            this.msg = char === 'ミュート' ? '……' : `【${char}】 ${txt}`;
+            this.msgLife = 180; 
+        }
+    },
+
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss'); canvas.width = 200; canvas.height = 300;
         this.st = 'title'; this.tmr = 0; this.level = 0; this.menuCur = 0; 
-        CommSys.msg = ''; CommSys.msgLife = 0; this.commQueue = [];
+        this.msg = ''; this.msgLife = 0; this.commQueue = [];
         if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
@@ -210,6 +218,7 @@ const Noise = {
         this.wL(0,0,20,this.mapH); this.wL(this.mapW-20,0,20,this.mapH);
     },
 
+    // ★ 全7ステージマップ設計
     loadLevel() {
         this.st = 'play'; this.p.box = false; this.o2 = 100; this.o2Cd = 0;
         this.texts = []; this.tmr = 0; this.commTmr = 150; this.commQueue = [];
@@ -345,7 +354,7 @@ const Noise = {
         }
 
         if (this.st === 'gameover' || this.st === 'result') {
-            if (CommSys.msgLife > 0) CommSys.msgLife--;
+            if (this.msgLife > 0) this.msgLife--;
             if (this.tmr > 60 && (keysDown.a || keysDown.b)) { this.st = 'title'; this.tmr = 0; }
             return;
         }
@@ -356,21 +365,21 @@ const Noise = {
         if (this.escapeTimer > 0) {
             this.escapeTimer--;
             if (this.escapeTimer <= 0) {
-                CommSys.speak('ルナ', '基地が爆発しました！！');
+                this.speak('ルナ', '基地が爆発しました！！');
                 playSE('hit'); shakeCam(30);
                 this.texts.push({ x: this.p.x, y: this.p.y, text: 'TIME OVER', col: '#f00', life: 120, maxLife: 120, size: 60, rot: 0, screenCenter: true });
                 this.st = 'gameover'; this.tmr = 0; return;
             }
         }
 
-        // ★ エラー修正：inLockerの確実な初期化
+        // ★ エラー回避：inLockerの確実な初期化
         let inLocker = false;
         for (let l of this.lockers) {
             if (this.p.x > l.x && this.p.x < l.x+l.w && this.p.y > l.y && this.p.y < l.y+l.h) { inLocker = true; break; }
         }
 
         if (this.commQueue.length > 0) {
-            if (CommSys.msgLife <= 0) { let n = this.commQueue.shift(); CommSys.speak(n.c, n.t); }
+            if (this.msgLife <= 0) { let n = this.commQueue.shift(); this.speak(n.c, n.t); }
         } else {
             this.commTmr--;
             if (this.commTmr <= 0) {
@@ -378,7 +387,7 @@ const Noise = {
                 this.commQueue = [...conv]; this.commTmr = 300 + Math.random() * 300;
             }
         }
-        if (CommSys.msgLife > 0) CommSys.msgLife--;
+        if (this.msgLife > 0) this.msgLife--;
         
         this.cam.x = Math.max(0, Math.min(this.mapW - 200, this.p.x - 100));
         this.cam.y = Math.max(0, Math.min(this.mapH - 300, this.p.y - 150));
@@ -427,7 +436,7 @@ const Noise = {
                     if (t.progress >= 100) {
                         t.hacked = true; playSE('combo');
                         this.texts.push({ x: t.x, y: t.y - 20, text: 'HACKED!!', col: '#0f0', life: 60, maxLife: 60, size: 50, rot: 0 });
-                        CommSys.speak('ルナ', 'ダウンロード完了です！');
+                        this.speak('ルナ', 'ダウンロード完了です！');
                     }
                 }
             }
@@ -482,7 +491,7 @@ const Noise = {
             playSE('combo'); this.level++; this.startStory(this.level); return;
         }
 
-        // ★ 敵とレーザーの視界判定（エラー回避処理＆敵の壁抜け完全修正）
+        // ★ 敵とレーザーの視界判定（エラー完全回避＆壁抜け修正）
         let spotted = false;
 
         for(let l of this.lasers) {
@@ -492,6 +501,7 @@ const Noise = {
 
         if (!spotted) {
             for (let e of this.enemies) {
+                let prevX = e.x, prevY = e.y;
                 if (e.type === 'boss') { e.dir += 0.03; } 
                 else if (e.type === 'sniper') { e.sweepTmr = (e.sweepTmr || 0) + 1; e.dir = Math.PI/2 + Math.sin(e.sweepTmr * 0.02) * 1.0; }
                 else {
@@ -548,7 +558,7 @@ const Noise = {
         // 見つかったら即座にループを抜ける（クラッシュ完全防止）
         if (spotted) {
             this.st = 'gameover'; this.tmr = 0;
-            CommSys.speak('司令官ノイズ', '捕らえろォォ！！');
+            this.speak('司令官ノイズ', '捕らえろォォ！！');
             playSE('hit'); shakeCam(15);
             this.texts.push({ x: this.p.x, y: this.p.y, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 70, rot: 0, screenCenter: true });
             return; 
@@ -729,7 +739,6 @@ const Noise = {
 
         for (let t of this.texts) {
             if (t.screenCenter) continue;
-            // 安全なグローバルアルファ計算
             let alpha = Math.max(0, Math.min(1, t.life / t.maxLife));
             ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.rot); ctx.fillStyle = t.col; ctx.font = `900 ${t.size}px "Arial Black", Impact, sans-serif`;
             ctx.strokeStyle = '#000'; ctx.lineWidth = 5; ctx.globalAlpha = alpha; ctx.strokeText(t.text, 0, 0); ctx.fillText(t.text, 0, 0); ctx.globalAlpha = 1.0; ctx.restore();
@@ -755,9 +764,9 @@ const Noise = {
         if (this.escapeTimer > 0) { ctx.fillStyle = '#f00'; ctx.font = 'bold 14px monospace'; ctx.fillText(`TIME: ${Math.ceil(this.escapeTimer/60)}`, 130, 35); }
 
         ctx.fillStyle = '#0ff'; ctx.font = '9px monospace';
-        if (CommSys.msgLife > 0 && CommSys.msg !== '') {
-            if (CommSys.msg.length > 20) { ctx.fillText(CommSys.msg.substring(0, 20), 5, 285); ctx.fillText(CommSys.msg.substring(20), 5, 295); } 
-            else { ctx.fillText(CommSys.msg, 5, 290); }
+        if (this.msgLife > 0 && this.msg !== '') {
+            if (this.msg.length > 20) { ctx.fillText(this.msg.substring(0, 20), 5, 285); ctx.fillText(this.msg.substring(20), 5, 295); } 
+            else { ctx.fillText(this.msg, 5, 290); }
         }
 
         if (this.st === 'result') {
