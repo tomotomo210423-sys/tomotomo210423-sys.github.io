@@ -24,7 +24,7 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// ★ セーブデータシステム（音量設定を追加）
+// ★ セーブデータシステム
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
@@ -33,8 +33,8 @@ const SaveSys = {
         scores: d.scores || { n: 0, h: 0 }, 
         rankings: d.rankings || { n: [], h: [] }, 
         bgTheme: d.bgTheme || 0, 
-        bgmVol: d.bgmVol !== undefined ? d.bgmVol : 0.5, // BGM音量
-        seVol: d.seVol !== undefined ? d.seVol : 0.8,    // SE音量
+        bgmVol: d.bgmVol !== undefined ? d.bgmVol : 0.5, 
+        seVol: d.seVol !== undefined ? d.seVol : 0.8,    
         slotCoins: d.slotCoins || 100, 
         jackpotPool: d.jackpotPool || 1000, 
         actStage: d.actStage||1, 
@@ -57,7 +57,6 @@ const SaveSys = {
   }
 };
 
-// ★ 音量設定を反映したサウンドシステム
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
   play(type) {
@@ -70,7 +69,7 @@ const BGM = {
     };
     const tr = mels[type] || mels.menu; let i = 0;
     bgmInterval = setInterval(() => {
-      if (SaveSys.data.bgmVol <= 0) { i++; return; } // 音量0なら鳴らさない
+      if (SaveSys.data.bgmVol <= 0) { i++; return; } 
       const now = audioCtx.currentTime; const d = tr.spd / 1000;
       const playNote = (f, w, baseV) => {
         if (!f) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
@@ -131,7 +130,6 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-// ★ 背景テーマの大幅追加
 const bgThemes = [
   { name: 'MATRIX', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); c.fillStyle='#0f0'; c.font='10px monospace'; for(let i=0;i<20;i++) c.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)),(i*10)+(Date.now()/50)%10,(Date.now()/20+i*15)%300); } },
   { name: 'STARS', draw: (c) => { c.fillStyle='#000822'; c.fillRect(0,0,200,300); c.fillStyle='#fff'; for(let i=0;i<50;i++){ const s=1+(i%3); c.fillRect((i*37)%200,(i*67+Date.now()/10)%300,s,s); } } },
@@ -155,12 +153,12 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ============================================
-// メニュー画面
+// メニュー画面 (ローカルランキングを削除)
 // ============================================
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ローカルランキング', 'システム設定', '王様の間'], 
-  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#ccc', '#888', '#fa0'],
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'システム設定', '王様の間'], 
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#888', '#fa0'],
   holdTimer: 0,
   
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
@@ -181,7 +179,6 @@ const Menu = {
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
-            typeof Ranking !== 'undefined' ? Ranking : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -194,7 +191,7 @@ const Menu = {
     
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
     ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v13.0', 60, 40);
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v14.0', 60, 40);
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
@@ -218,9 +215,6 @@ const Menu = {
   }
 };
 
-// ★============================================★
-// 設定画面 (設定項目の大幅追加)
-// ★============================================★
 const Settings = {
   cur: 0, tmr: 0,
   init() { this.cur = 0; this.tmr = 0; },
@@ -286,10 +280,7 @@ const Ranking = {
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
     if (!this.input) {
-      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mode === 'n' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'h' ? '[HARD]' : '<HARD>'), 120, 40);
-      const rank = this.mode === 'n' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
-      for (let i = 0; i < 10; i++) { ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa'; if (rank[i]) { ctx.fillText(`${String(i+1).padStart(2,' ')}. ${rank[i].name.padEnd(10,' ')} ${String(rank[i].score).padStart(6,' ')}`, 15, 76 + i * 18); } else { ctx.fillText(`${String(i+1).padStart(2,' ')}. ----------  ----`, 15, 76 + i * 18); } }
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
+      // (通常表示はオミットされているので直接名前入力画面か戻るだけになりますが、裏処理として保持)
     } else {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
       for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.c && this.mc === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
