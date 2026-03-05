@@ -1,12 +1,13 @@
 // === TETRIVADER V2 (Remake & Action Edition) ===
 
 const Tetri = {
+    // 状態管理
     st: 'title', tmr: 0, score: 0, hiScore: 0,
     shipIdx: 0, diff: 0, 
     px: 100, py: 260,
     bullets: [], blocks: [], parts: [], stars: [],
     
-    // ★ 弾幕モード用変数（V1から復活）
+    // 弾幕モード用変数
     starFall: false, starX: 0, starY: 0,
     danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0,
     
@@ -55,7 +56,6 @@ const Tetri = {
 
     SPRITE_STAR: "0001000000111000011111001111111001111100001110000001000000000000",
 
-    // ★ ブロックの色をテトリス仕様に完全準拠
     TETROMINOS: [
       { s: [[1,1,1,1]], c: '#0ff' }, // I
       { s: [[1,1],[1,1]], c: '#ff0' }, // O
@@ -116,7 +116,6 @@ const Tetri = {
             }
         }
 
-        // ★ ハード以上で確率で星（弾幕モードのトリガー）を降らせる
         if (!this.starFall && !this.danmakuMode && this.diff >= 1 && Math.random() < 0.15) {
             this.starFall = true;
             this.starY = -20;
@@ -202,8 +201,8 @@ const Tetri = {
                 this.danmakuMode = false;
                 this.danmakuBullets = [];
                 if (!this.playerHit) {
-                    const bScore = this.scoreBeforeDanmaku;
-                    this.score = bScore + ((this.score - bScore) * 2); // スコア2倍！
+                    // ★ ここが修正されたスコア2倍処理！
+                    this.score *= 2; 
                     this.playSE('combo');
                     for(let k=0; k<20; k++) this.parts.push({x: 100, y: 150, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, life: 40, maxLife: 40, col: '#ff0', type: 'shard'});
                     this.shakeCam(8);
@@ -231,7 +230,6 @@ const Tetri = {
             this.parts.push({ x: this.px + (Math.random()-0.5)*20, y: this.py + 8, vx: 0, vy: 1.5, life: 25, maxLife: 25, col: `hsl(${60+Math.random()*10}, 100%, 70%)`, type: 'sparkle' });
         }
 
-        // ★ 1タップ1発 に変更 (keysDown.a を使用)
         if (keysDown.a) {
             let bCol = this.SHIPS_INFO[this.shipIdx].col;
             if (bCol === 'rainbow') bCol = `hsl(${(this.tmr*15)%360}, 100%, 60%)`;
@@ -251,11 +249,10 @@ const Tetri = {
 
         let fallBonus = keys.b ? 4.0 : 0;
 
-        // ★ スターの落下処理
+        // スターの落下処理
         if (this.starFall) {
             this.starY += 1.5 + fallBonus;
             
-            // スターへの射撃判定 (撃ち落としたら弾幕阻止)
             for (let i = this.bullets.length - 1; i >= 0; i--) {
                 let b = this.bullets[i];
                 if (Math.abs(b.x - this.starX) < 15 && Math.abs(b.y - this.starY) < 15) {
@@ -267,7 +264,6 @@ const Tetri = {
                 }
             }
             
-            // 下まで到達したら弾幕モード開始！
             if (this.starFall && this.starY >= 280) {
                 this.starFall = false;
                 this.scoreBeforeDanmaku = this.score;
@@ -296,7 +292,6 @@ const Tetri = {
                     blk.y += currentSpd * 0.15;
                     blk.x = blk.bx + (Math.random() - 0.5) * 6;
                 } else {
-                    // ★ メテオ速度をマイルドに調整 (4.0 -> 2.5)
                     blk.y += currentSpd * 2.5;
                     this.parts.push({ x: blk.x + blk.w/2, y: blk.y, vx: 0, vy: -3, life: 12, maxLife: 12, col: '#f00', type: 'trail' });
                 }
@@ -359,7 +354,6 @@ const Tetri = {
         }
     },
     
-    // スターを描画するヘルパー
     drawStar(x, y) {
         let str = this.SPRITE_STAR;
         let s = 2.5;
@@ -474,11 +468,8 @@ const Tetri = {
             ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 1, b.y - 5, 2, 10);
         }
 
-        // ブロック (テトリスカラー反映)
         for (let blk of this.blocks) {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
-            
-            // ベース色はブロックのテトリスカラー
             ctx.fillStyle = blk.c; 
             
             if (blk.type === 'slide') { 
