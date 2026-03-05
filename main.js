@@ -1,4 +1,4 @@
-// === CORE SYSTEM (8in1 Ultimate Menu Edition) ===
+// === CORE SYSTEM (8in1 Ultimate Customization Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -24,48 +24,25 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-const BGM = {
-  stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
-  play(type) {
-    this.stop(); if (!audioCtx) return;
-    const mels = {
-      menu:   { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
-      tetri:  { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
-      action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
-      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
-    };
-    const tr = mels[type] || mels.menu; let i = 0;
-    bgmInterval = setInterval(() => {
-      const now = audioCtx.currentTime; const d = tr.spd / 1000;
-      const playNote = (f, w, v) => {
-        if (!f) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        o.type = w; o.frequency.value = f; g.gain.setValueAtTime(v, now); g.gain.exponentialRampToValueAtTime(0.001, now + d);
-        o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + d + 0.1); 
-      };
-      playNote(tr.t1[i % tr.t1.length], 'square', 0.05); playNote(tr.t2[i % tr.t2.length], 'square', 0.03); playNote(tr.t3[i % tr.t3.length], 'triangle', 0.08);
-      if (tr.n[i % tr.n.length] > 0 && noiseBuffer) {
-        const src = audioCtx.createBufferSource(); const g = audioCtx.createGain(); src.buffer = noiseBuffer; 
-        g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-        src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
-      }
-      i++; 
-    }, tr.spd);
-  }
-};
-
-let hitStopTimer = 0; function hitStop(f) { hitStopTimer = f; }
-function playSnd(t) {
-  if (!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
-  if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.05); } 
-  else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05, n); o.start(n); o.stop(n + 0.1); } 
-  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); } 
-  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
-}
-
+// ★ セーブデータシステム（音量設定を追加）
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
-    return { playerName: d.playerName || 'PLAYER', scores: d.scores || { n: 0, h: 0 }, rankings: d.rankings || { n: [], h: [] }, bgTheme: d.bgTheme || 0, slotCoins: d.slotCoins || 100, jackpotPool: d.jackpotPool || 1000, actStage: d.actStage||1, actLives: d.actLives||5, actSeed: d.actSeed||1, rhythm: d.rhythm||{easy:0,normal:0,hard:0}, logs: d.logs||[] }; 
+    return { 
+        playerName: d.playerName || 'PLAYER', 
+        scores: d.scores || { n: 0, h: 0 }, 
+        rankings: d.rankings || { n: [], h: [] }, 
+        bgTheme: d.bgTheme || 0, 
+        bgmVol: d.bgmVol !== undefined ? d.bgmVol : 0.5, // BGM音量
+        seVol: d.seVol !== undefined ? d.seVol : 0.8,    // SE音量
+        slotCoins: d.slotCoins || 100, 
+        jackpotPool: d.jackpotPool || 1000, 
+        actStage: d.actStage||1, 
+        actLives: d.actLives||5, 
+        actSeed: d.actSeed||1, 
+        rhythm: d.rhythm||{easy:0,normal:0,hard:0}, 
+        logs: d.logs||[] 
+    }; 
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
   addScore(mode, score) { 
@@ -79,6 +56,53 @@ const SaveSys = {
     this.save();
   }
 };
+
+// ★ 音量設定を反映したサウンドシステム
+const BGM = {
+  stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
+  play(type) {
+    this.stop(); if (!audioCtx) return;
+    const mels = {
+      menu:   { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
+      tetri:  { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
+      action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
+      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
+    };
+    const tr = mels[type] || mels.menu; let i = 0;
+    bgmInterval = setInterval(() => {
+      if (SaveSys.data.bgmVol <= 0) { i++; return; } // 音量0なら鳴らさない
+      const now = audioCtx.currentTime; const d = tr.spd / 1000;
+      const playNote = (f, w, baseV) => {
+        if (!f) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        o.type = w; o.frequency.value = f; 
+        g.gain.setValueAtTime(baseV * SaveSys.data.bgmVol, now); 
+        g.gain.exponentialRampToValueAtTime(0.001, now + d);
+        o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + d + 0.1); 
+      };
+      playNote(tr.t1[i % tr.t1.length], 'square', 0.05); 
+      playNote(tr.t2[i % tr.t2.length], 'square', 0.03); 
+      playNote(tr.t3[i % tr.t3.length], 'triangle', 0.08);
+      if (tr.n[i % tr.n.length] > 0 && noiseBuffer) {
+        const src = audioCtx.createBufferSource(); const g = audioCtx.createGain(); src.buffer = noiseBuffer; 
+        g.gain.setValueAtTime(0.05 * SaveSys.data.bgmVol, now); 
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
+      }
+      i++; 
+    }, tr.spd);
+  }
+};
+
+let hitStopTimer = 0; function hitStop(f) { hitStopTimer = f; }
+function playSnd(t) {
+  if (!audioCtx || SaveSys.data.seVol <= 0) return; 
+  const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
+  let vol = SaveSys.data.seVol;
+  if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1 * vol, n); o.start(n); o.stop(n + 0.05); } 
+  else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05 * vol, n); o.start(n); o.stop(n + 0.1); } 
+  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1 * vol, n); o.start(n); o.stop(n + 0.15); screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); } 
+  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15 * vol, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
+}
 
 const GEMINI_API_KEY = ["AIza","SyDa7Ku8RWSO","OGDXKCQTdw","AObBHi6A8GcKA"].join("");
 
@@ -107,10 +131,14 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
+// ★ 背景テーマの大幅追加
 const bgThemes = [
   { name: 'MATRIX', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); c.fillStyle='#0f0'; c.font='10px monospace'; for(let i=0;i<20;i++) c.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)),(i*10)+(Date.now()/50)%10,(Date.now()/20+i*15)%300); } },
   { name: 'STARS', draw: (c) => { c.fillStyle='#000822'; c.fillRect(0,0,200,300); c.fillStyle='#fff'; for(let i=0;i<50;i++){ const s=1+(i%3); c.fillRect((i*37)%200,(i*67+Date.now()/10)%300,s,s); } } },
-  { name: 'GAMEBOY', draw: (c) => { c.fillStyle='#8bac0f'; c.fillRect(0,0,200,300); c.strokeStyle='#9bbc0f'; c.lineWidth=1; for(let i=0;i<200;i+=4){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,300); c.stroke(); } for(let i=0;i<300;i+=4){ c.beginPath(); c.moveTo(0,i); c.lineTo(200,i); c.stroke(); } c.fillStyle='#306230'; c.fillRect(0,0,6,300); c.fillRect(194,0,6,300); c.fillRect(0,0,200,6); c.fillRect(0,294,200,6); } }
+  { name: 'GAMEBOY', draw: (c) => { c.fillStyle='#8bac0f'; c.fillRect(0,0,200,300); c.strokeStyle='#9bbc0f'; c.lineWidth=1; for(let i=0;i<200;i+=4){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,300); c.stroke(); } for(let i=0;i<300;i+=4){ c.beginPath(); c.moveTo(0,i); c.lineTo(200,i); c.stroke(); } c.fillStyle='#306230'; c.fillRect(0,0,6,300); c.fillRect(194,0,6,300); c.fillRect(0,0,200,6); c.fillRect(0,294,200,6); } },
+  { name: 'CYBERPUNK', draw: (c) => { c.fillStyle='#102'; c.fillRect(0,0,200,300); c.strokeStyle='#f0f'; c.lineWidth=1; let t = Date.now()/20; for(let i=0;i<300;i+=20){ c.beginPath(); c.moveTo(0, (i+t)%300); c.lineTo(200, (i+t)%300); c.stroke(); } c.fillStyle='rgba(0,255,255,0.15)'; c.fillRect(0,0,200,300); } },
+  { name: 'SUNSET', draw: (c) => { let g = c.createLinearGradient(0,0,0,300); g.addColorStop(0, '#202'); g.addColorStop(0.5, '#f42'); g.addColorStop(1, '#fa0'); c.fillStyle = g; c.fillRect(0,0,200,300); c.fillStyle='rgba(255,255,255,0.5)'; c.beginPath(); c.arc(100, 200, 60, 0, Math.PI*2); c.fill(); } },
+  { name: 'ABYSS', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); let t = Date.now()/1000; for(let i=0; i<3; i++){ c.fillStyle=`hsla(${(t*50+i*120)%360},100%,50%,0.2)`; c.beginPath(); c.arc(100+Math.sin(t+i)*50, 150+Math.cos(t*1.3+i)*80, 80, 0, Math.PI*2); c.fill(); } } }
 ];
 
 let shakeTimer = 0; function screenShake(i = 2) { shakeTimer = i; }
@@ -126,13 +154,12 @@ const drawSprite = (x, y, c, d, s = 2.5) => {
 let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
-// ★============================================★
-// メニュー管理 (カラフル・ハイライト仕様)
-// ★============================================★
+// ============================================
+// メニュー画面
+// ============================================
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ローカルランキング', '設定', '王様の間'], 
-  // 各ゲームの個性を表すテーマカラー
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ローカルランキング', 'システム設定', '王様の間'], 
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#ccc', '#888', '#fa0'],
   holdTimer: 0,
   
@@ -167,7 +194,7 @@ const Menu = {
     
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
     ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v12.0', 60, 40);
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v13.0', 60, 40);
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
@@ -176,13 +203,11 @@ const Menu = {
         ctx.font = 'bold 11px monospace'; 
         
         if (i === this.cur) {
-            // 選択中：テーマカラーで塗りつぶし、文字は黒
             ctx.fillStyle = col;
             ctx.fillRect(8, startY + (i - drawStart) * 19 - 11, 184, 15);
             ctx.fillStyle = '#000';
             ctx.fillText('▶ ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
         } else {
-            // 未選択：テーマカラーの文字
             ctx.fillStyle = col;
             ctx.fillText('  ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
         }
@@ -193,17 +218,59 @@ const Menu = {
   }
 };
 
+// ★============================================★
+// 設定画面 (設定項目の大幅追加)
+// ★============================================★
 const Settings = {
-  cur: 0, init() { this.cur = 0; },
+  cur: 0, tmr: 0,
+  init() { this.cur = 0; this.tmr = 0; },
   update() {
+    this.tmr++;
     if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
-    if (keysDown.up) { this.cur = 0; playSnd('sel'); } if (keysDown.down) { this.cur = 1; playSnd('sel'); }
-    if (keysDown.a) { if (this.cur === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } else { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } }
+    if (keysDown.up) { this.cur = (this.cur - 1 + 4) % 4; playSnd('sel'); } 
+    if (keysDown.down) { this.cur = (this.cur + 1) % 4; playSnd('sel'); }
+    
+    if (this.cur === 0) {
+        if (keysDown.a) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } 
+    } 
+    else if (this.cur === 1) {
+        if (keysDown.left) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme - 1 + bgThemes.length) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
+        if (keysDown.right || keysDown.a) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
+    }
+    else if (this.cur === 2) {
+        if (keys.left && this.tmr % 4 === 0) { SaveSys.data.bgmVol = Math.max(0, SaveSys.data.bgmVol - 0.1); SaveSys.save(); }
+        if (keys.right && this.tmr % 4 === 0) { SaveSys.data.bgmVol = Math.min(1.0, SaveSys.data.bgmVol + 0.1); SaveSys.save(); }
+    }
+    else if (this.cur === 3) {
+        if (keys.left && this.tmr % 4 === 0) { SaveSys.data.seVol = Math.max(0, SaveSys.data.seVol - 0.1); SaveSys.save(); playSnd('sel'); }
+        if (keys.right && this.tmr % 4 === 0) { SaveSys.data.seVol = Math.min(1.0, SaveSys.data.seVol + 0.1); SaveSys.save(); playSnd('sel'); }
+    }
   },
   draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
-    ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.cur === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.cur === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
-    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); 
+    ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【SYSTEM SETTINGS】', 25, 30);
+    ctx.strokeStyle = '#0f0'; ctx.beginPath(); ctx.moveTo(10, 40); ctx.lineTo(190, 40); ctx.stroke();
+    
+    let items = [
+      { label: 'PLAYER NAME', val: SaveSys.data.playerName },
+      { label: 'BACKGROUND', val: `< ${bgThemes[SaveSys.data.bgTheme].name} >` },
+      { label: 'BGM VOLUME', val: `< ${Math.round(SaveSys.data.bgmVol * 100).toString().padStart(3,' ')}% >` },
+      { label: 'SE  VOLUME', val: `< ${Math.round(SaveSys.data.seVol * 100).toString().padStart(3,' ')}% >` }
+    ];
+    
+    for (let i = 0; i < items.length; i++) {
+      let y = 80 + i * 45;
+      ctx.fillStyle = this.cur === i ? '#ff0' : '#fff';
+      ctx.font = this.cur === i ? 'bold 12px monospace' : '11px monospace';
+      ctx.fillText((this.cur === i ? '▶ ' : '  ') + items[i].label, 15, y);
+      
+      ctx.fillStyle = this.cur === i ? '#0ff' : '#888';
+      ctx.fillText(items[i].val, 40, y + 18);
+    }
+    
+    ctx.fillStyle = '#112'; ctx.fillRect(0, 270, 200, 30);
+    ctx.fillStyle = '#666'; ctx.font = '9px monospace'; 
+    ctx.fillText('SELECT/B: 戻る  ◀▶: 調整', 30, 285);
   }
 };
 
@@ -213,7 +280,7 @@ const Ranking = {
   update() {
     if (!this.input && (keysDown.select || keysDown.b)) { switchApp(Menu); return; } if (this.input && keysDown.select) { this.input = false; switchApp(Menu); return; }
     if (!this.input) { if (keysDown.left || keysDown.right) { this.mode = this.mode === 'n' ? 'h' : 'n'; playSnd('sel'); } if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.c = 0; this.mc = 0; playSnd('jmp'); } } else {
-      if (this.mc === 0) { if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else if (this.mc === 1) { if (keysDown.up) { this.mc = 0; playSnd('sel'); } if (keysDown.down) { this.mc = 2; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else { if (keysDown.up) { this.mc = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Menu); } }
+      if (this.mc === 0) { if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else if (this.mc === 1) { if (keysDown.up) { this.mc = 0; playSnd('sel'); } if (keysDown.down) { this.mc = 2; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else { if (keysDown.up) { this.mc = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Settings); } }
     }
   },
   draw() {
