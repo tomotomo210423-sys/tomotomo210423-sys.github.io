@@ -1,14 +1,13 @@
-// === CORE SYSTEM (8in1 Ultimate Edition) ===
+// === CORE SYSTEM (8in1 Ultimate Menu Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false };
+const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false, l0: false, l1: false, l2: false, l3: false };
 const keysDown = { ...keys };
 let prevKeys = { ...keys };
 const keyPressQueue = { ...keys };
 let activeApp = null;
 
-// 右手のタッチ（スワイプ）軌跡を保存するオブジェクト
 const pointer = { x: 0, y: 0, active: false, path: [] };
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -25,33 +24,10 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// ★ セーブデータ管理（ランキング消去・音量設定追加）
-const SaveSys = {
-  data: (() => { 
-    let d = {}; try { let p = JSON.parse(localStorage.getItem('8in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
-    return { 
-        playerName: d.playerName || 'PLAYER', 
-        bgTheme: d.bgTheme || 0, 
-        bgmVol: d.bgmVol !== undefined ? d.bgmVol : 5, // 0~10
-        seVol: d.seVol !== undefined ? d.seVol : 5,    // 0~10
-        slotCoins: d.slotCoins || 100, 
-        jackpotPool: d.jackpotPool || 1000, 
-        actStage: d.actStage||1, actLives: d.actLives||5, 
-        logs: d.logs||[] 
-    }; 
-  })(),
-  save() { localStorage.setItem('8in1_ultimate', JSON.stringify(this.data)); },
-  addLog(game, msg) {
-    this.data.logs.unshift(`【${game}】${msg}`);
-    if(this.data.logs.length > 10) this.data.logs.pop();
-    this.save();
-  }
-};
-
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
   play(type) {
-    this.stop(); if (!audioCtx || SaveSys.data.bgmVol === 0) return;
+    this.stop(); if (!audioCtx) return;
     const mels = {
       menu:   { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
       tetri:  { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
@@ -59,20 +35,17 @@ const BGM = {
       spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
     };
     const tr = mels[type] || mels.menu; let i = 0;
-    const volRatio = SaveSys.data.bgmVol / 5; // 5を基準(1.0)とする
-
     bgmInterval = setInterval(() => {
       const now = audioCtx.currentTime; const d = tr.spd / 1000;
       const playNote = (f, w, v) => {
         if (!f) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        o.type = w; o.frequency.value = f; 
-        g.gain.setValueAtTime(v * volRatio, now); g.gain.exponentialRampToValueAtTime(0.001, now + d);
+        o.type = w; o.frequency.value = f; g.gain.setValueAtTime(v, now); g.gain.exponentialRampToValueAtTime(0.001, now + d);
         o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + d + 0.1); 
       };
       playNote(tr.t1[i % tr.t1.length], 'square', 0.05); playNote(tr.t2[i % tr.t2.length], 'square', 0.03); playNote(tr.t3[i % tr.t3.length], 'triangle', 0.08);
       if (tr.n[i % tr.n.length] > 0 && noiseBuffer) {
         const src = audioCtx.createBufferSource(); const g = audioCtx.createGain(); src.buffer = noiseBuffer; 
-        g.gain.setValueAtTime(0.05 * volRatio, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        g.gain.setValueAtTime(0.05, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
       }
       i++; 
@@ -82,16 +55,30 @@ const BGM = {
 
 let hitStopTimer = 0; function hitStop(f) { hitStopTimer = f; }
 function playSnd(t) {
-  if (!audioCtx || SaveSys.data.seVol === 0) return; 
-  const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); 
-  o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
-  const volRatio = SaveSys.data.seVol / 5; // 5を基準とする
-
-  if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1 * volRatio, n); o.start(n); o.stop(n + 0.05); } 
-  else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05 * volRatio, n); o.start(n); o.stop(n + 0.1); } 
-  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1 * volRatio, n); o.start(n); o.stop(n + 0.15); screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); } 
-  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15 * volRatio, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
+  if (!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); const n = audioCtx.currentTime;
+  if (t === 'sel') { o.type = 'sine'; o.frequency.setValueAtTime(880, n); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.05); } 
+  else if (t === 'jmp') { o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(600, n + 0.1); g.gain.setValueAtTime(0.05, n); o.start(n); o.stop(n + 0.1); } 
+  else if (t === 'hit') { o.type = 'sawtooth'; o.frequency.setValueAtTime(150, n); o.frequency.exponentialRampToValueAtTime(20, n + 0.15); g.gain.setValueAtTime(0.1, n); o.start(n); o.stop(n + 0.15); screenShake(4); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(3); } 
+  else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
 }
+
+const SaveSys = {
+  data: (() => { 
+    let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
+    return { playerName: d.playerName || 'PLAYER', scores: d.scores || { n: 0, h: 0 }, rankings: d.rankings || { n: [], h: [] }, bgTheme: d.bgTheme || 0, slotCoins: d.slotCoins || 100, jackpotPool: d.jackpotPool || 1000, actStage: d.actStage||1, actLives: d.actLives||5, actSeed: d.actSeed||1, rhythm: d.rhythm||{easy:0,normal:0,hard:0}, logs: d.logs||[] }; 
+  })(),
+  save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
+  addScore(mode, score) { 
+    const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
+    rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
+    rank.sort((a,b) => b.score - a.score); if (rank.length > 10) rank.splice(10); this.save(); 
+  },
+  addLog(game, msg) {
+    this.data.logs.unshift(`【${game}】${msg}`);
+    if(this.data.logs.length > 10) this.data.logs.pop();
+    this.save();
+  }
+};
 
 const GEMINI_API_KEY = ["AIza","SyDa7Ku8RWSO","OGDXKCQTdw","AObBHi6A8GcKA"].join("");
 
@@ -120,14 +107,10 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-// ★ 背景テーマ強化（全6種類に拡張）
 const bgThemes = [
-  { name: 'MATRIX', draw: (c) => { c.fillStyle='rgba(0,0,0,0.3)'; c.fillRect(0,0,200,300); c.fillStyle='#0f0'; c.font='10px monospace'; for(let i=0;i<20;i++) c.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)),(i*10)+(Date.now()/50)%10,(Date.now()/20+i*15)%300); } },
+  { name: 'MATRIX', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); c.fillStyle='#0f0'; c.font='10px monospace'; for(let i=0;i<20;i++) c.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)),(i*10)+(Date.now()/50)%10,(Date.now()/20+i*15)%300); } },
   { name: 'STARS', draw: (c) => { c.fillStyle='#000822'; c.fillRect(0,0,200,300); c.fillStyle='#fff'; for(let i=0;i<50;i++){ const s=1+(i%3); c.fillRect((i*37)%200,(i*67+Date.now()/10)%300,s,s); } } },
-  { name: 'GAMEBOY', draw: (c) => { c.fillStyle='#8bac0f'; c.fillRect(0,0,200,300); c.strokeStyle='#9bbc0f'; c.lineWidth=1; for(let i=0;i<200;i+=4){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,300); c.stroke(); } for(let i=0;i<300;i+=4){ c.beginPath(); c.moveTo(0,i); c.lineTo(200,i); c.stroke(); } c.fillStyle='#306230'; c.fillRect(0,0,6,300); c.fillRect(194,0,6,300); c.fillRect(0,0,200,6); c.fillRect(0,294,200,6); } },
-  { name: 'SYNTHWAVE', draw: (c) => { c.fillStyle='#102'; c.fillRect(0,0,200,300); c.fillStyle='#f0a'; c.beginPath(); c.arc(100, 140, 45, 0, Math.PI*2); c.fill(); for(let i=0; i<6; i++) { c.fillStyle='#102'; c.fillRect(50, 150+i*8, 100, i*1.5+1); } c.strokeStyle='#0ff'; c.lineWidth=1; const t = (Date.now()%1000)/1000; for(let i=0; i<15; i++) { let y = 170 + Math.pow(i+t, 1.5) * 2; if(y>170 && y<300) { c.beginPath(); c.moveTo(0, y); c.lineTo(200, y); c.stroke(); } } for(let i=-6; i<=6; i++) { c.beginPath(); c.moveTo(100, 170); c.lineTo(100 + i*40, 300); c.stroke(); } } },
-  { name: 'BLOOD', draw: (c) => { c.fillStyle='#200'; c.fillRect(0,0,200,300); c.fillStyle='#500'; const t = Date.now()/500; for(let i=0; i<12; i++) { c.beginPath(); c.arc(100 + Math.sin(t+i)*60, 150 + Math.cos(t*1.3+i)*100, 20+Math.sin(t*2+i)*15, 0, Math.PI*2); c.fill(); } } },
-  { name: 'HYPERSPACE', draw: (c) => { c.fillStyle='rgba(0,0,0,0.4)'; c.fillRect(0,0,200,300); c.fillStyle='#fff'; const t = Date.now(); for(let i=0; i<40; i++) { let angle = (i * 137.5) * Math.PI / 180; let dist = ((t/2 + i*20) % 150); let x = 100 + Math.cos(angle) * dist; let y = 150 + Math.sin(angle) * dist; let size = dist / 30; c.fillRect(x, y, size, size*2.5); } } }
+  { name: 'GAMEBOY', draw: (c) => { c.fillStyle='#8bac0f'; c.fillRect(0,0,200,300); c.strokeStyle='#9bbc0f'; c.lineWidth=1; for(let i=0;i<200;i+=4){ c.beginPath(); c.moveTo(i,0); c.lineTo(i,300); c.stroke(); } for(let i=0;i<300;i+=4){ c.beginPath(); c.moveTo(0,i); c.lineTo(200,i); c.stroke(); } c.fillStyle='#306230'; c.fillRect(0,0,6,300); c.fillRect(194,0,6,300); c.fillRect(0,0,200,6); c.fillRect(0,294,200,6); } }
 ];
 
 let shakeTimer = 0; function screenShake(i = 2) { shakeTimer = i; }
@@ -144,14 +127,19 @@ let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app;
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ★============================================★
-// メニュー管理
+// メニュー管理 (カラフル・ハイライト仕様)
 // ★============================================★
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', '設定', '王様の間'], 
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ローカルランキング', '設定', '王様の間'], 
+  // 各ゲームの個性を表すテーマカラー
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#ccc', '#888', '#fa0'],
   holdTimer: 0,
+  
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
+  
   update() {
+    if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
     if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
     
@@ -166,25 +154,38 @@ const Menu = {
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
+            typeof Ranking !== 'undefined' ? Ranking : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
         if (appObjs[this.cur]) { switchApp(appObjs[this.cur]); } else { playSnd('hit'); }
     }
   },
+  
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
+    
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
     ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
     ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v12.0', 60, 40);
     
-    let startY = 65;
-    // 画面内に9項目表示するスクロール処理
-    let drawStart = Math.max(0, Math.min(this.cur - 4, this.apps.length - 9)); 
-    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 9); i++) { 
-        ctx.fillStyle = i === this.cur ? '#0f0' : (i === 8 ? '#f80' : '#aaa'); 
-        ctx.font = '11px monospace'; 
-        ctx.fillText((i === this.cur ? '> ' : '  ') + this.apps[i], 15, startY + (i - drawStart) * 22); 
+    let startY = 63;
+    let drawStart = Math.max(0, this.cur - 8);
+    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
+        let col = this.appColors[i];
+        ctx.font = 'bold 11px monospace'; 
+        
+        if (i === this.cur) {
+            // 選択中：テーマカラーで塗りつぶし、文字は黒
+            ctx.fillStyle = col;
+            ctx.fillRect(8, startY + (i - drawStart) * 19 - 11, 184, 15);
+            ctx.fillStyle = '#000';
+            ctx.fillText('▶ ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+        } else {
+            // 未選択：テーマカラーの文字
+            ctx.fillStyle = col;
+            ctx.fillText('  ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+        }
     }
     
     ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); 
@@ -192,156 +193,42 @@ const Menu = {
   }
 };
 
-// ★============================================★
-// 設定画面 (機能大幅拡張)
-// ★============================================★
 const Settings = {
-  cur: 0, 
-  items: ['プレイヤー名変更', '背景テーマ切替', 'BGM 音量', 'SE 音量', 'データ初期化'],
-  init() { this.cur = 0; },
+  cur: 0, init() { this.cur = 0; },
   update() {
     if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
-    if (keysDown.up) { this.cur = (this.cur - 1 + this.items.length) % this.items.length; playSnd('sel'); } 
-    if (keysDown.down) { this.cur = (this.cur + 1) % this.items.length; playSnd('sel'); }
-    
-    // 左右キーで音量やテーマを変更
-    if (this.cur === 1) {
-        if (keysDown.right) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('sel'); }
-        if (keysDown.left) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme - 1 + bgThemes.length) % bgThemes.length; SaveSys.save(); playSnd('sel'); }
-    } else if (this.cur === 2) {
-        if (keysDown.right && SaveSys.data.bgmVol < 10) { SaveSys.data.bgmVol++; SaveSys.save(); playSnd('sel'); BGM.play('menu'); } // BGM再再生で音量反映
-        if (keysDown.left && SaveSys.data.bgmVol > 0) { SaveSys.data.bgmVol--; SaveSys.save(); playSnd('sel'); BGM.play('menu'); }
-    } else if (this.cur === 3) {
-        if (keysDown.right && SaveSys.data.seVol < 10) { SaveSys.data.seVol++; SaveSys.save(); playSnd('sel'); }
-        if (keysDown.left && SaveSys.data.seVol > 0) { SaveSys.data.seVol--; SaveSys.save(); playSnd('sel'); }
-    }
-
-    if (keysDown.a) { 
-        if (this.cur === 0) { 
-            activeApp = NameInput; activeApp.name = SaveSys.data.playerName; activeApp.init(); playSnd('jmp');
-        } else if (this.cur === 4) {
-            activeApp = ResetConfirm; activeApp.init(); playSnd('hit');
-        }
-    }
+    if (keysDown.up) { this.cur = 0; playSnd('sel'); } if (keysDown.down) { this.cur = 1; playSnd('sel'); }
+    if (keysDown.a) { if (this.cur === 0) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } else { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } }
   },
   draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); 
-    ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
-    
-    ctx.font = '11px monospace';
-    for (let i = 0; i < this.items.length; i++) {
-        ctx.fillStyle = i === this.cur ? '#ff0' : '#fff';
-        if (i === 4) ctx.fillStyle = i === this.cur ? '#f55' : '#a55'; // 初期化は赤色
-        ctx.fillText((i === this.cur ? '> ' : '  ') + this.items[i], 15, 70 + i * 35);
-        
-        ctx.fillStyle = '#888'; ctx.font = '10px monospace';
-        if (i === 0) ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 85 + i * 35);
-        if (i === 1) ctx.fillText(`現在: < ${bgThemes[SaveSys.data.bgTheme].name} >`, 30, 85 + i * 35);
-        if (i === 2) ctx.fillText(`音量: ◀ ${SaveSys.data.bgmVol} ▶`, 30, 85 + i * 35);
-        if (i === 3) ctx.fillText(`音量: ◀ ${SaveSys.data.seVol} ▶`, 30, 85 + i * 35);
-        ctx.font = '11px monospace';
-    }
-    
-    ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
+    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('【設定】', 70, 30);
+    ctx.fillStyle = '#fff'; ctx.font = '11px monospace'; ctx.fillText((this.cur === 0 ? '> ' : '  ') + 'プレイヤー名変更', 20, 80); ctx.fillText((this.cur === 1 ? '> ' : '  ') + '背景テーマ切替', 20, 110);
+    ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`現在: ${SaveSys.data.playerName}`, 30, 95); ctx.fillText(`現在: ${bgThemes[SaveSys.data.bgTheme].name}`, 30, 125); ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 60, 280);
   }
 };
 
-// ★============================================★
-// データ初期化確認画面
-// ★============================================★
-const ResetConfirm = {
-    tmr: 0,
-    init() { this.tmr = 0; },
-    update() {
-        if (keysDown.b || keysDown.select) { switchApp(Settings); playSnd('hit'); }
-        if (keys.a) {
-            this.tmr++;
-            if (this.tmr > 90) {
-                localStorage.removeItem('8in1_ultimate');
-                location.reload(); // ブラウザをリロードして完全初期化
-            }
-        } else {
-            this.tmr = 0;
-        }
-    },
-    draw() {
-        ctx.fillStyle = '#000'; ctx.fillRect(0,0,200,300);
-        ctx.fillStyle = '#f00'; ctx.font = 'bold 20px monospace'; ctx.textAlign = 'center';
-        ctx.fillText('WARNING!', 100, 80);
-        ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
-        ctx.fillText('すべてのセーブデータが', 100, 120);
-        ctx.fillText('完全に消去されます。', 100, 140);
-        
-        ctx.fillStyle = '#ff0'; ctx.font = '10px monospace';
-        ctx.fillText('Aボタン 長押しで 実行', 100, 190);
-        
-        ctx.fillStyle = '#f00'; ctx.fillRect(50, 210, this.tmr * 1.11, 10);
-        ctx.strokeStyle = '#fff'; ctx.strokeRect(50, 210, 100, 10);
-        
-        ctx.fillStyle = '#888'; ctx.fillText('Bボタン で 戻る', 100, 260);
-        ctx.textAlign = 'left';
-    }
-};
-
-// ★============================================★
-// 名前入力画面
-// ★============================================★
-const NameInput = {
-  name: '', c: 0, mc: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
-  init() { this.c = 0; this.mc = 0; },
+const Ranking = {
+  mode: 'n', input: false, name: '', c: 0, mc: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
+  init() { if (!this.input) this.mode = 'n'; this.c = 0; this.mc = 0; },
   update() {
-    if (keysDown.select) { switchApp(Settings); return; }
-    
-    if (this.mc === 0) { 
-        if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } 
-        if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } 
-        if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } 
-        if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } 
-        if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } 
-        if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } 
-    } 
-    else if (this.mc === 1) { 
-        if (keysDown.up) { this.mc = 0; playSnd('sel'); } 
-        if (keysDown.down) { this.mc = 2; playSnd('sel'); } 
-        if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } 
-    } 
-    else { 
-        if (keysDown.up) { this.mc = 1; playSnd('sel'); } 
-        if (keysDown.a && this.name.length > 0) { 
-            SaveSys.data.playerName = this.name; 
-            SaveSys.save(); 
-            playSnd('combo'); 
-            switchApp(Settings); 
-        } 
+    if (!this.input && (keysDown.select || keysDown.b)) { switchApp(Menu); return; } if (this.input && keysDown.select) { this.input = false; switchApp(Menu); return; }
+    if (!this.input) { if (keysDown.left || keysDown.right) { this.mode = this.mode === 'n' ? 'h' : 'n'; playSnd('sel'); } if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.c = 0; this.mc = 0; playSnd('jmp'); } } else {
+      if (this.mc === 0) { if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else if (this.mc === 1) { if (keysDown.up) { this.mc = 0; playSnd('sel'); } if (keysDown.down) { this.mc = 2; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else { if (keysDown.up) { this.mc = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Menu); } }
     }
   },
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
-    ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); 
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); 
-    
-    ctx.font = '11px monospace';
-    for (let i = 0; i < this.chars.length; i++) { 
-        const x = 15 + (i % 10) * 17; 
-        const y = 90 + Math.floor(i / 10) * 18; 
-        if (i === this.c && this.mc === 0) { 
-            ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; 
-        } else { 
-            ctx.fillStyle = '#aaa'; 
-        } 
-        ctx.fillText(this.chars[i], x, y); 
+    if (!this.input) {
+      ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace'; ctx.fillText('LOCAL RANKING', 50, 20); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText((this.mode === 'n' ? '[NORMAL]' : '<NORMAL>'), 30, 40); ctx.fillText((this.mode === 'h' ? '[HARD]' : '<HARD>'), 120, 40);
+      const rank = this.mode === 'n' ? SaveSys.data.rankings.n : SaveSys.data.rankings.h; ctx.fillStyle = '#ff0'; ctx.font = '9px monospace'; ctx.fillText('RANK NAME       SCORE', 15, 58);
+      for (let i = 0; i < 10; i++) { ctx.fillStyle = i < 3 ? ['#ffd700', '#c0c0c0', '#cd7f32'][i] : '#aaa'; if (rank[i]) { ctx.fillText(`${String(i+1).padStart(2,' ')}. ${rank[i].name.padEnd(10,' ')} ${String(rank[i].score).padStart(6,' ')}`, 15, 76 + i * 18); } else { ctx.fillText(`${String(i+1).padStart(2,' ')}. ----------  ----`, 15, 76 + i * 18); } }
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.fillText('A:名前変更 SELECT:戻る', 25, 285);
+    } else {
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
+      for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.c && this.mc === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
+      ctx.fillStyle = this.mc === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.mc === 1 ? '#fff' : '#666'; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.mc === 1 ? '#fff' : '#ccc'; ctx.fillText('DELETE', 30, 191);
+      const okEn = this.name.length > 0; ctx.fillStyle = this.mc === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.mc === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.mc === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
     }
-    
-    ctx.fillStyle = this.mc === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); 
-    ctx.strokeStyle = this.mc === 1 ? '#fff' : '#666'; ctx.strokeRect(25, 175, 70, 22); 
-    ctx.fillStyle = this.mc === 1 ? '#fff' : '#ccc'; ctx.fillText('DELETE', 30, 191);
-    
-    const okEn = this.name.length > 0; 
-    ctx.fillStyle = this.mc === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); 
-    ctx.strokeStyle = this.mc === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); 
-    ctx.fillStyle = this.mc === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
-    
-    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
   }
 };
 
@@ -480,7 +367,7 @@ window.addEventListener('keyup', e => {
 
 const unlockAudio = () => {
   if (typeof audioCtx !== 'undefined' && audioCtx !== null) {
-    if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+    if (audioCtx.state === 'suspended') { audioCtx.resume().then(() => { console.log("Audio Unlocked!"); }).catch(err => console.error(err)); }
   }
 };
 window.addEventListener('touchstart', unlockAudio, { passive: true });
