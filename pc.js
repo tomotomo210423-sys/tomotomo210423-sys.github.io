@@ -1,122 +1,60 @@
-// === VIRTUAL PC EMULATOR (v86 Debug & Cloud Boot Edition) ===
+// === VIRTUAL PC EMULATOR (v86 Engine - Global CDN Edition) ===
+// ファイヤーウォールを突破し、世界最強のCDNからシステムを構築する
 
 const PCApp = {
     emu: null,
     st: 'boot',
-    logs: [],
-    progress: {},
-    errorMsg: null,
-
-    addLog(msg) {
-        this.logs.push(`> ${msg}`);
-        if(this.logs.length > 8) this.logs.shift();
-        this.refreshScreen();
-    },
-
-    refreshScreen() {
-        const screen = document.getElementById("v86-screen");
-        if (!screen) return;
-
-        let html = "<div style='font: 10px monospace; color: #0f0; background: #000; padding: 10px; border: 1px solid #0f0;'>";
-        html += "<div style='color: #ff0; margin-bottom: 5px;'>SYSTEM DEPLOYMENT...</div>";
-        
-        // ログの表示
-        this.logs.forEach(l => html += `<div>${l}</div>`);
-
-        // プログレスバーの表示
-        if (!this.errorMsg) {
-            Object.keys(this.progress).forEach(file => {
-                const p = this.progress[file];
-                const barLen = 15;
-                const filled = Math.floor((p.loaded / p.total) * barLen);
-                const bar = "▓".repeat(filled) + "░".repeat(barLen - filled);
-                const percent = Math.floor((p.loaded / p.total) * 100);
-                html += `<div style='margin-top:5px;'>${file.padEnd(8)} [${bar}] ${percent}%</div>`;
-            });
-        } else {
-            // エラー表示（赤色）
-            html += `<div style='color: #f00; margin-top: 10px; border-top: 1px solid #f00;'>[FATAL ERROR]</div>`;
-            html += `<div style='color: #f55; font-size: 9px;'>REASON: ${this.errorMsg}</div>`;
-            html += `<div style='color: #aaa; margin-top: 5px;'>TIP: Check Network or Firewall</div>`;
-        }
-
-        html += "</div>";
-        screen.innerHTML = html;
-    },
+    retryCount: 0,
 
     init() {
-        this.st = 'boot';
-        this.logs = [];
-        this.progress = {};
-        this.errorMsg = null;
-
+        this.st = 'run';
+        // 8in1のゲーム画面を隠し、PC用の黒いモニターを表示
         document.getElementById('gameCanvas').style.display = 'none';
-        document.getElementById('v86-container').style.display = 'flex';
-        BGM.stop();
+        const v86Container = document.getElementById('v86-container');
+        v86Container.style.display = 'flex';
 
-        this.addLog("Initializing hardware...");
+        BGM.stop(); // 起動音に集中するためBGM停止
 
-        if (typeof window.V86Starter === 'undefined') {
-            this.errorMsg = "libv86.js not found in window object.";
-            this.refreshScreen();
-            return;
-        }
+        if (!this.emu) {
+            // V86Starterが読み込まれるまでリトライし続ける（最大10回）
+            if (typeof window.V86Starter === 'undefined') {
+                this.retryCount++;
+                document.getElementById("v86-screen").innerHTML = `<div style='color:#0f0'>LOADING SYSTEM FROM CDN... (ATTEMPT ${this.retryCount})</div>`;
+                
+                if (this.retryCount > 10) {
+                    // 10回やってもダメならハッキング失敗画面
+                    document.getElementById("v86-screen").innerHTML = "<div style='color:#f00'>[FATAL ERROR]<br>NETWORK BLOCKED OR OFFLINE.<br>PRESS [SELECT] TO RETURN.</div>";
+                } else {
+                    setTimeout(() => this.init(), 1000);
+                }
+                return;
+            }
 
-        try {
+            // 読み込み成功！PCの画面の土台を作る
+            document.getElementById("v86-screen").innerHTML = "<div style='white-space: pre; font: 14px monospace; line-height: 14px; color: #fff;'></div><canvas style='display: none'></canvas>";
+
+            // エミュレータの構築（すべてCDNから直接ダウンロード）
             this.emu = new window.V86Starter({
-                wasm_path: "https://copy.sh/v86/build/v86.wasm",
+                wasm_path: "https://cdn.jsdelivr.net/gh/copy/v86@master/build/v86.wasm",
                 memory_size: 32 * 1024 * 1024,
                 vga_memory_size: 2 * 1024 * 1024,
                 screen_container: document.getElementById("v86-screen"),
-                bios: { url: "https://copy.sh/v86/bios/seabios.bin" },
-                vga_bios: { url: "https://copy.sh/v86/bios/vgabios.bin" },
-                fda: { url: "https://copy.sh/v86/images/freedos722.img" }, 
+                // マザーボードシステム
+                bios: { url: "https://cdn.jsdelivr.net/gh/copy/v86@master/bios/seabios.bin" },
+                vga_bios: { url: "https://cdn.jsdelivr.net/gh/copy/v86@master/bios/vgabios.bin" },
+                // テスト用OS（FreeDOS）
+                fda: { url: "https://cdn.jsdelivr.net/gh/copy/v86@master/images/freedos722.img" }, 
                 autostart: true,
             });
-
-            this.addLog("Network linking...");
-
-            // ロード状況をフックしてプログレスバーに反映
-            this.emu.add_listener("download-progress", (e) => {
-                const fileName = e.file.split('/').pop();
-                this.progress[fileName] = { loaded: e.loaded, total: e.total };
-                this.refreshScreen();
-            });
-
-            this.emu.add_listener("download-error", (e) => {
-                this.errorMsg = `Failed to load: ${e.file}`;
-                this.refreshScreen();
-            });
-
-            // 起動成功時
-            let hasStarted = false;
-            this.emu.add_listener("emulator-started", () => {
-                if(!hasStarted) {
-                    this.addLog("Hardware Ready.");
-                    this.addLog("Booting OS...");
-                    hasStarted = true;
-                    // OSが起動し始めたら画面をクリアして本物のPC画面に切り替える
-                    setTimeout(() => {
-                        if (this.emu) {
-                            document.getElementById("v86-screen").innerHTML = "";
-                            // v86が自動で生成するcanvasやdivがここに表示される
-                        }
-                    }, 2000);
-                }
-            });
-
-        } catch (e) {
-            this.errorMsg = e.message;
-            this.refreshScreen();
+        } else {
+            this.emu.run(); 
         }
     },
 
     update() {
+        // SELECTボタンでPCの電源を切り、8in1メニューに戻る
         if (keysDown.select) {
-            if (this.emu) {
-                this.emu.stop();
-                this.emu = null;
-            }
+            if (this.emu) this.emu.stop();
             document.getElementById('v86-container').style.display = 'none';
             document.getElementById('gameCanvas').style.display = 'block';
             switchApp(Menu);
@@ -124,5 +62,7 @@ const PCApp = {
         }
     },
 
-    draw() {}
+    draw() {
+        // 描画はv86が自動で行うためJS側からはノータッチ
+    }
 };
