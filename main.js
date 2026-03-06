@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Safety Net & Auto-Debug Edition) ===
+// === CORE SYSTEM (Safety Net & Auto-Debug Edition v2) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -127,6 +127,31 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
+// ★ 復旧：あらゆる記法に対応する万能ドット絵描画機能！
+function drawSprite(a, b, c, d, e, f) {
+  let targetCtx = ctx, id, x, y, scale = 1, flip = false, color = null;
+  if (typeof a === 'string' || (a && a.d)) {
+    id = a; x = b; y = c; scale = d || 1; flip = e || false; color = f || null;
+  } else {
+    targetCtx = a; id = b; x = c; y = d; scale = e || 1; flip = f || false; color = arguments[6] || null;
+  }
+  let s = typeof id === 'string' ? ((typeof sprites !== 'undefined' ? sprites[id] : null) || (typeof SPRITES !== 'undefined' ? SPRITES[id] : null)) : id;
+  if (!s || !s.d) return;
+  targetCtx.save();
+  targetCtx.translate(x, y);
+  if (flip) { targetCtx.scale(-1, 1); targetCtx.translate(-s.w * scale, 0); }
+  for (let r = 0; r < s.h; r++) {
+    for (let col = 0; col < s.w; col++) {
+      let p = s.d[r * s.w + col];
+      if (p !== '.' && p !== ' ' && p !== 0 && p !== null) {
+        targetCtx.fillStyle = color || (s.pal && s.pal[p] ? s.pal[p] : p);
+        targetCtx.fillRect(col * scale, r * scale, scale, scale);
+      }
+    }
+  }
+  targetCtx.restore();
+}
+
 const bgThemes = [
   { name: 'MATRIX', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); c.fillStyle='#0f0'; c.font='10px monospace'; for(let i=0;i<20;i++) c.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)),(i*10)+(Date.now()/50)%10,(Date.now()/20+i*15)%300); } },
   { name: 'STARS', draw: (c) => { c.fillStyle='#000822'; c.fillRect(0,0,200,300); c.fillStyle='#fff'; for(let i=0;i<50;i++){ const s=1+(i%3); c.fillRect((i*37)%200,(i*67+Date.now()/10)%300,s,s); } } },
@@ -136,7 +161,6 @@ const bgThemes = [
   { name: 'ABYSS', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); let t = Date.now()/1000; for(let i=0; i<3; i++){ c.fillStyle=`hsla(${(t*50+i*120)%360},100%,50%,0.2)`; c.beginPath(); c.arc(100+Math.sin(t+i)*50, 150+Math.cos(t*1.3+i)*80, 80, 0, Math.PI*2); c.fill(); } } }
 ];
 
-// ★ 修復：画面揺れとコンテキストの安全装置
 let shakeTimer = 0; 
 let isShaking = false;
 function screenShake(i = 2) { shakeTimer = i; }
@@ -277,7 +301,6 @@ const Settings = {
   }
 };
 
-// ★ 修復：メインループのセーフティネット強化
 function loop() {
   try {
     if (hitStopTimer <= 0) { 
@@ -295,14 +318,13 @@ function loop() {
     else if (hitStopTimer > 0) { hitStopTimer--; } 
     else { if (activeApp && activeApp.update) activeApp.update(); }
     
-    // ★修復: 描画ごとに画面をサンドボックス化（安全に描画）
-    ctx.save(); // 状態保存
+    ctx.save();
     applyShake();
     
     if (activeApp && activeApp.draw) activeApp.draw(); 
     
     resetShake();
-    ctx.restore(); // 状態復元
+    ctx.restore();
     
     drawTransition();
     
@@ -317,10 +339,8 @@ function loop() {
   } catch (err) {
     console.error(err); 
     
-    // ★追加: クリッピングや不完全な描画状態をすべて破棄して脱出
     ctx.restore(); ctx.restore(); ctx.restore(); 
     
-    // ハッカー風デバッグ画面の表示
     ctx.fillStyle = "rgba(150,0,0,0.95)"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height); 
     ctx.fillStyle = "#fff"; 
@@ -330,7 +350,6 @@ function loop() {
     ctx.fillStyle = "#ff0";
     ctx.font = "10px monospace"; 
     
-    // 実際のエラーメッセージを画面に表示する
     let msg = err.name + ": " + err.message;
     let words = msg.match(/.{1,30}/g) || [];
     for(let i=0; i<words.length; i++) {
