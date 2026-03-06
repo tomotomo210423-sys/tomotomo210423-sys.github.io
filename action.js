@@ -1,4 +1,4 @@
-// === UNREASONABLE BROS - TRUE COMPLETE EDITION ===
+// === UNREASONABLE BROS - TRUE COMPLETE EDITION (Standalone Texture Edition) ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   fallingSpikes: [], fireballs: [], sun: null, blackHole: null,
@@ -7,6 +7,45 @@ const Action = {
   mIdx: 1, deathReason: '', checkpointX: 20, bgTimer: 0,
   titleCur: 0, stageSelect: 1,
   
+  // ★ アクションゲーム専用のテクスチャデータ
+  tex: {
+    hero: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
+    enemy: { w:8, h:8, pal:{'1':'#f00', '2':'#fff', '3':'#000'}, d: "..........1111...111111..231123..111111...1..1...11..11........." },
+    coin: { w:8, h:8, pal:{'1':'#ff0', '2':'#fa0'}, d: "..........1111...122221..121121..121121..122221...1111.........." },
+    spike: { w:8, h:8, pal:{'1':'#ddd', '2':'#888'}, d: "...................11.....1221....1221...122221..122221.12222221" }
+  },
+
+  // ★ アクションゲーム専用・絶対バグらない描画エンジン
+  drawTex(x, y, texKey, scale, flip, color1) {
+      let t = this.tex[texKey];
+      if(!t) return;
+      ctx.save();
+      
+      // 反転処理をここで安全に行う
+      if (flip) {
+          ctx.translate(x + t.w * scale, y);
+          ctx.scale(-1, 1);
+      } else {
+          ctx.translate(x, y);
+      }
+      
+      for(let r=0; r<t.h; r++){
+          for(let c=0; c<t.w; c++){
+              let p = t.d[r*t.w + c];
+              if(p !== '.' && p !== ' ') {
+                  // 1番のパレットを指定色で上書き（服の色や敵の色を変えるため）
+                  if (p === '1' && color1) {
+                      ctx.fillStyle = color1;
+                  } else {
+                      ctx.fillStyle = t.pal[p] || '#fff';
+                  }
+                  ctx.fillRect(c*scale, r*scale, Math.ceil(scale), Math.ceil(scale));
+              }
+          }
+      }
+      ctx.restore();
+  },
+
   init() { 
     this.st = 'title'; BGM.play('action'); 
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
@@ -22,8 +61,7 @@ const Action = {
     this.invisibleBlocks = []; this.fakeCoins = []; this.fallingSpikes = []; this.fireballs = []; 
     this.sun = null; this.blackHole = null; this.camX = 0; this.coyoteTime = 0; this.deathReason = '';
     
-    SaveSys.data.actStage = this.stageSelect;
-    SaveSys.save();
+    SaveSys.data.actStage = this.stageSelect; SaveSys.save();
 
     const stage = SaveSys.data.actStage; 
     const themes = ['grass', 'desert', 'lava', 'ice', 'void', 'final'];
@@ -126,17 +164,13 @@ const Action = {
       if (keysDown.up || keysDown.down) { this.titleCur = this.titleCur === 0 ? 1 : 0; playSnd('sel'); }
       
       if (this.titleCur === 0) {
-          // ★ ステージ選択のロックを解除し、未クリアでも1〜6まで選べるように修正
           if (keysDown.left && this.stageSelect > 1) { this.stageSelect--; playSnd('sel'); }
           if (keysDown.right && this.stageSelect < 6) { this.stageSelect++; playSnd('sel'); }
       }
       
       if (keysDown.a) { 
-        if (this.titleCur === 0) {
-            this.checkpointX = 20; this.score = 0; this.load(); playSnd('jmp'); 
-        } else {
-            this.st = 'confirmDelete'; this.mIdx = 1; playSnd('sel');
-        }
+        if (this.titleCur === 0) { this.checkpointX = 20; this.score = 0; this.load(); playSnd('jmp'); } 
+        else { this.st = 'confirmDelete'; this.mIdx = 1; playSnd('sel'); }
       }
       return;
     }
@@ -148,8 +182,7 @@ const Action = {
             SaveSys.data.actStage = 1; SaveSys.data.actLives = 5; 
             SaveSys.data.actSeed = Math.floor(Math.random() * 1000); SaveSys.save(); 
             this.stageSelect = 1; playSnd('hit'); this.st = 'title'; 
-        } 
-        else { this.st = 'title'; playSnd('sel'); }
+        } else { this.st = 'title'; playSnd('sel'); }
       }
       if (keysDown.b) { this.st = 'title'; } return;
     }
@@ -165,9 +198,7 @@ const Action = {
     if (keys.right) { this.p.vx += accel; this.p.dir = 1; }
     
     this.p.vx = Math.max(-4.0, Math.min(4.0, this.p.vx)); 
-    this.p.vx *= friction; 
-    this.p.vy += gravity; 
-    this.p.anim = (this.p.anim + Math.abs(this.p.vx)) % 360;
+    this.p.vx *= friction; this.p.vy += gravity; this.p.anim = (this.p.anim + Math.abs(this.p.vx)) % 360;
     
     if (this.stageTheme === 'void' || this.stageTheme === 'final') {
        this.p.trail.unshift({x: this.p.x, y: this.p.y, dir: this.p.dir});
@@ -195,8 +226,7 @@ const Action = {
            if (this.checkpointX !== m.x) { this.checkpointX = m.x; playSnd('combo'); addParticle(m.x, m.y + 20, '#0f0', 'star'); }
         } else if (m.type === 'goal') {
            SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}クリア`);
-           SaveSys.data.actStage++; 
-           this.checkpointX = 20; SaveSys.save(); playSnd('combo');
+           SaveSys.data.actStage++; this.checkpointX = 20; SaveSys.save(); playSnd('combo');
            if (SaveSys.data.actStage > 6) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
         } else {
            if (this.p.vy > 0 && this.p.y + 20 <= m.y + 5) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; }
@@ -221,7 +251,6 @@ const Action = {
       if (!fc.touched && Math.abs(nx + 10 - fc.x) < 15 && Math.abs(ny + 10 - fc.y) < 15) { fc.touched = true; this.p.vy = -12; playSnd('hit'); addParticle(fc.x, fc.y, '#f00', 'explosion'); screenShake(5); }
     }
     
-    // ★ 消滅していた「本物のコイン」の当たり判定を復活！
     for (let coin of this.coins) {
       if (!coin.collected && Math.abs(nx + 10 - coin.x) < 15 && Math.abs(ny + 10 - coin.y) < 15) { 
           coin.collected = true; this.score += 100; playSnd('combo'); addParticle(coin.x, coin.y, '#ff0', 'explosion'); 
@@ -238,24 +267,17 @@ const Action = {
     
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       let e = this.enemies[i];
-      e.vy = (e.vy || 0) + gravity; e.y += e.vy; 
-      if (e.y > 250) { e.y = 250; e.vy = 0; }
+      e.vy = (e.vy || 0) + gravity; e.y += e.vy; if (e.y > 250) { e.y = 250; e.vy = 0; }
       
-      if (e.troll && !e.triggered && Math.abs(this.p.x - e.x) < 90) {
-         e.triggered = true; e.vy = jumpForce * 0.8; e.vx = (this.p.x > e.x ? 3.5 : -3.5); playSnd('jmp');
-      }
-      
-      if (!e.troll || !e.triggered) { e.x += e.vx; if (Math.abs(e.x - e.startX) > e.range) e.vx *= -1; } 
-      else { e.x += e.vx; }
+      if (e.troll && !e.triggered && Math.abs(this.p.x - e.x) < 90) { e.triggered = true; e.vy = jumpForce * 0.8; e.vx = (this.p.x > e.x ? 3.5 : -3.5); playSnd('jmp'); }
+      if (!e.troll || !e.triggered) { e.x += e.vx; if (Math.abs(e.x - e.startX) > e.range) e.vx *= -1; } else { e.x += e.vx; }
 
       e.anim = (e.anim || 0) + Math.abs(e.vx) * 2;
       
       if (Math.abs(nx + 10 - e.x) < 18 && Math.abs(ny + 10 - e.y) < 18) {
         if (this.p.vy > 0 && ny < e.y) { 
-           this.enemies.splice(i, 1);
-           this.p.vy = -6; this.score += 50; playSnd('hit'); addParticle(e.x, e.y, '#a00', 'explosion'); screenShake(4); 
-        } 
-        else { this.die("魔物に触れた"); return; }
+           this.enemies.splice(i, 1); this.p.vy = -6; this.score += 50; playSnd('hit'); addParticle(e.x, e.y, '#a00', 'explosion'); screenShake(4); 
+        } else { this.die("魔物に触れた"); return; }
       }
     }
 
@@ -272,15 +294,13 @@ const Action = {
 
     if (this.stageTheme === 'lava' || this.stageTheme === 'final') {
        for (let fb of this.fireballs) {
-          fb.vy += gravity * 0.5; fb.y += fb.vy;
-          if (fb.y > 400) { fb.y = 350; fb.vy = -10 - Math.random()*5; }
+          fb.vy += gravity * 0.5; fb.y += fb.vy; if (fb.y > 400) { fb.y = 350; fb.vy = -10 - Math.random()*5; }
           if (Math.abs(nx + 10 - fb.x) < 15 && Math.abs(ny + 10 - fb.y) < 15) { this.die("下からの火球"); return; }
        }
     }
 
     if ((this.stageTheme === 'void' || this.stageTheme === 'final') && this.blackHole) {
-       let dx = this.p.x - this.blackHole.x; let dy = this.p.y - this.blackHole.y;
-       let dist = Math.sqrt(dx*dx + dy*dy);
+       let dx = this.p.x - this.blackHole.x; let dy = this.p.y - this.blackHole.y; let dist = Math.sqrt(dx*dx + dy*dy);
        if (dist > 0) { this.blackHole.x += (dx/dist) * this.blackHole.speed; this.blackHole.y += (dy/dist) * this.blackHole.speed; }
        if (dist < 100) { nx -= (dx/dist)*0.5; ny -= (dy/dist)*0.5; }
        if (dist < this.blackHole.radius - 5) { this.die("虚無に飲まれた"); return; }
@@ -311,20 +331,16 @@ const Action = {
       const gradient = ctx.createLinearGradient(0, 0, 0, 300); gradient.addColorStop(0, '#f40'); gradient.addColorStop(1, '#820'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 200, 300);
       ctx.shadowBlur = 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText('UNREASONABLE', 30, 80); ctx.fillText('BROTHERS', 45, 105); ctx.shadowBlur = 0;
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('～理不尽なアクション～', 30, 130);
-      for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; drawSprite(x, y, '#00f', sprs.player, 2.5); }
+      
+      for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; this.drawTex(x, y, 'hero', 2.5, false, '#00f'); }
       
       if (this.st === 'title') {
         ctx.fillStyle = this.titleCur === 0 ? '#ff0' : '#fff'; ctx.font = 'bold 12px monospace'; 
         ctx.fillText((this.titleCur === 0 ? '> ' : '  ') + 'はじめる', 50, 220);
-        
         if (this.titleCur === 0) {
-            ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
-            ctx.fillText(`[STAGE ${this.stageSelect}]`, 60, 235);
-            // ★ STAGE 1〜6まで自由に選べるように描画も修正
-            if (this.stageSelect > 1) ctx.fillText('◀', 45, 235);
-            if (this.stageSelect < 6) ctx.fillText('▶', 130, 235);
+            ctx.fillStyle = '#0f0'; ctx.font = '10px monospace'; ctx.fillText(`[STAGE ${this.stageSelect}]`, 60, 235);
+            if (this.stageSelect > 1) ctx.fillText('◀', 45, 235); if (this.stageSelect < 6) ctx.fillText('▶', 130, 235);
         }
-
         ctx.fillStyle = this.titleCur === 1 ? '#ff0' : '#ccc'; ctx.font = '10px monospace'; 
         ctx.fillText((this.titleCur === 1 ? '> ' : '  ') + 'データリセット', 45, 255);
         ctx.fillStyle = '#f00'; ctx.font = '9px monospace'; ctx.fillText('※即死トラップ注意！', 45, 280);
@@ -369,10 +385,7 @@ const Action = {
     }
     
     if (this.stageTheme === 'lava' || this.stageTheme === 'final') {
-       for (let fb of this.fireballs) { 
-           ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(fb.x, fb.y, 10, 0, Math.PI * 2); ctx.fill(); 
-           ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(fb.x, fb.y+4, 8, 0, Math.PI * 2); ctx.fill(); 
-       }
+       for (let fb of this.fireballs) { ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(fb.x, fb.y, 10, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(fb.x, fb.y+4, 8, 0, Math.PI * 2); ctx.fill(); }
     }
 
     if ((this.stageTheme === 'void' || this.stageTheme === 'final') && this.blackHole) {
@@ -394,59 +407,48 @@ const Action = {
         }
       }
     }
-    for (let plat of this.platforms) {
-      if (plat.x - this.camX > -50 && plat.x - this.camX < 250) this.drawBlock(plat.x, plat.y, plat.w, plat.h, 'plat', false);
-    }
-    for (let ib of this.invisibleBlocks) {
-      if (ib.x - this.camX > -50 && ib.x - this.camX < 250 && ib.visible) this.drawBlock(ib.x, ib.y, ib.w, ib.h, 'inv', false); 
-    }
+    for (let plat of this.platforms) { if (plat.x - this.camX > -50 && plat.x - this.camX < 250) this.drawBlock(plat.x, plat.y, plat.w, plat.h, 'plat', false); }
+    for (let ib of this.invisibleBlocks) { if (ib.x - this.camX > -50 && ib.x - this.camX < 250 && ib.visible) this.drawBlock(ib.x, ib.y, ib.w, ib.h, 'inv', false); }
     for (let fc of this.fakeCoins) {
       if (!fc.touched && fc.x - this.camX > -50 && fc.x - this.camX < 250) {
-        const offset = Math.sin(this.bgTimer / 10) * 3; drawSprite(fc.x - 4, fc.y + offset - 4, '#f00', sprs.coin, 2.0); 
+        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(fc.x - 4, fc.y + offset - 4, 'coin', 2.0, false, '#f00'); 
       }
     }
     for (let coin of this.coins) {
       if (!coin.collected && coin.x - this.camX > -50 && coin.x - this.camX < 250) {
-        const offset = Math.sin(this.bgTimer / 10) * 3; drawSprite(coin.x - 4, coin.y + offset - 4, '#ff0', sprs.coin, 2.0); 
+        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(coin.x - 4, coin.y + offset - 4, 'coin', 2.0, false, '#ff0'); 
       }
     }
     for (let s of this.fallingSpikes) { 
-        if (s.x - this.camX > -50 && s.x - this.camX < 250) { 
-            ctx.fillStyle = s.isIce ? '#8ff' : '#888'; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x+20, s.y); ctx.lineTo(s.x+10, s.y+20); ctx.fill(); 
-        } 
+        if (s.x - this.camX > -50 && s.x - this.camX < 250) { ctx.fillStyle = s.isIce ? '#8ff' : '#888'; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x+20, s.y); ctx.lineTo(s.x+10, s.y+20); ctx.fill(); } 
     }
-    for (let spike of this.spikes) { if (spike.x - this.camX > -50 && spike.x - this.camX < 250) drawSprite(spike.x, spike.y, '#aaa', sprs.spike, 2.5); }
+    for (let spike of this.spikes) { if (spike.x - this.camX > -50 && spike.x - this.camX < 250) this.drawTex(spike.x, spike.y, 'spike', 2.5, false, '#aaa'); }
     for (let e of this.enemies) {
       if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;
         const color = e.troll ? '#f0f' : '#a00'; 
-        drawSprite(e.x - 4, e.y + offsetY - 4, color, sprs.enemyNew, 2.5);
+        this.drawTex(e.x - 4, e.y + offsetY - 4, 'enemy', 2.5, false, color);
       }
     }
+    
+    // ★ プレイヤー描画
     if (this.st !== 'dead' && this.st !== 'gameover') {
-      ctx.save(); 
       for(let i=0; i<this.p.trail.length; i++) {
           let tr = this.p.trail[i]; ctx.globalAlpha = 0.5 - (i*0.1);
-          ctx.save(); if (tr.dir < 0) { ctx.scale(-1, 1); ctx.translate(-(tr.x * 2 + 20), 0); }
-          drawSprite(tr.x, tr.y, '#0ff', sprs.heroNew, 2.5); ctx.restore();
+          this.drawTex(tr.x, tr.y, 'hero', 2.5, tr.dir < 0, '#0ff');
       }
       ctx.globalAlpha = 1;
-      
-      if (this.p.dir < 0) { ctx.scale(-1, 1); ctx.translate(-(this.p.x * 2 + 20), 0); } 
-      drawSprite(this.p.x, this.p.y, '#00f', sprs.heroNew, 2.5); 
-      ctx.restore();
+      this.drawTex(this.p.x, this.p.y, 'hero', 2.5, this.p.dir < 0, '#00f'); 
     }
     ctx.restore();
 
     drawParticles();
     
-    // ★ 消滅していたスコア表示を復活！
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 25); 
     ctx.fillStyle = this.stageTheme === 'final' ? '#f0f' : '#0f0'; ctx.font = 'bold 10px monospace';
     let stName = this.stageTheme.toUpperCase();
     ctx.fillText(`ST${SaveSys.data.actStage}[${stName}]`, 5, 17);
-    
-    ctx.fillStyle = '#ff0'; ctx.fillText(`SC:${this.score}`, 85, 17); // ここにスコア表示を追加
+    ctx.fillStyle = '#ff0'; ctx.fillText(`SC:${this.score}`, 85, 17); 
     ctx.fillStyle = '#f00'; ctx.fillText(`♥:${SaveSys.data.actLives}`, 150, 17);
     
     if (this.st === 'dead' || this.st === 'gameover') { 
