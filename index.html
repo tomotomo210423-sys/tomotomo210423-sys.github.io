@@ -15,7 +15,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100dvh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100dvh; }
 
-/* 筐体本体：マットブラックボディ ＋ グリーンのサイバーエッジ */
 #gameboy { 
   width: 100%; max-width: 450px; height: 100%; max-height: 900px; 
   background: linear-gradient(135deg, #333 0%, #111 100%); 
@@ -24,7 +23,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   border: 1px solid #444; position: relative; opacity: 1; transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55); 
 }
 
-/* 画面枠：ダークガラス風 */
 #screen-container { 
   flex: 1; background: linear-gradient(180deg, #1a1a1a 0%, #000 100%); 
   margin: 15px 15px 5px 15px; border-radius: 10px 10px 20px 10px; 
@@ -32,14 +30,12 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   border: 2px solid #222; box-shadow: inset 0px 5px 15px rgba(0,0,0,0.9), 0 2px 0 rgba(255,255,255,0.1); 
   position: relative; overflow: hidden; z-index: 5; transition: all 0.8s; 
 }
-/* 画面のガラス反射エフェクト */
 #screen-container::after {
   content: ''; position: absolute; top: 0; left: -50%; width: 200%; height: 100%;
   background: linear-gradient(to bottom, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 100%);
   transform: rotate(-10deg); pointer-events: none;
 }
 
-/* スロットモード */
 #gameboy.mode-slot { 
   background: linear-gradient(135deg, #600 0%, #200 100%); border-radius: 15px 15px 50px 50px; 
   box-shadow: inset -5px -5px 15px rgba(0,0,0,0.8), inset 3px 3px 10px rgba(255,100,100,0.2), 0 0 40px rgba(255,50,50,0.6); 
@@ -49,7 +45,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-slot #classic-controls { opacity: 0; transform: translateY(100px); pointer-events: none; }
 #gameboy.mode-slot #slot-controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-/* アビス・ジェネラル横画面モード */
 #gameboy.mode-abyss {
   max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row-reverse;
   background: linear-gradient(135deg, #1a0022 0%, #000 100%); 
@@ -83,7 +78,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 .d-btn, .a-btn, .s-btn { touch-action: none; -webkit-tap-highlight-color: transparent; }
 #dpad { position: absolute; left: 35px; top: 35px; width: 150px; height: 150px; }
 
-/* 十字キー（つや消しブラック） */
 .d-btn { 
   position: absolute; background: #222; border-radius: 4px; 
   box-shadow: inset -2px -2px 5px rgba(0,0,0,0.8), inset 2px 2px 5px rgba(255,255,255,0.1), 0 5px 10px rgba(0,0,0,0.5); 
@@ -101,14 +95,11 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   position: absolute; width: 70px; height: 70px; border-radius: 50%; font-weight: bold; font-size: 24px; text-align: center; line-height: 70px; 
   cursor: pointer; border: 2px solid #111;
 }
-/* A: ルビーレッド */
 #btn-a { 
   background: radial-gradient(circle at 30% 30%, #ff4444, #990000); color: #fff; text-shadow: 0 0 5px #fff;
   box-shadow: inset -4px -4px 10px rgba(0,0,0,0.6), inset 2px 2px 8px rgba(255,255,255,0.5), 0 6px 12px rgba(0,0,0,0.8); right: 0; top: 0;
 }
 #btn-a:active { background: #770000; transform: translateY(4px); box-shadow: inset 2px 2px 10px rgba(0,0,0,0.9); }
-
-/* B: サファイアブルー */
 #btn-b { 
   background: radial-gradient(circle at 30% 30%, #4444ff, #000099); color: #fff; text-shadow: 0 0 5px #fff;
   box-shadow: inset -4px -4px 10px rgba(0,0,0,0.6), inset 2px 2px 8px rgba(255,255,255,0.5), 0 6px 12px rgba(0,0,0,0.8); left: 0; bottom: 0;
@@ -120,7 +111,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 
 #sys-buttons { position: absolute; bottom: 35px; width: 100%; display: flex; justify-content: center; z-index: 30; }
 .s-btn-wrap { text-align: center; }
-/* SELECT: メタリックグレー */
 .s-btn { 
   width: 70px; height: 20px; background: #222; border-radius: 10px; 
   box-shadow: inset -2px -2px 5px rgba(0,0,0,0.8), inset 2px 2px 5px rgba(255,255,255,0.1), 0 4px 6px rgba(0,0,0,0.5); 
@@ -134,7 +124,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 .slot-row { display: flex; gap: 30px; justify-content: center; align-items: center; width: 100%; }
 .slot-btn { border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #fff; cursor: pointer; box-shadow: 0 6px 0 #222, 0 10px 15px rgba(0,0,0,0.6); text-shadow: 1px 1px 2px #000; touch-action: none; transition: transform 0.1s, box-shadow 0.1s; }
 .slot-btn:active { transform: translateY(6px); box-shadow: 0 0 0 #222, 0 4px 5px rgba(0,0,0,0.6); }
-
 #btn-slot-bet { width: 60px; height: 60px; background: radial-gradient(circle, #00f, #005); border: 4px solid #00a; font-size: 14px; }
 #btn-slot-max { width: 60px; height: 60px; background: radial-gradient(circle, #0a0, #050); border: 4px solid #080; font-size: 14px; }
 #btn-slot-spin { width: 90px; height: 90px; background: radial-gradient(circle, #f00, #a00); border: 6px solid #c00; font-size: 22px; margin-top: 10px; }
@@ -149,7 +138,16 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
       <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
     </div>
+    
     <canvas id="gameCanvas" width="200" height="300"></canvas>
+    
+    <div id="v86-container" style="display: none; width: 100%; height: 100%; background: #000; position: absolute; top: 0; left: 0; z-index: 10; align-items: center; justify-content: center; overflow: hidden;">
+        <div id="v86-screen" style="transform: scale(0.65); transform-origin: center center;">
+            <div style="white-space: pre; font: 14px monospace; line-height: 14px; color: #fff;"></div>
+            <canvas style="display: none"></canvas>
+        </div>
+    </div>
+    
   </div>
   
   <div id="controls">
@@ -199,7 +197,10 @@ const bootInterval = setInterval(() => {
 }, 100);
 </script>
 
+<script src="https://copy.sh/v86/build/libv86.js"></script>
+
 <script src="sprites.js"></script>
+<script src="pc.js"></script>
 <script src="main.js"></script>
 <script src="guide.js"></script>
 <script src="tetri.js"></script>
@@ -210,7 +211,8 @@ const bootInterval = setInterval(() => {
 <script src="king.js"></script>
 <script src="musou.js"></script>
 <script src="abyss.js"></script>
-<script src="noise.js"></script> <script>
+<script src="noise.js"></script>
+<script>
 window.onload = () => {
   activeApp = Menu;
   activeApp.init();
