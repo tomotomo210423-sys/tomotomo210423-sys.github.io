@@ -1,4 +1,4 @@
-// === CORE SYSTEM (RETRO-OS Integration & Fix Edition) ===
+// === CORE SYSTEM (Safety Net & Auto-Debug Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -115,14 +115,10 @@ const AISys = {
     const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: sysPrompt }] }, generationConfig: { temperature: 0.7, maxOutputTokens: 100 } };
     try {
       const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!response.ok) {
-        if (response.status === 429) return `むむっ… 連続で話しすぎて わしの魔力が 尽きてしまったワイ！`;
-        return `むむっ… 時空の歪み（エラー）で そなたの声が 届かぬようじゃ！`;
-      }
+      if (!response.ok) return `むむっ… 時空の歪み（エラー）じゃ！`;
       const data = await response.json();
-      if (!data.candidates || data.candidates.length === 0) return "かみさまが 沈黙しておる……";
       return data.candidates[0].content.parts[0].text.trim();
-    } catch (e) { return `むむっ… 世界の繋がり（ネットワーク）が 切れておるようじゃ！`; }
+    } catch (e) { return `ネットワークが 切れておるようじゃ！`; }
   }
 };
 
@@ -140,9 +136,21 @@ const bgThemes = [
   { name: 'ABYSS', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); let t = Date.now()/1000; for(let i=0; i<3; i++){ c.fillStyle=`hsla(${(t*50+i*120)%360},100%,50%,0.2)`; c.beginPath(); c.arc(100+Math.sin(t+i)*50, 150+Math.cos(t*1.3+i)*80, 80, 0, Math.PI*2); c.fill(); } } }
 ];
 
-let shakeTimer = 0; function screenShake(i = 2) { shakeTimer = i; }
-function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; } }
-function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
+// ★ 修復：画面揺れとコンテキストの安全装置
+let shakeTimer = 0; 
+let isShaking = false;
+function screenShake(i = 2) { shakeTimer = i; }
+function applyShake() { 
+    if (shakeTimer > 0) { 
+        isShaking = true; 
+        ctx.save(); 
+        ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); 
+        shakeTimer--; 
+    } else {
+        isShaking = false;
+    }
+}
+function resetShake() { if (isShaking) { ctx.restore(); isShaking = false; } }
 
 let transTimer = 0; let nextApp = null; 
 function switchApp(app) { 
@@ -153,7 +161,7 @@ function switchApp(app) {
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ============================================
-// メニュー画面 (★全12アプリをスクロールなしで完全表示！)
+// メニュー画面
 // ============================================
 const Menu = {
   cur: 0, 
@@ -183,7 +191,7 @@ const Menu = {
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
-            typeof PCApp !== 'undefined' ? PCApp : null,
+            typeof PCApp !== 'undefined' ? PCApp : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -195,23 +203,23 @@ const Menu = {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('8in1 RETRO', 55, 23); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v14.0', 60, 36);
+    ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v14.0', 60, 40);
     
-    // 全12個のアプリを画面内にピッタリ収まるように描画
-    let startY = 52;
-    for (let i = 0; i < this.apps.length; i++) { 
+    let startY = 63;
+    let drawStart = Math.max(0, this.cur - 8);
+    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
         let col = this.appColors[i];
         ctx.font = 'bold 11px monospace'; 
         
         if (i === this.cur) {
             ctx.fillStyle = col;
-            ctx.fillRect(8, startY + i * 18 - 11, 184, 15);
+            ctx.fillRect(8, startY + (i - drawStart) * 19 - 11, 184, 15);
             ctx.fillStyle = '#000';
-            ctx.fillText('▶ ' + this.apps[i], 12, startY + i * 18); 
+            ctx.fillText('▶ ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
         } else {
             ctx.fillStyle = col;
-            ctx.fillText('  ' + this.apps[i], 12, startY + i * 18); 
+            ctx.fillText('  ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
         }
     }
     
@@ -269,6 +277,7 @@ const Settings = {
   }
 };
 
+// ★ 修復：メインループのセーフティネット強化
 function loop() {
   try {
     if (hitStopTimer <= 0) { 
@@ -286,7 +295,16 @@ function loop() {
     else if (hitStopTimer > 0) { hitStopTimer--; } 
     else { if (activeApp && activeApp.update) activeApp.update(); }
     
-    if (activeApp && activeApp.draw) activeApp.draw(); drawTransition();
+    // ★修復: 描画ごとに画面をサンドボックス化（安全に描画）
+    ctx.save(); // 状態保存
+    applyShake();
+    
+    if (activeApp && activeApp.draw) activeApp.draw(); 
+    
+    resetShake();
+    ctx.restore(); // 状態復元
+    
+    drawTransition();
     
     ['up', 'down', 'left', 'right'].forEach(dir => {
       const btn = document.getElementById('btn-' + dir);
@@ -297,15 +315,36 @@ function loop() {
     });
 
   } catch (err) {
-    console.error(err); ctx.fillStyle = "rgba(255,0,0,0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = "#fff"; ctx.fillText("ERROR CRASHED", 10, 50);
+    console.error(err); 
+    
+    // ★追加: クリッピングや不完全な描画状態をすべて破棄して脱出
+    ctx.restore(); ctx.restore(); ctx.restore(); 
+    
+    // ハッカー風デバッグ画面の表示
+    ctx.fillStyle = "rgba(150,0,0,0.95)"; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height); 
+    ctx.fillStyle = "#fff"; 
+    ctx.font = "bold 14px monospace"; 
+    ctx.fillText("SYSTEM CRASHED", 10, 30);
+    
+    ctx.fillStyle = "#ff0";
+    ctx.font = "10px monospace"; 
+    
+    // 実際のエラーメッセージを画面に表示する
+    let msg = err.name + ": " + err.message;
+    let words = msg.match(/.{1,30}/g) || [];
+    for(let i=0; i<words.length; i++) {
+        ctx.fillText(words[i], 10, 50 + i*15);
+    }
+    ctx.fillStyle = "#fff";
+    ctx.fillText("AIにこの画面を見せて！", 10, 280);
   }
   requestAnimationFrame(loop);
 }
 
-// ★修正：長押し時の連続効果音を防止
 const setBtn = (id, k) => {
   const e = document.getElementById(id); if (!e) return;
-  const p = (ev) => { ev.preventDefault(); if (!keys[k]) { keyPressQueue[k] = true; initAudio(); } keys[k] = true; };
+  const p = (ev) => { ev.preventDefault(); keys[k] = true; keyPressQueue[k] = true; initAudio(); };
   const r = (ev) => { ev.preventDefault(); keys[k] = false; };
   e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('touchcancel', r, {passive: false});
   e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
@@ -344,11 +383,7 @@ const handleDpad = (ev) => {
     if (angle < -22.5 && angle > -157.5) newKeys.up = true;
   }
   
-  // ★修正：長押し効果音防止
-  ['up', 'down', 'left', 'right'].forEach(k => { 
-      if (newKeys[k] && !keys[k]) { keyPressQueue[k] = true; initAudio(); } 
-      keys[k] = newKeys[k]; 
-  });
+  ['up', 'down', 'left', 'right'].forEach(k => { if (newKeys[k] && !keys[k]) keyPressQueue[k] = true; keys[k] = newKeys[k]; });
 };
 
 const releaseDpad = (ev) => { ev.preventDefault(); dpadActive = false; keys.up = keys.down = keys.left = keys.right = false; };
@@ -388,16 +423,15 @@ canvas.addEventListener('mousedown', handlePointerDown); canvas.addEventListener
 canvas.addEventListener('mouseup', handlePointerUp); canvas.addEventListener('mouseleave', handlePointerUp);
 canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canvas.addEventListener('touchmove', handlePointerMove, {passive: false}); canvas.addEventListener('touchend', handlePointerUp, {passive: false});
 
-// ★修正：キーボード入力時の長押し効果音防止
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { if(!keys.up) keyPressQueue.up = true; keys.up = true; initAudio(); } 
-  if (e.key === 'ArrowDown') { if(!keys.down) keyPressQueue.down = true; keys.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { if(!keys.left) keyPressQueue.left = true; keys.left = true; initAudio(); } 
-  if (e.key === 'ArrowRight') { if(!keys.right) keyPressQueue.right = true; keys.right = true; initAudio(); }
-  if (k === 'z' || e.key === ' ') { if(!keys.a) keyPressQueue.a = true; keys.a = true; initAudio(); } 
-  if (k === 'x') { if(!keys.b) keyPressQueue.b = true; keys.b = true; initAudio(); }
-  if (e.key === 'Shift') { if(!keys.select) keyPressQueue.select = true; keys.select = true; initAudio(); }
+  if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { keys.down = true; keyPressQueue.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { keys.left = true; keyPressQueue.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { keys.right = true; keyPressQueue.right = true; initAudio(); }
+  if (k === 'z' || e.key === ' ') { keys.a = true; keyPressQueue.a = true; initAudio(); } 
+  if (k === 'x') { keys.b = true; keyPressQueue.b = true; initAudio(); }
+  if (e.key === 'Shift') { keys.select = true; keyPressQueue.select = true; initAudio(); }
 });
 
 window.addEventListener('keyup', e => {
