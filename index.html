@@ -36,30 +36,30 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   transform: rotate(-10deg); pointer-events: none;
 }
 
-/* ★ 修正: スロットモードの変形CSS */
-.mode-slot #gameboy { 
+/* ★ 修正完了: スロットモードの変形CSS */
+#gameboy.mode-slot { 
   background: linear-gradient(135deg, #600 0%, #200 100%); border-radius: 15px 15px 50px 50px; 
   box-shadow: inset -5px -5px 15px rgba(0,0,0,0.8), inset 3px 3px 10px rgba(255,100,100,0.2), 0 0 40px rgba(255,50,50,0.6); 
 }
-.mode-slot #screen-container { background: #100; border-color: #ffd700; box-shadow: inset 0 0 20px rgba(255,215,0,0.2); margin: 25px 20px 10px 20px; }
-.mode-slot #controls { background: transparent; }
-.mode-slot #classic-controls { opacity: 0; transform: translateY(100px); pointer-events: none; }
-.mode-slot #slot-controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
+#gameboy.mode-slot #screen-container { background: #100; border-color: #ffd700; box-shadow: inset 0 0 20px rgba(255,215,0,0.2); margin: 25px 20px 10px 20px; }
+#gameboy.mode-slot #controls { background: transparent; }
+#gameboy.mode-slot #classic-controls { opacity: 0; transform: translateY(100px); pointer-events: none; }
+#gameboy.mode-slot #slot-controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-/* ★ 修正: アビス・ジェネラルの横画面変形CSS */
-.mode-abyss #gameboy {
+/* ★ 修正完了: アビス・ジェネラルの横画面変形CSS */
+#gameboy.mode-abyss {
   max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row-reverse;
   background: linear-gradient(135deg, #1a0022 0%, #000 100%); 
   box-shadow: inset -5px -5px 15px rgba(0,0,0,0.9), inset 3px 3px 10px rgba(200,0,255,0.1), 0 0 40px rgba(150,0,255,0.5); 
   border-radius: 20px;
 }
-.mode-abyss #screen-container { margin: 15px 15px 15px 0; background: #000; border-color: #60a; box-shadow: inset 0 0 30px rgba(100,0,200,0.5); }
-.mode-abyss #controls { width: 160px; height: 100%; border-radius: 20px 0 0 20px; background: transparent; }
-.mode-abyss #dpad { top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
-.mode-abyss #action-buttons { opacity: 0; pointer-events: none; }
-.mode-abyss #sys-buttons { bottom: 15px; width: 100%; }
-.mode-abyss #sys-buttons .s-btn { background: #306; }
-.mode-abyss #gameCanvas { aspect-ratio: 400 / 240; box-shadow: none; border-radius: 0; }
+#gameboy.mode-abyss #screen-container { margin: 15px 15px 15px 0; background: #000; border-color: #60a; box-shadow: inset 0 0 30px rgba(100,0,200,0.5); }
+#gameboy.mode-abyss #controls { width: 160px; height: 100%; border-radius: 20px 0 0 20px; background: transparent; }
+#gameboy.mode-abyss #dpad { top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
+#gameboy.mode-abyss #action-buttons { opacity: 0; pointer-events: none; }
+#gameboy.mode-abyss #sys-buttons { bottom: 15px; width: 100%; }
+#gameboy.mode-abyss #sys-buttons .s-btn { background: #306; }
+#gameboy.mode-abyss #gameCanvas { aspect-ratio: 400 / 240; box-shadow: none; border-radius: 0; }
 
 #boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
 #boot.hidden { opacity: 0; }
@@ -73,7 +73,7 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; 
 }
 
-/* ★ 修正: リズムゲームの縦画面変形CSS */
+/* ★ 修正完了: リズムゲームの縦画面変形CSS */
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; pointer-events: none; } 
 
