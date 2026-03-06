@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Safety Net & Texture Fix Edition) ===
+// === CORE SYSTEM (Ultimate Texture & Safety Net Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -104,60 +104,65 @@ function playSnd(t) {
   else if (t === 'combo') { o.type = 'sine'; o.frequency.setValueAtTime(440, n); o.frequency.setValueAtTime(880, n + 0.05); g.gain.setValueAtTime(0.15 * vol, n); o.start(n); o.stop(n + 0.15); screenShake(2); if (typeof Rhythm === 'undefined' || activeApp !== Rhythm) hitStop(2); }
 }
 
-const GEMINI_API_KEY = ["AIza","SyDa7Ku8RWSO","OGDXKCQTdw","AObBHi6A8GcKA"].join("");
-
-const AISys = {
-  status: 'ready',
-  async chat(sysPrompt, userPrompt) {
-    const key = GEMINI_API_KEY.trim();
-    if (key.includes("ここに") || key.length < 30) return "わしの 頭脳（APIキー）が まだ 設定されておらぬようじゃ！ main.js を確認せい！";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
-    const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: sysPrompt }] }, generationConfig: { temperature: 0.7, maxOutputTokens: 100 } };
-    try {
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!response.ok) return `むむっ… 時空の歪み（エラー）じゃ！`;
-      const data = await response.json();
-      return data.candidates[0].content.parts[0].text.trim();
-    } catch (e) { return `ネットワークが 切れておるようじゃ！`; }
-  }
-};
-
 const particles = [];
 function addParticle(x, y, color, type = 'star') { const count = type === 'explosion' ? 12 : type === 'line' ? 20 : 5; for (let i = 0; i < count; i++) { particles.push({ x: x, y: y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 1, life: 30 + Math.random()*10, color: color, size: type === 'explosion' ? 3 : 1 }); } }
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-// ★ 復旧＆修正：ドット絵テクスチャ崩壊の原因（0番パレット除外）を取り除いた完全版！
-function drawSprite(a, b, c, d, e) {
-  let targetCtx = ctx, id, x, y, scale = 1, flip = false;
-  
-  if (typeof a === 'string' || (a && a.d)) {
-    id = a; x = b; y = c; scale = d || 1; flip = e || false;
-  } else {
-    targetCtx = a; id = b; x = c; y = d; scale = e || 1; flip = arguments[5] || false;
-  }
-  
-  let s = typeof id === 'string' ? ((typeof sprites !== 'undefined' ? sprites[id] : null) || (typeof SPRITES !== 'undefined' ? SPRITES[id] : null)) : id;
-  if (!s || !s.d) return;
-  
-  targetCtx.save();
-  targetCtx.translate(x, y);
-  if (flip) { 
-      targetCtx.scale(-1, 1); 
-      targetCtx.translate(-s.w * scale, 0); 
-  }
-  
-  for (let r = 0; r < s.h; r++) {
-    for (let col = 0; col < s.w; col++) {
-      let p = s.d[r * s.w + col];
-      // ★ ピリオドと空白以外は全て描画する（0番の黒色も透過させない！）
-      if (p !== '.' && p !== ' ') {
-        targetCtx.fillStyle = (s.pal && s.pal[p]) ? s.pal[p] : '#000'; // 安全装置
-        targetCtx.fillRect(col * scale, r * scale, scale, scale);
-      }
+// ============================================
+// ★ ここにテクスチャを完全直書き（ハードコーディング）
+// ============================================
+window.sprs = {
+    player: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
+    heroNew: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
+    enemyNew: { w:8, h:8, pal:{'1':'#f00', '2':'#fff', '3':'#000'}, d: "..........1111...111111..231123..111111...1..1...11..11........." },
+    coin: { w:8, h:8, pal:{'1':'#ff0', '2':'#fa0'}, d: "..........1111...122221..121121..121121..122221...1111.........." },
+    spike: { w:8, h:8, pal:{'1':'#ddd', '2':'#888'}, d: "...................11.....1221....1221...122221..122221.12222221" }
+};
+
+const universalPal = {
+    '1': '#000', '2': '#fff', '3': '#444', '4': '#888',
+    '5': '#f00', '6': '#0f0', '7': '#00f', '8': '#ff0',
+    '9': '#f0f', 'a': '#0ff', 'b': '#fa0', 'c': '#f8f',
+    'd': '#840', 'e': '#8f8', 'f': '#88f'
+};
+
+// ★ バグを完全に排除した最強のドット絵描画関数
+function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
+    let targetCtx = ctx, x, y, color, spriteObj, scale=1, flip=false;
+    
+    // 引数の渡し方がゲームによって違うため、自動で判別する処理
+    if (arg1 && arg1.fillRect) {
+        targetCtx = arg1; x = arg2; y = arg3; color = arg4; spriteObj = arg5; scale = arg6 || 1; flip = arguments[6] || false;
+    } else if (typeof arg1 === 'number') {
+        x = arg1; y = arg2; color = arg3; spriteObj = arg4; scale = arg5 || 1; flip = arg6 || false;
+    } else if (typeof arg1 === 'string') {
+        spriteObj = arg1; x = arg2; y = arg3; scale = arg4 || 1; flip = arg5 || false; color = arg6 || null;
     }
-  }
-  targetCtx.restore();
+    
+    let s = typeof spriteObj === 'string' ? (window.sprs ? window.sprs[spriteObj] : null) : spriteObj;
+    if (!s || !s.d) return;
+
+    targetCtx.save();
+    targetCtx.translate(x, y);
+    if (flip) { targetCtx.scale(-1, 1); targetCtx.translate(-s.w * scale, 0); }
+    
+    for (let r = 0; r < s.h; r++) {
+        for (let col = 0; col < s.w; col++) {
+            let p = s.d[r * s.w + col];
+            
+            // 完全に透明にする文字（0はスロットの透明部分）
+            if (p === '.' || p === ' ' || p === '0') continue;
+            
+            let fillCol = color || '#fff';
+            if (s.pal && s.pal[p]) { fillCol = s.pal[p]; } // 専用パレット優先
+            else if (!s.pal && universalPal[p]) { fillCol = universalPal[p]; } // スロット等の共通パレット
+            
+            targetCtx.fillStyle = fillCol;
+            targetCtx.fillRect(col * scale, r * scale, scale, scale);
+        }
+    }
+    targetCtx.restore();
 }
 
 const bgThemes = [
@@ -347,9 +352,10 @@ function loop() {
   } catch (err) {
     console.error(err); 
     
-    // ★ エラー時に画面設定を完全にクリーンリセットする
+    // エラー発生時にCanvasの描画状態を完全に初期化（バグの連鎖を防ぐ）
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
+    ctx.shadowBlur = 0;
     
     ctx.fillStyle = "rgba(150,0,0,0.95)"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height); 
