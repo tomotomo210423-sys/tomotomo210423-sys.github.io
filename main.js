@@ -1,4 +1,4 @@
-// === CORE SYSTEM (RETRO-OS Integration Edition) ===
+// === CORE SYSTEM (RETRO-OS Integration & Fix Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -145,7 +145,6 @@ function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.ra
 function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
 let transTimer = 0; let nextApp = null; 
-// ★ 修正：アプリ切り替え時に画面の変形クラスを確実にリセット！
 function switchApp(app) { 
     nextApp = app; transTimer = 20; playSnd('sel'); 
     document.body.className = '';
@@ -154,7 +153,7 @@ function switchApp(app) {
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ============================================
-// メニュー画面
+// メニュー画面 (★全12アプリをスクロールなしで完全表示！)
 // ============================================
 const Menu = {
   cur: 0, 
@@ -164,7 +163,6 @@ const Menu = {
   
   init() { 
       this.cur = 0; this.holdTimer = 0; BGM.play('menu'); 
-      // ★ 念のためメニュー起動時にも変形リセット
       document.body.className = '';
       document.getElementById('gameboy').className = '';
   },
@@ -185,7 +183,7 @@ const Menu = {
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
-            typeof PCApp !== 'undefined' ? PCApp : null, // RETRO-OS
+            typeof PCApp !== 'undefined' ? PCApp : null,
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -197,23 +195,23 @@ const Menu = {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v14.0', 60, 40);
+    ctx.fillText('8in1 RETRO', 55, 23); ctx.shadowBlur = 0; 
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v14.0', 60, 36);
     
-    let startY = 63;
-    let drawStart = Math.max(0, this.cur - 8);
-    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
+    // 全12個のアプリを画面内にピッタリ収まるように描画
+    let startY = 52;
+    for (let i = 0; i < this.apps.length; i++) { 
         let col = this.appColors[i];
         ctx.font = 'bold 11px monospace'; 
         
         if (i === this.cur) {
             ctx.fillStyle = col;
-            ctx.fillRect(8, startY + (i - drawStart) * 19 - 11, 184, 15);
+            ctx.fillRect(8, startY + i * 18 - 11, 184, 15);
             ctx.fillStyle = '#000';
-            ctx.fillText('▶ ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+            ctx.fillText('▶ ' + this.apps[i], 12, startY + i * 18); 
         } else {
             ctx.fillStyle = col;
-            ctx.fillText('  ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+            ctx.fillText('  ' + this.apps[i], 12, startY + i * 18); 
         }
     }
     
@@ -304,9 +302,10 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+// ★修正：長押し時の連続効果音を防止
 const setBtn = (id, k) => {
   const e = document.getElementById(id); if (!e) return;
-  const p = (ev) => { ev.preventDefault(); keys[k] = true; keyPressQueue[k] = true; initAudio(); };
+  const p = (ev) => { ev.preventDefault(); if (!keys[k]) { keyPressQueue[k] = true; initAudio(); } keys[k] = true; };
   const r = (ev) => { ev.preventDefault(); keys[k] = false; };
   e.addEventListener('touchstart', p, {passive: false}); e.addEventListener('touchend', r, {passive: false}); e.addEventListener('touchcancel', r, {passive: false});
   e.addEventListener('mousedown', p); e.addEventListener('mouseup', r); e.addEventListener('mouseleave', r);
@@ -345,7 +344,11 @@ const handleDpad = (ev) => {
     if (angle < -22.5 && angle > -157.5) newKeys.up = true;
   }
   
-  ['up', 'down', 'left', 'right'].forEach(k => { if (newKeys[k] && !keys[k]) keyPressQueue[k] = true; keys[k] = newKeys[k]; });
+  // ★修正：長押し効果音防止
+  ['up', 'down', 'left', 'right'].forEach(k => { 
+      if (newKeys[k] && !keys[k]) { keyPressQueue[k] = true; initAudio(); } 
+      keys[k] = newKeys[k]; 
+  });
 };
 
 const releaseDpad = (ev) => { ev.preventDefault(); dpadActive = false; keys.up = keys.down = keys.left = keys.right = false; };
@@ -385,15 +388,16 @@ canvas.addEventListener('mousedown', handlePointerDown); canvas.addEventListener
 canvas.addEventListener('mouseup', handlePointerUp); canvas.addEventListener('mouseleave', handlePointerUp);
 canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canvas.addEventListener('touchmove', handlePointerMove, {passive: false}); canvas.addEventListener('touchend', handlePointerUp, {passive: false});
 
+// ★修正：キーボード入力時の長押し効果音防止
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
-  if (e.key === 'ArrowDown') { keys.down = true; keyPressQueue.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { keys.left = true; keyPressQueue.left = true; initAudio(); } 
-  if (e.key === 'ArrowRight') { keys.right = true; keyPressQueue.right = true; initAudio(); }
-  if (k === 'z' || e.key === ' ') { keys.a = true; keyPressQueue.a = true; initAudio(); } 
-  if (k === 'x') { keys.b = true; keyPressQueue.b = true; initAudio(); }
-  if (e.key === 'Shift') { keys.select = true; keyPressQueue.select = true; initAudio(); }
+  if (e.key === 'ArrowUp') { if(!keys.up) keyPressQueue.up = true; keys.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { if(!keys.down) keyPressQueue.down = true; keys.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { if(!keys.left) keyPressQueue.left = true; keys.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { if(!keys.right) keyPressQueue.right = true; keys.right = true; initAudio(); }
+  if (k === 'z' || e.key === ' ') { if(!keys.a) keyPressQueue.a = true; keys.a = true; initAudio(); } 
+  if (k === 'x') { if(!keys.b) keyPressQueue.b = true; keys.b = true; initAudio(); }
+  if (e.key === 'Shift') { if(!keys.select) keyPressQueue.select = true; keys.select = true; initAudio(); }
 });
 
 window.addEventListener('keyup', e => {
