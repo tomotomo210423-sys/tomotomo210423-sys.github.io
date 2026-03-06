@@ -1,60 +1,70 @@
-// === 2D KART: MADNESS (Top-Down 2D Racing) ===
-// 疑似3Dを廃止し、完全な2Dトップビュー（見下ろし型）として再構築。
-// バグを排除し、正確な当たり判定と直感的な操作性を実現した超安定版！
+// === MAD KART EVOLUTION (Full 2D Racing with Bots & Minimap) ===
+// 障害物システムを廃止し、7人のBotと順位を競い合う本格レーシングへ進化。
 
 const PCApp = {
     st: 'title', 
     stage: 1,    
-    pos: 0,      // コース全体の進行距離 (Z軸の代わり)
+    pos: 0,      
     speed: 0,
-    maxSpeed: 100,
-    px: 100,     // プレイヤーのX座標 (画面中心は100)
-    py: 240,     // プレイヤーのY座標 (固定)
+    maxSpeed: 130,
+    playerTrackX: 0, // 道の中心からの相対X座標 (-70 〜 70)
     
-    sprites: [], // 敵やアイテムの配列
+    bots: [], items: [],
     
-    // アイテムシステム
-    heldItem: 0,   // 持っているアイテム
-    activeItem: 0, // 発動中のアイテム
-    activeTimer: 0,
+    heldItem: 0, activeItem: 0, activeTimer: 0,
     itemNames: ["", "🍄ダッシュ", "⭐無敵", "⚡落雷"],
     
-    // 順位・カオスギミック
-    rank: 20, 
-    chaosTimer: 0,
-    
+    rank: 8, goal: 20000, chaosTimer: 0,
+
     init() {
-        this.st = 'title';
-        this.stage = 1;
-        BGM.stop();
+        this.st = 'title'; this.stage = 1; BGM.stop();
     },
 
     startStage(stg) {
-        this.st = 'play';
-        this.stage = stg;
-        this.pos = 0;
-        this.speed = 0;
-        this.px = 100;
-        this.sprites = [];
-        this.heldItem = 0;
-        this.activeItem = 0;
-        this.activeTimer = 0;
-        this.rank = 15 + (stg * 5); 
+        this.st = 'play'; this.stage = stg;
+        this.pos = 0; this.speed = 0; this.playerTrackX = 0;
+        this.heldItem = 0; this.activeItem = 0; this.activeTimer = 0;
         this.chaosTimer = 0;
+        this.goal = 15000 + stg * 5000;
+        
+        // 🏁 Bot（7人）の生成
+        this.bots = [];
+        let colors = ['#f00', '#0f0', '#ff0', '#f0f', '#0ff', '#fa0', '#fff'];
+        for(let i=0; i<7; i++) {
+            this.bots.push({
+                id: i,
+                z: 300 + i * 150, // プレイヤーの少し前からスタート
+                trackX: (i%2 === 0 ? -35 : 35),
+                speed: 50,
+                baseSpeed: 90 + i*4 + (stg*5), // 前のBotほど速い
+                color: colors[i],
+                shock: 0 // サンダーの感電タイマー
+            });
+        }
+
+        // 📦 アイテムの配置
+        this.items = [];
+        for (let z = 1000; z < this.goal - 1000; z += 1000) {
+            this.items.push({ z: z, trackX: -45, active: true });
+            this.items.push({ z: z, trackX: 0, active: true });
+            this.items.push({ z: z, trackX: 45, active: true });
+        }
+
         BGM.play('action');
     },
 
-    // コースのウネウネ（カーブ）を計算する関数
+    // コースのカーブ計算
     getTrackOffset(z) {
-        if (this.stage === 1) return Math.sin(z * 0.002) * 30;
-        if (this.stage === 2) return Math.sin(z * 0.003) * 50 + Math.cos(z * 0.001) * 20;
-        if (this.stage === 3) {
-            // カオスステージは狂ったカーブ＋突然のズレ
-            let offset = (Math.sin(z * 0.004) + Math.cos(z * 0.007)) * 40;
-            if (this.chaosTimer > 0) offset += Math.sin(z * 0.1) * 15;
-            return offset;
+        let offset = 0;
+        if (this.stage === 1) {
+            offset = Math.sin(z * 0.001) * 60;
+        } else if (this.stage === 2) {
+            offset = Math.sin(z * 0.0015) * 80 + Math.cos(z * 0.0007) * 40;
+        } else if (this.stage === 3) {
+            offset = Math.sin(z * 0.002) * 100 + Math.cos(z * 0.0011) * 70;
+            if (this.chaosTimer > 0) offset += Math.sin(z * 0.05) * 20; // 病気ギミック
         }
-        return 0;
+        return offset;
     },
 
     update() {
@@ -66,244 +76,253 @@ const PCApp = {
         }
 
         if (this.st === 'clear') {
-            this.speed *= 0.9; 
-            this.pos += this.speed; 
-            this.px += (100 - this.px) * 0.1; // 中央に戻る
-            if (keysDown.a) {
-                if (this.stage < 3) this.startStage(this.stage + 1);
-                else this.init(); 
-            }
+            this.speed *= 0.95; this.pos += this.speed; this.playerTrackX *= 0.9;
+            for (let b of this.bots) b.z += b.speed; 
+            if (keysDown.a) { if (this.stage < 3) this.startStage(this.stage + 1); else this.init(); }
             return;
         }
 
         // === プレイ中の処理 ===
 
-        // アイテムタイマー
         if (this.activeTimer > 0) {
             this.activeTimer--;
             if (this.activeTimer <= 0) this.activeItem = 0;
         }
 
-        // アイテム使用 (十字キー上)
-        if (keysDown.up && this.heldItem > 0 && this.activeTimer <= 0) {
+        // ★修正: アイテム使用を「Bボタン」に変更！
+        if (keysDown.b && this.heldItem > 0 && this.activeTimer <= 0) {
             playSnd('combo');
             this.activeItem = this.heldItem;
             this.heldItem = 0;
-            this.activeTimer = 180; // 約3秒
+            this.activeTimer = 180;
             
             if (this.activeItem === 3) {
-                // ⚡落雷: 画面上の敵を全滅
-                this.sprites = this.sprites.filter(s => s.type !== 'enemy');
-                this.chaosTimer = 20; 
-                this.rank = Math.max(1, this.rank - 3);
+                // ⚡サンダー: 全Botを感電減速
+                for (let bot of this.bots) bot.shock = 60;
+                this.chaosTimer = 20;
                 playSnd('hit');
             }
         }
 
-        // アクセル・ブレーキ処理
-        let limit = (this.activeItem === 1 && this.activeTimer > 0) ? this.maxSpeed * 1.5 : this.maxSpeed;
+        // アクセル・ブレーキ (ブレーキを十字キー下に変更)
+        let limit = (this.activeItem === 1 && this.activeTimer > 0) ? this.maxSpeed * 1.4 : this.maxSpeed;
         if (keys.a) {
             this.speed += 2;
             if (this.speed > limit) this.speed = limit;
-        } else if (keys.b) {
-            this.speed -= 4;
+        } else if (keys.down) {
+            this.speed -= 4; // 急ブレーキ
         } else {
-            this.speed -= 1;
+            this.speed -= 1; // 惰性
         }
 
-        // 左右移動 (ピクセル単位で正確に移動)
-        if (keys.left) this.px -= 3;
-        if (keys.right) this.px += 3;
+        // ハンドル
+        if (keys.left) this.playerTrackX -= 4;
+        if (keys.right) this.playerTrackX += 4;
 
-        // ★ 完全2Dの正確なコースアウト(ダート)判定
-        let currentOffset = this.getTrackOffset(this.pos);
-        let roadCenter = 100 + currentOffset;
-        let leftBound = roadCenter - 60;  // コース左端
-        let rightBound = roadCenter + 60; // コース右端
-        
-        // 道を踏み外した時のペナルティ
-        if (this.px < leftBound + 10 || this.px > rightBound - 10) {
+        // 遠心力
+        let curveDelta = this.getTrackOffset(this.pos + 10) - this.getTrackOffset(this.pos);
+        this.playerTrackX -= curveDelta * (this.speed / this.maxSpeed) * 3;
+
+        // ダート(道外)減速
+        if (Math.abs(this.playerTrackX) > 65) {
             if (this.activeItem !== 1 && this.activeItem !== 2) {
-                // 無敵・キノコ以外は大幅減速
-                if (this.speed > 30) this.speed -= 3;
+                if (this.speed > 50) this.speed -= 3;
             }
-            // 完全な壁への激突判定
-            if (this.px < leftBound - 10) { this.px = leftBound - 10; this.speed -= 5; }
-            if (this.px > rightBound + 10) { this.px = rightBound + 10; this.speed -= 5; }
+            // 壁
+            if (Math.abs(this.playerTrackX) > 90) {
+                this.playerTrackX = 90 * Math.sign(this.playerTrackX);
+                this.speed -= 5;
+            }
         }
         
         if (this.speed < 0) this.speed = 0;
         this.pos += this.speed;
 
-        // ★ スプライト（敵・アイテム）の生成
-        if (Math.random() < 0.04 + (this.stage * 0.02)) {
-            let isItem = Math.random() < 0.15;
-            let spawnZ = this.pos + 400; // 画面のはるか上空(奥)に生成
-            let spawnOffset = this.getTrackOffset(spawnZ);
-            this.sprites.push({
-                type: isItem ? 'item' : 'enemy',
-                x: 100 + spawnOffset + (Math.random() - 0.5) * 100, // 道の幅に合わせて配置
-                y: -50, // 画面外(上)
-                z: spawnZ, // コース上の絶対位置
-                s: isItem ? 0 : this.maxSpeed * (0.4 + Math.random() * 0.4),
-                passed: false // 追い抜いたかどうかのフラグ
-            });
-        }
-
-        // ★ スプライトの更新と当たり判定
-        for (let i = this.sprites.length - 1; i >= 0; i--) {
-            let s = this.sprites[i];
-            
-            // Y座標を「プレイヤーの進行距離」に合わせて計算（見下ろしスクロールの肝）
-            s.y = 240 - (s.z - this.pos); 
-            
-            // カオスモードの敵の震え
-            if (this.stage === 3 && s.type === 'enemy') s.x += Math.sin(Date.now()/100 + s.x) * 2;
-
-            // 敵を追い抜いた判定（Y座標が自分より下に行ったら）
-            if (s.type === 'enemy' && s.y > 240 && !s.passed) {
-                s.passed = true;
-                if (Math.abs(s.x - this.px) > 20) { // ぶつからずに追い抜いた
-                    this.rank = Math.max(1, this.rank - 1);
-                }
-            }
-
-            // 2Dの正確な当たり判定 (XYの四角形判定)
-            if (Math.abs(s.x - this.px) < 20 && Math.abs(s.y - this.py) < 20) {
-                if (s.type === 'item') {
-                    // アイテムGET！
-                    if (this.heldItem === 0) { 
-                        this.heldItem = Math.floor(Math.random() * 3) + 1; 
-                        playSnd('sel'); 
-                    }
-                    this.sprites.splice(i, 1);
-                    continue;
-                } else if (s.type === 'enemy') {
-                    // 敵に衝突
-                    if (this.activeItem === 2) {
-                        // 無敵で粉砕
-                        playSnd('hit'); 
-                        this.sprites.splice(i, 1); 
-                        screenShake(3); 
-                        this.rank = Math.max(1, this.rank - 1); 
-                        continue;
-                    } else {
-                        // クラッシュ
-                        this.speed *= 0.2; 
-                        playSnd('hit'); 
-                        this.chaosTimer = 10; 
-                        s.z += 50; // ぶつかった敵を前に押し出す
-                    }
-                }
+        // ★ Bot(敵)のAI更新
+        for (let bot of this.bots) {
+            if (bot.shock > 0) {
+                bot.shock--; bot.speed *= 0.95; // 感電中は超減速
+            } else {
+                if (bot.speed < bot.baseSpeed) bot.speed += 1;
+                // 道の中央へ戻ろうとする
+                if (bot.trackX > 0) bot.trackX -= 1;
+                if (bot.trackX < 0) bot.trackX += 1;
             }
             
-            // 画面の下端を過ぎたら削除
-            if (s.y > 350) this.sprites.splice(i, 1);
+            let botCurveDelta = this.getTrackOffset(bot.z + 10) - this.getTrackOffset(bot.z);
+            bot.trackX -= botCurveDelta * 1.5;
+
+            if (Math.abs(bot.trackX) > 65) {
+                bot.speed *= 0.98;
+                if (Math.abs(bot.trackX) > 80) bot.trackX = 80 * Math.sign(bot.trackX);
+            }
+            bot.z += bot.speed;
         }
 
-        // ステージクリア判定
-        let goal = 10000 + (this.stage * 5000);
-        if (this.pos > goal) {
-            this.st = 'clear';
-            playSnd('combo');
+        // 🏁 順位の計算
+        let racers = [{id: 'p', z: this.pos}];
+        for (let b of this.bots) racers.push({id: b.id, z: b.z});
+        racers.sort((a,b) => b.z - a.z);
+        this.rank = racers.findIndex(r => r.id === 'p') + 1;
+
+        // 💥 車同士の衝突判定
+        for (let bot of this.bots) {
+            let distZ = Math.abs(bot.z - this.pos);
+            let distX = Math.abs(bot.trackX - this.playerTrackX);
+            if (distZ < 40 && distX < 16) {
+                if (this.activeItem === 2) {
+                    bot.shock = 60; // 無敵で弾き飛ばす
+                    bot.trackX += (bot.trackX > this.playerTrackX) ? 30 : -30;
+                    playSnd('hit'); screenShake(3);
+                } else {
+                    this.speed *= 0.8; bot.speed *= 0.8; // お互いに減速・反発
+                    if (this.playerTrackX < bot.trackX) { this.playerTrackX -= 5; bot.trackX += 5; }
+                    else { this.playerTrackX += 5; bot.trackX -= 5; }
+                    playSnd('hit');
+                }
+            }
         }
 
-        // カオスギミック
+        // 📦 アイテム取得判定
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            let itm = this.items[i];
+            if (!itm.active) continue;
+            let distZ = Math.abs(itm.z - this.pos);
+            let distX = Math.abs(itm.trackX - this.playerTrackX);
+            
+            // プレイヤーが取る
+            if (itm.z > this.pos - 10 && itm.z < this.pos + 30 && distX < 20) {
+                itm.active = false;
+                if (this.heldItem === 0) {
+                    this.heldItem = Math.floor(Math.random() * 3) + 1;
+                    playSnd('sel');
+                }
+            }
+            // Botもアイテムを破壊(取得)する
+            for (let bot of this.bots) {
+                if (itm.active && Math.abs(itm.z - bot.z) < 30 && Math.abs(itm.trackX - bot.trackX) < 20) {
+                    itm.active = false; break;
+                }
+            }
+        }
+
         if (this.stage === 3 && Math.random() < 0.01) this.chaosTimer = 30;
         if (this.chaosTimer > 0) this.chaosTimer--;
+
+        if (this.pos > this.goal) { this.st = 'clear'; playSnd('combo'); }
     },
 
     draw() {
-        // 背景色
         ctx.fillStyle = ['#2a2', '#141', '#202'][this.stage - 1];
         if (this.chaosTimer > 0) ctx.fillStyle = `hsl(${(Date.now()/10)%360}, 100%, 30%)`;
         ctx.fillRect(0, 0, 200, 300);
 
         if (this.st === 'title') {
-            ctx.fillStyle = '#000'; ctx.fillRect(20, 80, 160, 60);
-            ctx.fillStyle = '#f00'; ctx.font = 'bold 20px monospace'; ctx.fillText('2D KART', 60, 100);
-            ctx.fillStyle = '#ff0'; ctx.fillText('MADNESS', 60, 125);
+            ctx.fillStyle = '#000'; ctx.fillRect(10, 60, 180, 100);
+            ctx.fillStyle = '#f00'; ctx.font = 'bold 20px monospace'; ctx.fillText('MAD KART', 50, 90);
+            ctx.fillStyle = '#ff0'; ctx.fillText('EVOLUTION', 45, 115);
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('A:アクセル B:ブレーキ', 20, 180);
-            ctx.fillText('UP(上): アイテム使用', 30, 200);
-            if (Math.floor(Date.now() / 500) % 2 === 0) ctx.fillText('PRESS [A] TO START', 45, 240);
+            ctx.fillText('A:アクセル  ▼:ブレーキ', 20, 140);
+            ctx.fillText('B:アイテム使用', 45, 155);
+            if (Math.floor(Date.now() / 500) % 2 === 0) ctx.fillText('PRESS [A] TO START', 45, 220);
             return;
         }
 
-        // === 見下ろし型 2Dスクロール道路の描画 ===
+        // === 道路描画 (★スケールを調整して広範囲を描画) ===
         let roadCol = ['#666', '#444', '#303'][this.stage - 1];
         let lineCol = ['#fff', '#dd0', '#f0f'][this.stage - 1];
         let rumble1 = ['#f00', '#f00', '#0ff'][this.stage - 1];
         let rumble2 = ['#fff', '#fff', '#f0f'][this.stage - 1];
 
-        // 画面の上から下へ、5ピクセルずつ「道路の輪切り」を描いていく
-        for (let y = 0; y < 300; y += 5) {
-            // そのY座標に該当する「コース上の絶対位置(Z)」を逆算
-            let virtualZ = this.pos + (240 - y);
-            let offsetX = this.getTrackOffset(virtualZ);
-            let cx = 100 + offsetX;
+        // yを4ピクセルずつ飛ばすことで遠くまで見せる
+        for (let y = 0; y < 300; y += 4) {
+            let virtualZ = this.pos + (240 - y) * 2.5; 
+            let curveOffset = this.getTrackOffset(virtualZ) - this.getTrackOffset(this.pos);
+            let cx = 100 + curveOffset - this.playerTrackX; // 自車を中央に固定し、道が動く
+            let isRumble = Math.floor(virtualZ / 50) % 2 === 0;
             
-            let isRumble = Math.floor(virtualZ / 20) % 2 === 0;
-            
-            // 縁石(ゼブラゾーン)
             ctx.fillStyle = isRumble ? rumble1 : rumble2;
-            ctx.fillRect(cx - 65, y, 130, 5);
-            
-            // アスファルト
+            ctx.fillRect(cx - 75, y, 150, 4); // 縁石
             ctx.fillStyle = roadCol;
-            ctx.fillRect(cx - 60, y, 120, 5);
-            
-            // センターライン
+            ctx.fillRect(cx - 70, y, 140, 4); // アスファルト
             if (isRumble) {
-                ctx.fillStyle = lineCol;
-                ctx.fillRect(cx - 2, y, 4, 5);
+                ctx.fillStyle = lineCol; ctx.fillRect(cx - 2, y, 4, 4); // センターライン
             }
         }
 
-        // === スプライトの描画 ===
-        for (let s of this.sprites) {
-            if (s.y < -30 || s.y > 330) continue; // 画面外は描画しない
+        // === スプライト描画 (Zソート) ===
+        let renderList = [];
+        for (let bot of this.bots) {
+            let y = 240 - (bot.z - this.pos) / 2.5;
+            let cx = 100 + this.getTrackOffset(bot.z) - this.getTrackOffset(this.pos) + bot.trackX - this.playerTrackX;
+            renderList.push({type: 'bot', y: y, x: cx, obj: bot});
+        }
+        for (let itm of this.items) {
+            if(!itm.active) continue;
+            let y = 240 - (itm.z - this.pos) / 2.5;
+            let cx = 100 + this.getTrackOffset(itm.z) - this.getTrackOffset(this.pos) + itm.trackX - this.playerTrackX;
+            renderList.push({type: 'item', y: y, x: cx, obj: itm});
+        }
+        renderList.push({type: 'player', y: 240, x: 100}); // 自車
+        renderList.sort((a,b) => a.y - b.y); // 奥から手前へ
+
+        for (let r of renderList) {
+            if (r.y < -30 || r.y > 330) continue;
             
-            if (s.type === 'enemy') {
-                ctx.fillStyle = '#000'; ctx.fillRect(s.x - 12, s.y - 14, 24, 28); // 影/タイヤ
-                ctx.fillStyle = '#f00'; ctx.fillRect(s.x - 10, s.y - 12, 20, 24); // 車体
-                ctx.fillStyle = '#0ff'; ctx.fillRect(s.x - 8, s.y - 8, 16, 6);  // 窓
-                ctx.fillStyle = '#ff0'; ctx.fillRect(s.x - 8, s.y + 8, 4, 4); ctx.fillRect(s.x + 4, s.y + 8, 4, 4); // ランプ
-            } else {
+            if (r.type === 'item') {
                 ctx.fillStyle = (Math.floor(Date.now()/100)%2===0) ? '#ff0' : '#f0f';
-                ctx.fillRect(s.x - 10, s.y - 10, 20, 20);
-                ctx.fillStyle = '#000'; ctx.font = 'bold 16px monospace'; ctx.fillText('?', s.x - 5, s.y + 5);
+                ctx.fillRect(r.x - 8, r.y - 8, 16, 16);
+                ctx.fillStyle = '#000'; ctx.font = 'bold 12px monospace'; ctx.fillText('?', r.x - 4, r.y + 4);
+            } 
+            else if (r.type === 'bot') {
+                let bounce = (r.obj.speed > 0) ? Math.sin(r.obj.z * 0.1) * 2 : 0;
+                ctx.fillStyle = '#000'; ctx.fillRect(r.x - 9, r.y - 12 + bounce, 18, 24); // 影/タイヤ
+                ctx.fillStyle = r.obj.color; ctx.fillRect(r.x - 7, r.y - 10 + bounce, 14, 20); // 車体
+                ctx.fillStyle = '#0ff'; ctx.fillRect(r.x - 5, r.y - 2 + bounce, 10, 4); // 窓
+                if(r.obj.shock > 0) { ctx.fillStyle = 'rgba(255,255,0,0.7)'; ctx.fillRect(r.x-12, r.y-14, 24, 28); }
+            } 
+            else if (r.type === 'player') {
+                let bounce = (this.speed > 0) ? Math.sin(this.pos * 0.1) * 2 : 0;
+                ctx.fillStyle = '#000'; ctx.fillRect(r.x - 9, r.y - 12 + bounce, 18, 24);
+                ctx.fillStyle = (this.activeItem === 2 && this.activeTimer > 0) ? `hsl(${(Date.now()/5)%360}, 100%, 50%)` : '#00f';
+                ctx.fillRect(r.x - 7, r.y - 10 + bounce, 14, 20);
+                ctx.fillStyle = '#0ff'; ctx.fillRect(r.x - 5, r.y - 2 + bounce, 10, 4); 
+                ctx.fillStyle = '#f00'; ctx.fillRect(r.x - 6, r.y - 10 + bounce, 3, 3); ctx.fillRect(r.x + 3, r.y - 10 + bounce, 3, 3);
             }
         }
 
-        // === プレイヤーの描画 ===
-        let bounce = (this.speed > 0) ? Math.sin(Date.now() / 50) * 2 : 0;
-        ctx.fillStyle = '#000'; ctx.fillRect(this.px - 12, this.py - 14 + bounce, 24, 28);
-        ctx.fillStyle = (this.activeItem === 2 && this.activeTimer > 0) ? `hsl(${(Date.now()/5)%360}, 100%, 50%)` : '#00f';
-        ctx.fillRect(this.px - 10, this.py - 12 + bounce, 20, 24);
-        ctx.fillStyle = '#0ff'; ctx.fillRect(this.px - 8, this.py - 2 + bounce, 16, 6); // 窓
-        ctx.fillStyle = '#f00'; ctx.fillRect(this.px - 8, this.py - 12 + bounce, 4, 4); ctx.fillRect(this.px + 4, this.py - 12 + bounce, 4, 4); // ランプ
-
-        // === UI（画面表示） ===
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
-        ctx.fillText(`STG ${this.stage}`, 5, 15);
+        // === UI ===
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 200, 25);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px monospace';
+        ctx.fillText(`STG ${this.stage}`, 5, 10);
         ctx.fillStyle = (this.rank === 1) ? '#ff0' : '#fff';
-        ctx.fillText(`RANK:${this.rank}`, 65, 15);
-        ctx.fillStyle = '#fff'; ctx.fillText(`${Math.floor(this.speed)}km/h`, 130, 15);
-        
-        let goal = 10000 + (this.stage * 5000);
-        let prog = Math.min(this.pos / goal, 1.0);
-        ctx.strokeStyle = '#fff'; ctx.strokeRect(5, 20, 190, 5);
-        ctx.fillStyle = '#0f0'; ctx.fillRect(5, 20, 190 * prog, 5);
+        ctx.font = 'bold 14px monospace'; ctx.fillText(`RANK ${this.rank}/8`, 5, 23);
+        ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`${Math.floor(this.speed)}km/h`, 80, 22);
 
-        // アイテムボックス
-        ctx.strokeStyle = '#fff'; ctx.strokeRect(160, 30, 35, 35);
+        // アイテム枠
+        ctx.strokeStyle = '#fff'; ctx.strokeRect(120, 3, 20, 20);
         if (this.heldItem > 0) {
-            ctx.font = '20px monospace'; ctx.fillText(["", "🍄", "⭐", "⚡"][this.heldItem], 167, 55);
+            ctx.font = '14px monospace'; ctx.fillText(["", "🍄", "⭐", "⚡"][this.heldItem], 122, 18);
         }
         if (this.activeTimer > 0) {
-            ctx.fillStyle = '#f00'; ctx.font = '8px monospace'; ctx.fillText('ACTIVE', 162, 75);
-            ctx.fillStyle = '#0ff'; ctx.fillRect(160, 68, 35 * (this.activeTimer/180), 3);
+            ctx.fillStyle = '#f00'; ctx.font = '8px monospace'; ctx.fillText('ACT', 145, 12);
+            ctx.fillStyle = '#0ff'; ctx.fillRect(145, 15, 25 * (this.activeTimer/180), 3);
+        }
+
+        // 📍 ミニマップ (画面右上に設置)
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(180, 30, 15, 100);
+        ctx.fillStyle = '#fff'; ctx.fillRect(180, 30, 15, 2); // ゴール線
+        
+        // 自車の点
+        let pMapY = 30 + 100 - Math.min((this.pos / this.goal) * 100, 100);
+        ctx.fillStyle = '#00f'; ctx.fillRect(182, pMapY, 11, 4); 
+
+        // Botの点
+        for (let bot of this.bots) {
+            let bMapY = 30 + 100 - Math.min((bot.z / this.goal) * 100, 100);
+            if (bMapY >= 30 && bMapY <= 130) {
+                ctx.fillStyle = bot.color; ctx.fillRect(184, bMapY, 7, 3);
+            }
         }
 
         // メッセージ
@@ -311,18 +330,15 @@ const PCApp = {
             ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 100, 200, 100);
             ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
             if (this.stage < 3) {
-                ctx.fillText(`STAGE CLEAR! (R:${this.rank})`, 10, 140);
-                ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('PRESS [A] TO NEXT', 50, 170);
+                ctx.fillText(`STAGE CLEAR!`, 40, 130);
+                ctx.fillText(`RANK: ${this.rank}`, 65, 150);
+                ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('PRESS [A] TO NEXT', 50, 180);
             } else {
-                ctx.fillText('ALL CLEAR!!', 50, 140);
-                ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`FINAL RANK: ${this.rank}`, 55, 160);
+                ctx.fillText('ALL CLEAR!!', 50, 130);
+                ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`FINAL RANK: ${this.rank}`, 50, 160);
             }
         }
-        if (this.st === 'gameover') {
-            ctx.fillStyle = '#f00'; ctx.font = 'bold 20px monospace'; ctx.fillText('CRASHED!', 60, 140);
-        }
         
-        // カオスステージのエフェクト
         if (this.chaosTimer > 15 && this.stage === 3) {
             ctx.globalCompositeOperation = 'difference'; 
             ctx.fillStyle = '#fff'; ctx.fillRect(0,0,200,300); 
