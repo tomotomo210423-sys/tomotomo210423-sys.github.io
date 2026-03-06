@@ -24,7 +24,6 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// ★ セーブデータシステム
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
@@ -143,22 +142,17 @@ let shakeTimer = 0; function screenShake(i = 2) { shakeTimer = i; }
 function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; } }
 function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
-const PALETTE = {'2':'#fff','3':'#000','4':'#fcc','5':'#f00','6':'#0a0','7':'#00f','8':'#ff0','9':'#842','a':'#aaa','b':'#0ff','c':'#f0f','d':'#80f','e':'#531','f':'#141'};
-const drawSprite = (x, y, c, d, s = 2.5) => { 
-  if (!d) return; const str = Array.isArray(d) ? d[Math.floor(Date.now() / 300) % d.length] : d; const l = str.length > 100 ? 16 : 8; const ds = (8 / l) * s; 
-  for (let i = 0; i < str.length; i++) { if (i >= l * l) break; const ch = str[i]; if (ch === '0') continue; ctx.fillStyle = (ch === '1') ? c : (PALETTE[ch] || c); ctx.fillRect(x + (i % l) * ds, y + Math.floor(i / l) * ds, ds, ds); }
-};
-
 let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ============================================
-// メニュー画面 (ローカルランキングを削除)
+// メニュー画面 (PCを9つ目に追加！)
 // ============================================
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'システム設定', '王様の間'], 
-  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#888', '#fa0'],
+  // ★ ここに「仮想PC (Windows)」を追加
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', '仮想PC (Windows)', 'システム設定', '王様の間'], 
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#888', '#fa0'],
   holdTimer: 0,
   
   init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
@@ -179,6 +173,7 @@ const Menu = {
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
+            typeof PCApp !== 'undefined' ? PCApp : null, // ★ PCアプリの紐付け
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -221,21 +216,18 @@ const Settings = {
   update() {
     this.tmr++;
     if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
-    if (keysDown.up) { this.cur = (this.cur - 1 + 4) % 4; playSnd('sel'); } 
-    if (keysDown.down) { this.cur = (this.cur + 1) % 4; playSnd('sel'); }
+    if (keysDown.up) { this.cur = (this.cur - 1 + 3) % 3; playSnd('sel'); } 
+    if (keysDown.down) { this.cur = (this.cur + 1) % 3; playSnd('sel'); }
     
     if (this.cur === 0) {
-        if (keysDown.a) { activeApp = Ranking; activeApp.input = true; activeApp.name = SaveSys.data.playerName; activeApp.cursor = 0; activeApp.menuCursor = 0; activeApp.init(); } 
-    } 
-    else if (this.cur === 1) {
         if (keysDown.left) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme - 1 + bgThemes.length) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
         if (keysDown.right || keysDown.a) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
     }
-    else if (this.cur === 2) {
+    else if (this.cur === 1) {
         if (keys.left && this.tmr % 4 === 0) { SaveSys.data.bgmVol = Math.max(0, SaveSys.data.bgmVol - 0.1); SaveSys.save(); }
         if (keys.right && this.tmr % 4 === 0) { SaveSys.data.bgmVol = Math.min(1.0, SaveSys.data.bgmVol + 0.1); SaveSys.save(); }
     }
-    else if (this.cur === 3) {
+    else if (this.cur === 2) {
         if (keys.left && this.tmr % 4 === 0) { SaveSys.data.seVol = Math.max(0, SaveSys.data.seVol - 0.1); SaveSys.save(); playSnd('sel'); }
         if (keys.right && this.tmr % 4 === 0) { SaveSys.data.seVol = Math.min(1.0, SaveSys.data.seVol + 0.1); SaveSys.save(); playSnd('sel'); }
     }
@@ -246,7 +238,6 @@ const Settings = {
     ctx.strokeStyle = '#0f0'; ctx.beginPath(); ctx.moveTo(10, 40); ctx.lineTo(190, 40); ctx.stroke();
     
     let items = [
-      { label: 'PLAYER NAME', val: SaveSys.data.playerName },
       { label: 'BACKGROUND', val: `< ${bgThemes[SaveSys.data.bgTheme].name} >` },
       { label: 'BGM VOLUME', val: `< ${Math.round(SaveSys.data.bgmVol * 100).toString().padStart(3,' ')}% >` },
       { label: 'SE  VOLUME', val: `< ${Math.round(SaveSys.data.seVol * 100).toString().padStart(3,' ')}% >` }
@@ -280,7 +271,6 @@ const Ranking = {
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
     if (!this.input) {
-      // (通常表示はオミットされているので直接名前入力画面か戻るだけになりますが、裏処理として保持)
     } else {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
       for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.c && this.mc === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
