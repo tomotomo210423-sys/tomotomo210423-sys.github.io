@@ -1,5 +1,5 @@
-// === VIRTUAL PC EMULATOR (v86 Engine - Global CDN Edition) ===
-// ファイヤーウォールを突破し、世界最強のCDNからシステムを構築する
+// === VIRTUAL PC EMULATOR (v86 Engine - NPM Stable Edition) ===
+// 開発用ソースではなく、公式リリース版(NPM)の完成品パッケージからシステムを構築する
 
 const PCApp = {
     emu: null,
@@ -16,14 +16,13 @@ const PCApp = {
         BGM.stop(); // 起動音に集中するためBGM停止
 
         if (!this.emu) {
-            // V86Starterが読み込まれるまでリトライし続ける（最大10回）
+            // V86Starterが読み込まれるまでリトライ（最大10回）
             if (typeof window.V86Starter === 'undefined') {
                 this.retryCount++;
-                document.getElementById("v86-screen").innerHTML = `<div style='color:#0f0'>LOADING SYSTEM FROM CDN... (ATTEMPT ${this.retryCount})</div>`;
+                document.getElementById("v86-screen").innerHTML = `<div style='color:#0f0'>LOADING SYSTEM FROM NPM... (ATTEMPT ${this.retryCount})</div>`;
                 
                 if (this.retryCount > 10) {
-                    // 10回やってもダメならハッキング失敗画面
-                    document.getElementById("v86-screen").innerHTML = "<div style='color:#f00'>[FATAL ERROR]<br>NETWORK BLOCKED OR OFFLINE.<br>PRESS [SELECT] TO RETURN.</div>";
+                    document.getElementById("v86-screen").innerHTML = "<div style='color:#f00'>[FATAL ERROR]<br>SYSTEM ENGINE NOT FOUND.<br>PRESS [SELECT] TO RETURN.</div>";
                 } else {
                     setTimeout(() => this.init(), 1000);
                 }
@@ -33,17 +32,15 @@ const PCApp = {
             // 読み込み成功！PCの画面の土台を作る
             document.getElementById("v86-screen").innerHTML = "<div style='white-space: pre; font: 14px monospace; line-height: 14px; color: #fff;'></div><canvas style='display: none'></canvas>";
 
-            // エミュレータの構築（すべてCDNから直接ダウンロード）
+            // エミュレータの構築（OSなし・ハードウェアのみで起動！）
             this.emu = new window.V86Starter({
-                wasm_path: "https://cdn.jsdelivr.net/gh/copy/v86@master/build/v86.wasm",
+                wasm_path: "https://cdn.jsdelivr.net/npm/v86@latest/build/v86.wasm",
                 memory_size: 32 * 1024 * 1024,
                 vga_memory_size: 2 * 1024 * 1024,
                 screen_container: document.getElementById("v86-screen"),
-                // マザーボードシステム
+                // マザーボードシステム（これらはGitHubに実在するのでOK）
                 bios: { url: "https://cdn.jsdelivr.net/gh/copy/v86@master/bios/seabios.bin" },
                 vga_bios: { url: "https://cdn.jsdelivr.net/gh/copy/v86@master/bios/vgabios.bin" },
-                // テスト用OS（FreeDOS）
-                fda: { url: "https://cdn.jsdelivr.net/gh/copy/v86@master/images/freedos722.img" }, 
                 autostart: true,
             });
         } else {
