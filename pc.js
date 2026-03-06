@@ -1,334 +1,360 @@
-// === RETRO-OS (Canvas Fake Desktop System v2.1) ===
-// アイコンのタップバグ修正 ＆ アシスタント（イルカ）実装
+// === PIXEL KART: MADNESS (Fake 3D Racing) ===
+// 擬似PCプロジェクトは破棄され、カオスな疑似3Dレーシングへと生まれ変わった。
 
 const PCApp = {
-    windows: [],
-    icons: [
-        { id: 'net', title: 'NetSurf', x: 10, y: 10, col: '#00f', txt: '🌐' },
-        { id: 'file', title: 'FileDesk', x: 10, y: 60, col: '#da0', txt: '📁' },
-        { id: 'task', title: 'TaskMgr', x: 10, y: 110, col: '#666', txt: '⚙️' },
-        { id: 'calc', title: 'Calc', x: 10, y: 160, col: '#088', txt: '🧮' },
-        { id: 'sys', title: 'SysInfo', x: 10, y: 210, col: '#a0a', txt: '💻' },
-        { id: 'trash', title: 'Trash', x: 155, y: 235, col: '#444', txt: '🗑️' },
-        { id: 'dolphin', title: 'Assist', x: 155, y: 10, col: '#0af', txt: '🐬' } // ★ イルカを追加！
-    ],
-    dragTarget: null,
-    dragType: '', 
-    dragOffX: 0, dragOffY: 0,
-    prevPtr: false,
-    ptrStartX: 0, ptrStartY: 0,
-    isDragging: false, // ★ 追加：ドラッグかタップかを正確に判定するフラグ
-    bootTimer: 60,
-    startMenuOpen: false, 
+    st: 'title', // title, play, clear, gameover
+    stage: 1,    // 1:通常 2:砂漠 3:病気カオス
+    pos: 0,      // コースの進行距離
+    speed: 0,
+    maxSpeed: 150,
+    playerX: 0,  // -1 (左端) 〜 1 (右端)
+    
+    curve: 0,
+    trackCurve: 0,
+    
+    sprites: [], // 敵車やアイテムボックス
+    
+    // アイテム関連
+    item: 0, // 0:なし, 1:🍄ダッシュ, 2:⭐無敵, 3:⚡落雷
+    itemNames: ["", "🍄ダッシュ", "⭐無敵", "⚡落雷"],
+    itemTimer: 0, // 効果時間
+    
+    // カオスギミック用
+    chaosTimer: 0,
+    bgOffset: 0,
     
     init() {
-        this.windows = [];
-        this.dragTarget = null;
-        this.prevPtr = false;
-        this.isDragging = false;
-        this.bootTimer = 60;
-        this.startMenuOpen = false;
+        this.st = 'title';
+        this.stage = 1;
         BGM.stop();
-        
-        if (!SaveSys.data.osFiles) { SaveSys.data.osFiles = { 'README.TXT': 'RETRO-OS v2.1へようこそ！\nイルカのサポート機能が\n追加されました。' }; }
-        if (!SaveSys.data.trashFiles) SaveSys.data.trashFiles = {};
-        SaveSys.save();
     },
 
-    openApp(id) {
-        this.startMenuOpen = false;
-        let exist = this.windows.find(w => w.id === id);
-        if (exist) {
-            this.windows = this.windows.filter(w => w !== exist);
-            this.windows.push(exist);
-            return;
-        }
-
-        let w = { id: id, x: 20 + this.windows.length * 10, y: 20 + this.windows.length * 10, w: 150, h: 180, data: {} };
-        
-        if (id === 'net') { w.title = 'NetSurf (Wiki)'; w.data.text = "Wiki-API 接続完了。\nタップして検索キーワードを入力。"; }
-        if (id === 'file') { w.title = 'FileDesk (C:\\)'; }
-        if (id === 'task') { w.title = 'Task Manager'; w.w = 140; w.h = 140; }
-        if (id === 'calc') { w.title = 'Calculator'; w.w = 110; w.h = 150; w.data.val = '0'; }
-        if (id === 'sys') { w.title = 'System Info'; w.w = 140; w.h = 100; }
-        if (id === 'trash') { w.title = 'Recycle Bin'; w.w = 140; w.h = 140; }
-        if (id === 'dolphin') { w.title = 'Dolphin Assist'; w.w = 120; w.h = 100; w.data.msg = '何かわからないことは\nありますか？\n(タップして質問)'; }
-        
-        this.windows.push(w);
+    startStage(stg) {
+        this.st = 'play';
+        this.stage = stg;
+        this.pos = 0;
+        this.speed = 0;
+        this.playerX = 0;
+        this.sprites = [];
+        this.item = 0;
+        this.itemTimer = 0;
+        this.chaosTimer = 0;
+        BGM.play('action');
     },
 
     update() {
         if (keysDown.select) { switchApp(Menu); return; }
 
-        if (this.bootTimer > 0) { this.bootTimer--; return; }
-
-        const ptr = pointer;
-        const clicked = ptr.active && !this.prevPtr;
-        const released = !ptr.active && this.prevPtr;
-        
-        if (clicked) {
-            this.ptrStartX = ptr.x;
-            this.ptrStartY = ptr.y;
-            this.isDragging = false; // タップ開始時にフラグをリセット
-        }
-
-        // --- ドラッグ処理 ---
-        if (this.dragTarget) {
-            if (ptr.active) {
-                // 指が5px以上動いたら「ドラッグ」として判定
-                if (Math.hypot(ptr.x - this.ptrStartX, ptr.y - this.ptrStartY) > 5) {
-                    this.isDragging = true;
-                    this.dragTarget.x = ptr.x - this.dragOffX;
-                    this.dragTarget.y = ptr.y - this.dragOffY;
-                }
-            } else {
-                if (this.dragType === 'icon') {
-                    this.dragTarget.x = Math.max(0, Math.min(160, this.dragTarget.x));
-                    this.dragTarget.y = Math.max(0, Math.min(240, this.dragTarget.y));
-                }
-            }
-        }
-
-        // --- クリック・判定処理 ---
-        if (clicked && !this.dragTarget) {
-            if (this.startMenuOpen) {
-                if (ptr.x >= 2 && ptr.x <= 102 && ptr.y >= 140 && ptr.y <= 280) {
-                    let idx = Math.floor((280 - ptr.y) / 23);
-                    if (idx >= 0 && idx < this.icons.length) this.openApp(this.icons[this.icons.length - 1 - idx].id);
-                    this.startMenuOpen = false;
-                    return;
-                } else { this.startMenuOpen = false; }
-            }
-
-            if (ptr.x >= 2 && ptr.x <= 50 && ptr.y >= 282 && ptr.y <= 298) { this.startMenuOpen = !this.startMenuOpen; return; }
-
-            for (let i = this.windows.length - 1; i >= 0; i--) {
-                let w = this.windows[i];
-                if (ptr.x >= w.x + w.w - 18 && ptr.x <= w.x + w.w - 4 && ptr.y >= w.y + 4 && ptr.y <= w.y + 16) { this.windows.splice(i, 1); return; }
-                if (ptr.x >= w.x && ptr.x <= w.x + w.w && ptr.y >= w.y && ptr.y <= w.y + 20) {
-                    this.dragTarget = w; this.dragType = 'win';
-                    this.dragOffX = ptr.x - w.x; this.dragOffY = ptr.y - w.y;
-                    this.windows.push(this.windows.splice(i, 1)[0]); return;
-                }
-                if (ptr.x >= w.x && ptr.x <= w.x + w.w && ptr.y >= w.y && ptr.y <= w.y + w.h) {
-                    this.windows.push(this.windows.splice(i, 1)[0]);
-                    this.handleAppClick(this.windows[this.windows.length - 1], ptr.x - w.x, ptr.y - w.y);
-                    return;
-                }
-            }
-
-            for (let ic of this.icons) {
-                if (ptr.x >= ic.x && ptr.x <= ic.x + 36 && ptr.y >= ic.y && ptr.y <= ic.y + 40) {
-                    this.dragTarget = ic; this.dragType = 'icon';
-                    this.dragOffX = ptr.x - ic.x; this.dragOffY = ptr.y - ic.y;
-                    return;
-                }
-            }
-        }
-
-        // --- ★修正：指を離した時、ドラッグしていなければアプリを開く ---
-        if (released && this.dragTarget && this.dragType === 'icon') {
-            if (!this.isDragging) {
-                this.openApp(this.dragTarget.id);
-            }
-            this.dragTarget = null;
-        }
-
-        this.prevPtr = ptr.active;
-    },
-
-    handleAppClick(w, lx, ly) {
-        // 🐬 イルカ (お前を消す方法)
-        if (w.id === 'dolphin' && ly > 20) {
-            let q = prompt("イルカへの質問を入力してください:");
-            if (q) {
-                if (q.includes("お前を消す方法")) {
-                    w.data.msg = "............\n\n\nｻﾖｳﾅﾗ。";
-                    // 2秒後にOSから完全に消滅する
-                    setTimeout(() => {
-                        this.icons = this.icons.filter(i => i.id !== 'dolphin');
-                        this.windows = this.windows.filter(win => win.id !== 'dolphin');
-                    }, 2000);
-                } else {
-                    const errs = ["[ERROR] ｲﾙｶﾊ理解\nﾃﾞｷﾏｾﾝﾃﾞｼﾀ!", "[FATAL] 質問ﾉ意図ｶﾞ\n不明ﾃﾞｽ! ｶﾁｯ!", "[ERROR] ﾓｯﾄ分ｶﾘﾔｽｸ\n質問ｼﾃｸﾀﾞｻｲ!"];
-                    w.data.msg = errs[Math.floor(Math.random() * errs.length)];
-                }
-            }
-        }
-
-        if (w.id === 'net' && ly > 20) {
-            let q = prompt("NetSurf: 検索キーワードを入力\n(Wikipediaから概要を取得します)");
-            if (q) {
-                w.data.text = "[SEARCHING...] データベース照会中...";
-                const url = `https://ja.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&exchars=200&explaintext=1&titles=${encodeURIComponent(q)}&origin=*`;
-                fetch(url)
-                .then(r => r.json()).then(j => {
-                    const pages = j.query.pages;
-                    const pageId = Object.keys(pages)[0];
-                    if (pageId == "-1") w.data.text = "データが見つかりません。別の単語をお試しください。";
-                    else w.data.text = "【" + q + "】\n" + pages[pageId].extract;
-                }).catch(e => { w.data.text = "通信エラーが発生しました。"; });
-            }
-        }
-        else if (w.id === 'file' && ly > 20) {
-            if (ly > 25 && ly < 45) { 
-                let name = prompt("新しいファイル名を入力:");
-                if (name) { let content = prompt(`[${name}] の内容を入力:`); if (content !== null) { SaveSys.data.osFiles[name] = content; SaveSys.save(); } }
-            } else {
-                let files = Object.keys(SaveSys.data.osFiles);
-                let idx = Math.floor((ly - 50) / 20);
-                if (idx >= 0 && idx < files.length) {
-                    let fname = files[idx];
-                    let act = prompt(`ファイル [${fname}]\n内容: ${SaveSys.data.osFiles[fname]}\n\n編集する場合は新しい文字を入力。\n(削除する場合は "DEL" と入力)`);
-                    if (act === "DEL") { SaveSys.data.trashFiles[fname] = SaveSys.data.osFiles[fname]; delete SaveSys.data.osFiles[fname]; SaveSys.save(); } 
-                    else if (act) { SaveSys.data.osFiles[fname] = act; SaveSys.save(); }
-                }
-            }
-        }
-        else if (w.id === 'trash' && ly > 20) {
-            if (ly > 25 && ly < 45) {
-                if (confirm("ゴミ箱を空にしますか？(完全削除)")) { SaveSys.data.trashFiles = {}; SaveSys.save(); }
-            } else {
-                let files = Object.keys(SaveSys.data.trashFiles);
-                let idx = Math.floor((ly - 50) / 20);
-                if (idx >= 0 && idx < files.length) {
-                    let fname = files[idx];
-                    if (confirm(`[${fname}]\nこのファイルを元に戻しますか？`)) { SaveSys.data.osFiles[fname] = SaveSys.data.trashFiles[fname]; delete SaveSys.data.trashFiles[fname]; SaveSys.save(); }
-                }
-            }
-        }
-        else if (w.id === 'task' && ly > 20) {
-            let idx = Math.floor((ly - 25) / 20);
-            if (idx >= 0 && idx < this.windows.length) {
-                let target = this.windows[idx];
-                if (target.id !== 'task') { if (confirm(`プロセス [${target.title}] を強制終了しますか？`)) this.windows.splice(idx, 1); }
-            }
-        }
-        else if (w.id === 'calc' && ly > 40) {
-            let btns = ['7','8','9','/','4','5','6','*','1','2','3','-','C','0','=','+'];
-            let col = Math.floor((lx - 5) / 25); let row = Math.floor((ly - 45) / 25); let btnIdx = row * 4 + col;
-            if (btnIdx >= 0 && btnIdx < btns.length) {
-                let b = btns[btnIdx];
-                if (b === 'C') w.data.val = '0';
-                else if (b === '=') { try { w.data.val = eval(w.data.val).toString(); } catch(e) { w.data.val = 'ERR'; } }
-                else { w.data.val = w.data.val === '0' || w.data.val === 'ERR' ? b : w.data.val + b; }
-            }
-        }
-    },
-
-    draw() {
-        if (this.bootTimer > 0) {
-            ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
-            ctx.fillStyle = '#aaa'; ctx.font = '12px monospace';
-            ctx.fillText('BIOS Date 03/06/26', 10, 20);
-            ctx.fillText('Memory Test: ' + (60 - this.bootTimer) * 1024 + ' KB OK', 10, 40);
-            if (this.bootTimer < 20) ctx.fillText('Starting RETRO-OS...', 10, 70);
+        if (this.st === 'title') {
+            if (keysDown.a) this.startStage(1);
             return;
         }
 
-        ctx.fillStyle = '#008080'; ctx.fillRect(0, 0, 200, 300);
-
-        for (let ic of this.icons) {
-            ctx.fillStyle = ic.col; ctx.fillRect(ic.x, ic.y, 32, 32);
-            ctx.fillStyle = '#fff'; ctx.font = '16px monospace'; ctx.fillText(ic.txt, ic.x + 8, ic.y + 22);
-            ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText(ic.title, ic.x - 2, ic.y + 42);
+        if (this.st === 'clear') {
+            this.speed *= 0.95;
+            this.pos += this.speed;
+            if (keysDown.a) {
+                if (this.stage < 3) this.startStage(this.stage + 1);
+                else this.init(); // 全クリ
+            }
+            return;
+        }
+        
+        if (this.st === 'gameover') {
+            this.speed *= 0.9;
+            if (keysDown.a) this.startStage(this.stage); // リトライ
+            return;
         }
 
-        for (let w of this.windows) {
-            ctx.fillStyle = '#c0c0c0'; ctx.fillRect(w.x, w.y, w.w, w.h);
-            ctx.fillStyle = '#fff'; ctx.fillRect(w.x, w.y, w.w, 1); ctx.fillRect(w.x, w.y, 1, w.h);
-            ctx.fillStyle = '#444'; ctx.fillRect(w.x, w.y + w.h - 1, w.w, 1); ctx.fillRect(w.x + w.w - 1, w.y, 1, w.h);
-            
-            ctx.fillStyle = '#000080'; ctx.fillRect(w.x + 2, w.y + 2, w.w - 4, 18);
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px monospace'; ctx.fillText(w.title, w.x + 6, w.y + 14);
-            
-            ctx.fillStyle = '#c0c0c0'; ctx.fillRect(w.x + w.w - 18, w.y + 4, 14, 14);
-            ctx.fillStyle = '#fff'; ctx.fillRect(w.x + w.w - 18, w.y + 4, 14, 1); ctx.fillRect(w.x + w.w - 18, w.y + 4, 1, 14);
-            ctx.fillStyle = '#000'; ctx.fillRect(w.x + w.w - 5, w.y + 4, 1, 14); ctx.fillRect(w.x + w.w - 18, w.y + 17, 14, 1);
-            ctx.fillText('X', w.x + w.w - 14, w.y + 15);
+        // === プレイ中の処理 ===
 
-            ctx.save();
-            ctx.beginPath(); ctx.rect(w.x + 2, w.y + 20, w.w - 4, w.h - 22); ctx.clip();
+        // アイテム効果の減衰
+        if (this.itemTimer > 0) this.itemTimer--;
 
-            ctx.fillStyle = '#000'; ctx.font = '9px monospace';
-            
-            // 🐬 イルカの描画
-            if (w.id === 'dolphin') {
-                ctx.fillStyle = '#fff'; ctx.fillRect(w.x + 4, w.y + 24, w.w - 8, w.h - 28);
-                ctx.fillStyle = '#000'; 
-                ctx.fillText('🐬 ｲﾙｶ ｱｼｽﾀﾝﾄ', w.x + 8, w.y + 35);
-                this.wrapText(ctx, w.data.msg, w.x + 8, w.y + 55, w.w - 16, 12);
+        // アクセル＆ブレーキ
+        if (keys.a) {
+            let limit = (this.itemTimer > 0 && this.item === 1) ? this.maxSpeed * 1.5 : this.maxSpeed;
+            this.speed += 2;
+            if (this.speed > limit) this.speed = limit;
+        } else if (keys.b) {
+            this.speed -= 4; // ブレーキ
+        } else {
+            this.speed -= 1; // 惰性
+        }
+        if (this.speed < 0) this.speed = 0;
+
+        // 左右移動
+        if (keys.left) this.playerX -= 0.05 * (this.speed / this.maxSpeed);
+        if (keys.right) this.playerX += 0.05 * (this.speed / this.maxSpeed);
+
+        // カーブによる遠心力
+        this.playerX -= this.curve * 0.02 * (this.speed / this.maxSpeed);
+
+        // ダート（道外）の減速
+        if (Math.abs(this.playerX) > 1.2) {
+            if (this.speed > 50 && this.item !== 2) this.speed -= 3; // 無敵以外は減速
+            if (Math.abs(this.playerX) > 2.0) this.playerX = 2.0 * Math.sign(this.playerX);
+        }
+
+        // 進行
+        this.pos += this.speed;
+
+        // コースのカーブ生成
+        let section = Math.floor(this.pos / 1000);
+        if (this.stage === 1) this.trackCurve = Math.sin(section) * 0.5;
+        if (this.stage === 2) this.trackCurve = Math.sin(section * 1.5) * 1.0;
+        if (this.stage === 3) this.trackCurve = (Math.sin(section * 2) + Math.cos(section * 3)) * 1.5; // カオスカーブ
+        
+        // カーブを滑らかに補間
+        this.curve += (this.trackCurve - this.curve) * 0.05;
+        this.bgOffset -= this.curve * this.speed * 0.005;
+
+        // アイテム使用 (Bボタンに変更: Aはアクセル)
+        if (keysDown.b && this.item > 0 && this.itemTimer === 0) {
+            playSnd('combo');
+            this.itemTimer = 180; // 約3秒
+            if (this.item === 3) {
+                // ⚡落雷: 画面上の敵を全滅
+                this.sprites = this.sprites.filter(s => s.type !== 'enemy');
+                this.chaosTimer = 20; // 画面フラッシュ
+                playSnd('hit');
             }
-            if (w.id === 'net') {
-                ctx.fillStyle = '#fff'; ctx.fillRect(w.x + 4, w.y + 24, w.w - 8, w.h - 28);
-                ctx.fillStyle = '#000'; this.wrapText(ctx, w.data.text, w.x + 8, w.y + 36, w.w - 16, 12);
-            }
-            if (w.id === 'file') {
-                ctx.fillStyle = '#fff'; ctx.fillRect(w.x + 4, w.y + 24, w.w - 8, 20);
-                ctx.fillStyle = '#00f'; ctx.fillText('📝 ＋新規ファイル作成', w.x + 8, w.y + 38);
-                let files = Object.keys(SaveSys.data.osFiles);
-                ctx.fillStyle = '#000'; for (let i = 0; i < files.length; i++) ctx.fillText('📄 ' + files[i], w.x + 8, w.y + 60 + i * 20);
-            }
-            if (w.id === 'trash') {
-                ctx.fillStyle = '#aaa'; ctx.fillRect(w.x + 4, w.y + 24, w.w - 8, 20);
-                ctx.fillStyle = '#f00'; ctx.fillText('🔥 ゴミ箱を空にする', w.x + 8, w.y + 38);
-                let files = Object.keys(SaveSys.data.trashFiles);
-                ctx.fillStyle = '#000'; for (let i = 0; i < files.length; i++) ctx.fillText('🗑️ ' + files[i], w.x + 8, w.y + 60 + i * 20);
-            }
-            if (w.id === 'task') {
-                ctx.fillText('起動中のプロセス一覧:', w.x + 6, w.y + 30);
-                for (let i = 0; i < this.windows.length; i++) {
-                    let tw = this.windows[i]; ctx.fillStyle = tw.id === 'task' ? '#888' : '#f00'; ctx.fillText('▶ ' + tw.title, w.x + 6, w.y + 45 + i * 20);
-                    if (tw.id !== 'task') ctx.fillText('[KILL]', w.x + w.w - 35, w.y + 45 + i * 20);
+        }
+        if (this.itemTimer === 0 && this.item !== 0) {
+            if (this.item === 1 || this.item === 3) this.item = 0; // 効果終了で消費
+            if (this.item === 2) this.item = 0; // 無敵終了
+        }
+
+        // スプライト（敵・アイテム）の生成
+        if (Math.random() < 0.03 + (this.stage * 0.01)) {
+            let isItem = Math.random() < 0.1;
+            this.sprites.push({
+                type: isItem ? 'item' : 'enemy',
+                x: (Math.random() - 0.5) * 2.0, // 道の左右どこか
+                z: 1500, // 遠くから出現
+                s: isItem ? 0 : this.maxSpeed * (0.4 + Math.random() * 0.4) // 敵は少し遅い
+            });
+        }
+
+        // スプライトの更新と当たり判定
+        for (let i = this.sprites.length - 1; i >= 0; i--) {
+            let s = this.sprites[i];
+            s.z -= (this.speed - (s.type === 'enemy' ? s.s : 0)); // 自分との相対速度
+
+            // 当たり判定 (Zが近く、X座標が近い場合)
+            if (s.z > 0 && s.z < 100 && Math.abs(s.x - this.playerX) < 0.4) {
+                if (s.type === 'item') {
+                    // アイテムボックス取得
+                    this.item = Math.floor(Math.random() * 3) + 1; // 1, 2, 3のどれか
+                    playSnd('sel');
+                    this.sprites.splice(i, 1);
+                    continue;
+                } else if (s.type === 'enemy') {
+                    // 敵に衝突
+                    if (this.item === 2 && this.itemTimer > 0) {
+                        // 無敵状態なら敵を吹き飛ばす
+                        playSnd('hit');
+                        this.sprites.splice(i, 1);
+                        screenShake(3);
+                        continue;
+                    } else {
+                        // クラッシュ！
+                        this.speed = 0;
+                        playSnd('hit');
+                        this.chaosTimer = 10; // 画面揺れ
+                    }
                 }
             }
-            if (w.id === 'calc') {
-                ctx.fillStyle = '#fff'; ctx.fillRect(w.x + 4, w.y + 24, w.w - 8, 16);
-                ctx.fillStyle = '#000'; ctx.textAlign = 'right'; ctx.fillText(w.data.val, w.x + w.w - 8, w.y + 35); ctx.textAlign = 'left';
-                let btns = ['7','8','9','/','4','5','6','*','1','2','3','-','C','0','=','+'];
-                for (let i = 0; i < 16; i++) { let bx = w.x + 5 + (i % 4) * 25; let by = w.y + 45 + Math.floor(i / 4) * 25; ctx.fillStyle = '#ddd'; ctx.fillRect(bx, by, 22, 22); ctx.fillStyle = '#000'; ctx.fillText(btns[i], bx + 8, by + 14); }
+            
+            // 通過したものは消す
+            if (s.z < -100 || s.z > 2000) {
+                this.sprites.splice(i, 1);
             }
-            if (w.id === 'sys') {
-                ctx.fillText(`USER: ${SaveSys.data.playerName}`, w.x + 6, w.y + 40);
-                ctx.fillText(`MEMORY: 1979 KB USED`, w.x + 6, w.y + 55);
-                ctx.fillText(`OS: RETRO-OS v2.1`, w.x + 6, w.y + 70);
-                ctx.fillText(`TIME: ${new Date().toLocaleTimeString()}`, w.x + 6, w.y + 85);
-            }
-            ctx.restore(); 
         }
 
-        ctx.fillStyle = '#c0c0c0'; ctx.fillRect(0, 280, 200, 20); ctx.fillStyle = '#fff'; ctx.fillRect(0, 280, 200, 1);
-        
-        if (this.startMenuOpen) {
-            ctx.fillStyle = '#aaa'; ctx.fillRect(2, 282, 48, 16); ctx.fillStyle = '#000'; ctx.fillRect(2, 282, 48, 1); ctx.fillRect(2, 282, 1, 16);
-        } else {
-            ctx.fillStyle = '#ddd'; ctx.fillRect(2, 282, 48, 16); ctx.fillStyle = '#fff'; ctx.fillRect(2, 282, 48, 1); ctx.fillRect(2, 282, 1, 16);
-        }
-        ctx.fillStyle = '#000'; ctx.fillText('◆ START', 6, 294); ctx.fillText(new Date().getHours() + ':' + String(new Date().getMinutes()).padStart(2, '0'), 165, 294);
-
-        if (this.startMenuOpen) {
-            ctx.fillStyle = '#c0c0c0'; ctx.fillRect(2, 140, 100, 140); ctx.fillStyle = '#fff'; ctx.fillRect(2, 140, 100, 1); ctx.fillRect(2, 140, 1, 140);
-            ctx.fillStyle = '#444'; ctx.fillRect(2, 279, 100, 1); ctx.fillRect(101, 140, 1, 140);
-            ctx.fillStyle = '#000080'; ctx.fillRect(4, 142, 16, 136); ctx.save(); ctx.translate(14, 270); ctx.rotate(-Math.PI / 2);
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px monospace'; ctx.fillText('RETRO-OS', 0, 0); ctx.restore();
-            for (let i = 0; i < this.icons.length; i++) { let ic = this.icons[this.icons.length - 1 - i]; let itemY = 257 - i * 23; ctx.fillStyle = '#000'; ctx.font = '10px monospace'; ctx.fillText(ic.txt + ' ' + ic.title, 25, itemY + 10); }
+        // ステージクリア判定 (Stage 1: 15000, 2: 20000, 3: 25000)
+        let goalLength = 10000 + (this.stage * 5000);
+        if (this.pos > goalLength) {
+            this.st = 'clear';
+            playSnd('combo');
         }
 
-        if (pointer.active) {
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(pointer.x, pointer.y); ctx.lineTo(pointer.x + 10, pointer.y + 10); ctx.lineTo(pointer.x + 4, pointer.y + 12); ctx.lineTo(pointer.x, pointer.y + 16); ctx.fill();
-            ctx.strokeStyle = '#000'; ctx.stroke();
+        // カオスギミック進行 (Stage 3限定の病気演出)
+        if (this.stage === 3) {
+            if (Math.random() < 0.01) this.chaosTimer = 30; // 突然のグリッチ
         }
+        if (this.chaosTimer > 0) this.chaosTimer--;
     },
-    
-    wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-        let line = '';
-        for (let n = 0; n < text.length; n++) {
-            let char = text[n];
-            if (char === '\n') { ctx.fillText(line, x, y); line = ''; y += lineHeight; continue; }
-            let testLine = line + char;
-            if (ctx.measureText(testLine).width > maxWidth && n > 0) { ctx.fillText(line, x, y); line = char; y += lineHeight; } 
-            else { line = testLine; }
+
+    draw() {
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
+
+        if (this.st === 'title') {
+            ctx.fillStyle = '#f00'; ctx.font = 'bold 20px monospace';
+            ctx.fillText('PIXEL KART', 40, 100);
+            ctx.fillStyle = '#ff0'; ctx.fillText('MADNESS', 60, 125);
+            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+            ctx.fillText('A: アクセル  B: アイテム', 30, 180);
+            ctx.fillText('◀ ▶: ハンドル', 60, 200);
+            if (Math.floor(Date.now() / 500) % 2 === 0) ctx.fillText('PRESS [A] TO START', 45, 240);
+            return;
         }
-        ctx.fillText(line, x, y);
+
+        // === 疑似3D 道路描画アルゴリズム ===
+        
+        // 色設定 (ステージごと)
+        let colors = {
+            sky: ['#4bf', '#002', '#200'][this.stage - 1],
+            ground1: ['#2a2', '#a84', '#111'][this.stage - 1],
+            ground2: ['#181', '#862', '#000'][this.stage - 1],
+            road1: ['#666', '#555', '#303'][this.stage - 1],
+            road2: ['#555', '#444', '#202'][this.stage - 1],
+            rumble1: ['#fff', '#f00', '#0ff'][this.stage - 1],
+            rumble2: ['#f00', '#fff', '#f0f'][this.stage - 1]
+        };
+
+        // カオスモードの背景色オーバーライド
+        if (this.chaosTimer > 0 || (this.stage === 3 && this.item === 2 && this.itemTimer > 0)) {
+            let hue = (Date.now() / 5) % 360;
+            colors.sky = `hsl(${hue}, 100%, 20%)`;
+            colors.road1 = `hsl(${hue + 180}, 100%, 30%)`;
+            colors.ground1 = `hsl(${hue + 90}, 100%, 40%)`;
+        }
+
+        // 空と背景（疑似スクロール）
+        ctx.fillStyle = colors.sky; ctx.fillRect(0, 0, 200, 150);
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 5; i++) {
+            let bx = (this.bgOffset + i * 80) % 200;
+            if (bx < 0) bx += 200;
+            if (this.stage === 1) ctx.fillText('☁', bx, 50 + (i % 2) * 20);
+            if (this.stage === 2) ctx.fillText('★', bx, 50 + (i % 2) * 20);
+            if (this.stage === 3) ctx.fillText('👁', bx, 50 + Math.sin(Date.now()/100)*20); // 病気
+        }
+
+        let roadWidth = 100;
+        let segLength = 20;
+
+        // 手前から奥へ（画面下から中央へ）向かって1行ずつ描画
+        for (let y = 150; y < 300; y++) {
+            // カオスギミック：道路が波打つ
+            let wave = 0;
+            if (this.stage === 3) wave = Math.sin((y + this.pos * 0.1) * 0.05) * (this.chaosTimer > 0 ? 20 : 5);
+
+            // Z座標 (遠近法)
+            let z = 150 / (y - 149);
+            
+            // 描画する行の模様を決定 (Zと進行距離を足してゼブラ柄を作る)
+            let seg = Math.floor((this.pos + z * 100) / segLength);
+            
+            let dx = this.curve * z * z * 0.5 + wave; // カーブによるXのズレ
+            let px = this.playerX * roadWidth / z;    // プレイヤー位置によるズレ
+            let cx = 100 - px + dx;                   // 画面上の中心X
+
+            let w = roadWidth / z;                    // 画面上の道幅
+
+            // 描画
+            ctx.fillStyle = (seg % 2 === 0) ? colors.ground1 : colors.ground2;
+            ctx.fillRect(0, y, 200, 1); // 草地
+
+            ctx.fillStyle = (seg % 2 === 0) ? colors.rumble1 : colors.rumble2;
+            ctx.fillRect(cx - w * 1.2, y, w * 2.4, 1); // 縁石
+
+            ctx.fillStyle = (seg % 2 === 0) ? colors.road1 : colors.road2;
+            ctx.fillRect(cx - w, y, w * 2, 1); // 道路
+        }
+
+        // スプライト（敵やアイテム）の描画
+        // Z値が大きい（奥にある）ものから順に描画するためソート
+        let sortedSprites = [...this.sprites].sort((a, b) => b.z - a.z);
+        
+        for (let s of sortedSprites) {
+            if (s.z < 10) continue; // 近すぎる（カメラの後ろ）は見えない
+            
+            // 遠近法で画面上の座標とサイズを計算
+            let scale = 100 / s.z;
+            let cx = 100 - (this.playerX * roadWidth * scale) + (s.x * roadWidth * scale);
+            // カーブの影響も加味
+            cx += this.curve * (s.z/100) * (s.z/100) * 0.5;
+            
+            let cy = 150 + (150 * scale); // y=150が地平線
+            let sw = 40 * scale;
+            let sh = 40 * scale;
+
+            if (s.type === 'enemy') {
+                ctx.fillStyle = '#000'; ctx.fillRect(cx - sw/2, cy - sh, sw, sh); // タイヤ影
+                ctx.fillStyle = '#f00'; ctx.fillRect(cx - sw/2 + 2, cy - sh + 2, sw - 4, sh - 10); // 車体
+                ctx.fillStyle = '#ff0'; ctx.fillRect(cx - sw/2 + 4, cy - sh + 10, 8 * scale, 8 * scale); // テールランプ
+            } else if (s.type === 'item') {
+                ctx.fillStyle = (Math.floor(Date.now() / 100) % 2 === 0) ? '#ff0' : '#f0f';
+                ctx.fillRect(cx - sw/2, cy - sh, sw, sh);
+                ctx.fillStyle = '#000'; ctx.font = `bold ${Math.floor(20*scale)}px monospace`;
+                ctx.fillText('?', cx - sw/4, cy - sh/4);
+            }
+        }
+
+        // プレイヤー自身の車の描画
+        let pWidth = 40; let pHeight = 30;
+        let bounce = (this.speed > 0) ? Math.sin(Date.now() / 50) * 2 : 0;
+        
+        ctx.fillStyle = '#000'; ctx.fillRect(100 - pWidth/2, 270 - pHeight + bounce, pWidth, pHeight);
+        
+        // アイテム無敵中の光
+        if (this.item === 2 && this.itemTimer > 0) {
+            ctx.fillStyle = `hsl(${(Date.now()/5)%360}, 100%, 50%)`;
+        } else {
+            ctx.fillStyle = '#00f'; 
+        }
+        ctx.fillRect(100 - pWidth/2 + 2, 270 - pHeight + 2 + bounce, pWidth - 4, pHeight - 8);
+        ctx.fillStyle = '#f00'; ctx.fillRect(100 - 10, 270 - 15 + bounce, 20, 10); // ランプ
+
+        // UI描画
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
+        ctx.fillText(`STAGE ${this.stage}`, 5, 15);
+        ctx.fillText(`${Math.floor(this.speed)} km/h`, 5, 30);
+        
+        // 進行度バー
+        let goal = 10000 + (this.stage * 5000);
+        let prog = Math.min(this.pos / goal, 1.0);
+        ctx.strokeStyle = '#fff'; ctx.strokeRect(5, 40, 100, 5);
+        ctx.fillStyle = '#0f0'; ctx.fillRect(5, 40, 100 * prog, 5);
+
+        // アイテム表示枠
+        ctx.strokeStyle = '#fff'; ctx.strokeRect(150, 5, 40, 40);
+        if (this.item > 0) {
+            ctx.font = '24px monospace';
+            let icon = ["", "🍄", "⭐", "⚡"][this.item];
+            ctx.fillText(icon, 158, 32);
+            ctx.font = '8px monospace';
+            ctx.fillText(this.itemNames[this.item], 150, 55);
+            // アイテムタイマーゲージ
+            if (this.itemTimer > 0) {
+                ctx.fillStyle = '#0ff'; ctx.fillRect(150, 48, 40 * (this.itemTimer/180), 3);
+            }
+        }
+
+        // メッセージ
+        if (this.st === 'clear') {
+            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 100, 200, 100);
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
+            if (this.stage < 3) {
+                ctx.fillText('STAGE CLEAR!', 45, 140);
+                ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('PRESS [A] TO NEXT', 50, 170);
+            } else {
+                ctx.fillText('ALL CLEAR!!', 50, 140);
+                ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('YOU ARE RACING GOD.', 40, 170);
+            }
+        }
+        if (this.st === 'gameover') {
+            ctx.fillStyle = '#f00'; ctx.font = 'bold 20px monospace';
+            ctx.fillText('CRASHED!', 60, 140);
+        }
+        
+        // カオスエフェクト（画面反転）
+        if (this.chaosTimer > 15 && this.stage === 3) {
+            ctx.globalCompositeOperation = 'difference';
+            ctx.fillStyle = '#fff'; ctx.fillRect(0,0,200,300);
+            ctx.globalCompositeOperation = 'source-over';
+        }
     }
 };
