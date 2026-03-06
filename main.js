@@ -1,4 +1,4 @@
-// === CORE SYSTEM (8in1 Ultimate Customization Edition) ===
+// === CORE SYSTEM (RETRO-OS Integration Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -40,7 +40,9 @@ const SaveSys = {
         actLives: d.actLives||5, 
         actSeed: d.actSeed||1, 
         rhythm: d.rhythm||{easy:0,normal:0,hard:0}, 
-        logs: d.logs||[] 
+        logs: d.logs||[],
+        osFiles: d.osFiles||null,
+        trashFiles: d.trashFiles||{}
     }; 
   })(),
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
@@ -142,20 +144,30 @@ let shakeTimer = 0; function screenShake(i = 2) { shakeTimer = i; }
 function applyShake() { if (shakeTimer > 0) { ctx.save(); ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; } }
 function resetShake() { if (shakeTimer >= 0) ctx.restore(); }
 
-let transTimer = 0; let nextApp = null; function switchApp(app) { nextApp = app; transTimer = 20; playSnd('sel'); }
+let transTimer = 0; let nextApp = null; 
+// ★ 修正：アプリ切り替え時に画面の変形クラスを確実にリセット！
+function switchApp(app) { 
+    nextApp = app; transTimer = 20; playSnd('sel'); 
+    document.body.className = '';
+    document.getElementById('gameboy').className = '';
+}
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
 // ============================================
-// メニュー画面 (PCを9つ目に追加！)
+// メニュー画面
 // ============================================
 const Menu = {
   cur: 0, 
-  // ★ ここに「仮想PC (Windows)」を追加
   apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'RETRO-OS', 'システム設定', '王様の間'], 
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#888', '#fa0'],
   holdTimer: 0,
   
-  init() { this.cur = 0; this.holdTimer = 0; BGM.play('menu'); },
+  init() { 
+      this.cur = 0; this.holdTimer = 0; BGM.play('menu'); 
+      // ★ 念のためメニュー起動時にも変形リセット
+      document.body.className = '';
+      document.getElementById('gameboy').className = '';
+  },
   
   update() {
     if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
@@ -173,7 +185,7 @@ const Menu = {
             typeof Musou !== 'undefined' ? Musou : null, 
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
-            typeof PCApp !== 'undefined' ? PCApp : null, // ★ PCアプリの紐付け
+            typeof PCApp !== 'undefined' ? PCApp : null, // RETRO-OS
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -256,27 +268,6 @@ const Settings = {
     ctx.fillStyle = '#112'; ctx.fillRect(0, 270, 200, 30);
     ctx.fillStyle = '#666'; ctx.font = '9px monospace'; 
     ctx.fillText('SELECT/B: 戻る  ◀▶: 調整', 30, 285);
-  }
-};
-
-const Ranking = {
-  mode: 'n', input: false, name: '', c: 0, mc: 0, chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ',
-  init() { if (!this.input) this.mode = 'n'; this.c = 0; this.mc = 0; },
-  update() {
-    if (!this.input && (keysDown.select || keysDown.b)) { switchApp(Menu); return; } if (this.input && keysDown.select) { this.input = false; switchApp(Menu); return; }
-    if (!this.input) { if (keysDown.left || keysDown.right) { this.mode = this.mode === 'n' ? 'h' : 'n'; playSnd('sel'); } if (keysDown.a) { this.input = true; this.name = SaveSys.data.playerName; this.c = 0; this.mc = 0; playSnd('jmp'); } } else {
-      if (this.mc === 0) { if (keysDown.right) { this.c = (this.c + 1) % this.chars.length; playSnd('sel'); } if (keysDown.left) { this.c = (this.c - 1 + this.chars.length) % this.chars.length; playSnd('sel'); } if (keysDown.down) { let n = this.c + 10; if (n >= this.chars.length) this.mc = 1; else this.c = n; playSnd('sel'); } if (keysDown.up) { let n = this.c - 10; if (n >= 0) { this.c = n; playSnd('sel'); } } if (keysDown.a && this.name.length < 10) { this.name += this.chars[this.c]; playSnd('jmp'); } if (keysDown.b && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else if (this.mc === 1) { if (keysDown.up) { this.mc = 0; playSnd('sel'); } if (keysDown.down) { this.mc = 2; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { this.name = this.name.slice(0, -1); playSnd('hit'); } } else { if (keysDown.up) { this.mc = 1; playSnd('sel'); } if (keysDown.a && this.name.length > 0) { SaveSys.data.playerName = this.name; SaveSys.save(); this.input = false; playSnd('combo'); switchApp(Settings); } }
-    }
-  },
-  draw() {
-    ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
-    if (!this.input) {
-    } else {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 14px monospace'; ctx.fillText('名前入力', 65, 25); ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.name + '_', 100 - (this.name.length + 1) * 4.5, 50); ctx.font = '11px monospace';
-      for (let i = 0; i < this.chars.length; i++) { const x = 15 + (i % 10) * 17; const y = 90 + Math.floor(i / 10) * 18; if (i === this.c && this.mc === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x - 2, y - 13, 14, 15); ctx.fillStyle = '#0f0'; } else { ctx.fillStyle = '#aaa'; } ctx.fillText(this.chars[i], x, y); }
-      ctx.fillStyle = this.mc === 1 ? '#f00' : '#800'; ctx.fillRect(25, 175, 70, 22); ctx.strokeStyle = this.mc === 1 ? '#fff' : '#666'; ctx.strokeRect(25, 175, 70, 22); ctx.fillStyle = this.mc === 1 ? '#fff' : '#ccc'; ctx.fillText('DELETE', 30, 191);
-      const okEn = this.name.length > 0; ctx.fillStyle = this.mc === 2 ? (okEn ? '#0f0' : '#444') : (okEn ? '#080' : '#222'); ctx.fillRect(105, 175, 70, 22); ctx.strokeStyle = this.mc === 2 ? '#fff' : '#666'; ctx.strokeRect(105, 175, 70, 22); ctx.fillStyle = this.mc === 2 ? '#fff' : (okEn ? '#ccc' : '#666'); ctx.fillText('OK', 130, 191);
-    }
   }
 };
 
