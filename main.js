@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Safety Net & Texture Engine Fixed) ===
+// === CORE SYSTEM (Safety Net & Texture Fix Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -127,28 +127,37 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-// ★ 復旧：真のレトロドット描画エンジン
-function drawSprite(x, y, color, tex, scale = 1, flip = false) {
-  if (!tex) return;
-  let t = Array.isArray(tex) ? tex[Math.floor(Date.now() / 200) % tex.length] : tex;
-  ctx.save();
-  ctx.translate(x, y);
-  if (flip) { ctx.scale(-1, 1); ctx.translate(-8 * scale, 0); }
+// ★ 復旧＆修正：ドット絵テクスチャ崩壊の原因（0番パレット除外）を取り除いた完全版！
+function drawSprite(a, b, c, d, e) {
+  let targetCtx = ctx, id, x, y, scale = 1, flip = false;
   
-  // レトロカラーパレット (16進数の文字と色の対応)
-  const pal = { '1':'#00f', '2':'#0f0', '4':'#f00', '5':'#f0f', '6':'#ff0', '8':'#888', '9':'#444', 'a':'#fa0', 'b':'#0ff', 'c':'#0ff', 'e':'#840', 'f':'#000' };
+  if (typeof a === 'string' || (a && a.d)) {
+    id = a; x = b; y = c; scale = d || 1; flip = e || false;
+  } else {
+    targetCtx = a; id = b; x = c; y = d; scale = e || 1; flip = arguments[5] || false;
+  }
   
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      let p = t[r * 8 + c];
-      if (p && p !== '0') {
-        // '3' の部分は引数で指定されたベースカラーに、それ以外はパレットの色になる
-        ctx.fillStyle = p === '3' ? color : (pal[p] || color);
-        ctx.fillRect(c * scale, r * scale, scale, scale);
+  let s = typeof id === 'string' ? ((typeof sprites !== 'undefined' ? sprites[id] : null) || (typeof SPRITES !== 'undefined' ? SPRITES[id] : null)) : id;
+  if (!s || !s.d) return;
+  
+  targetCtx.save();
+  targetCtx.translate(x, y);
+  if (flip) { 
+      targetCtx.scale(-1, 1); 
+      targetCtx.translate(-s.w * scale, 0); 
+  }
+  
+  for (let r = 0; r < s.h; r++) {
+    for (let col = 0; col < s.w; col++) {
+      let p = s.d[r * s.w + col];
+      // ★ ピリオドと空白以外は全て描画する（0番の黒色も透過させない！）
+      if (p !== '.' && p !== ' ') {
+        targetCtx.fillStyle = (s.pal && s.pal[p]) ? s.pal[p] : '#000'; // 安全装置
+        targetCtx.fillRect(col * scale, r * scale, scale, scale);
       }
     }
   }
-  ctx.restore();
+  targetCtx.restore();
 }
 
 const bgThemes = [
@@ -337,7 +346,10 @@ function loop() {
 
   } catch (err) {
     console.error(err); 
-    ctx.restore(); ctx.restore(); ctx.restore(); 
+    
+    // ★ エラー時に画面設定を完全にクリーンリセットする
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
     
     ctx.fillStyle = "rgba(150,0,0,0.95)"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height); 
