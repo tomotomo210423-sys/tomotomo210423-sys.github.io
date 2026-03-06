@@ -7,10 +7,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
 <title>8in1 RETRO SYSTEM</title>
-
-<link rel="icon" href="icon.png" type="image/png">
-<link rel="apple-touch-icon" href="icon.png">
-
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100dvh; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; width: 100vw; height: 100dvh; }
@@ -36,29 +32,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   transform: rotate(-10deg); pointer-events: none;
 }
 
-#gameboy.mode-slot { 
-  background: linear-gradient(135deg, #600 0%, #200 100%); border-radius: 15px 15px 50px 50px; 
-  box-shadow: inset -5px -5px 15px rgba(0,0,0,0.8), inset 3px 3px 10px rgba(255,100,100,0.2), 0 0 40px rgba(255,50,50,0.6); 
-}
-#gameboy.mode-slot #screen-container { background: #100; border-color: #ffd700; box-shadow: inset 0 0 20px rgba(255,215,0,0.2); margin: 25px 20px 10px 20px; }
-#gameboy.mode-slot #controls { background: transparent; }
-#gameboy.mode-slot #classic-controls { opacity: 0; transform: translateY(100px); pointer-events: none; }
-#gameboy.mode-slot #slot-controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
-
-#gameboy.mode-abyss {
-  max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row-reverse;
-  background: linear-gradient(135deg, #1a0022 0%, #000 100%); 
-  box-shadow: inset -5px -5px 15px rgba(0,0,0,0.9), inset 3px 3px 10px rgba(200,0,255,0.1), 0 0 40px rgba(150,0,255,0.5); 
-  border-radius: 20px;
-}
-#gameboy.mode-abyss #screen-container { margin: 15px 15px 15px 0; background: #000; border-color: #60a; box-shadow: inset 0 0 30px rgba(100,0,200,0.5); }
-#gameboy.mode-abyss #controls { width: 160px; height: 100%; border-radius: 20px 0 0 20px; background: transparent; }
-#gameboy.mode-abyss #dpad { top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
-#gameboy.mode-abyss #action-buttons { opacity: 0; pointer-events: none; }
-#gameboy.mode-abyss #sys-buttons { bottom: 15px; width: 100%; }
-#gameboy.mode-abyss #sys-buttons .s-btn { background: #306; }
-#gameboy.mode-abyss #gameCanvas { aspect-ratio: 400 / 240; box-shadow: none; border-radius: 0; }
-
 #boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
 #boot.hidden { opacity: 0; }
 .boot-text { font-size: 10px; margin: 4px 0; }
@@ -70,7 +43,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); 
   z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; 
 }
-.mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 
 #controls { height: 300px; position: relative; background: transparent; border-radius: 0 0 20px 20px; overflow: hidden; z-index: 20; transition: all 0.8s; }
 #classic-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
@@ -118,15 +90,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 }
 .s-btn:active { background: #111; transform: rotate(-15deg) translateY(2px); box-shadow: inset 2px 2px 5px rgba(0,0,0,0.8); }
 .s-label { font-size: 12px; color: #aaa; font-weight: bold; margin-top: 8px; transition: color 0.5s; }
-.mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; } 
-
-#slot-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transform: translateY(100px); pointer-events: none; transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; padding-bottom: 30px; }
-.slot-row { display: flex; gap: 30px; justify-content: center; align-items: center; width: 100%; }
-.slot-btn { border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #fff; cursor: pointer; box-shadow: 0 6px 0 #222, 0 10px 15px rgba(0,0,0,0.6); text-shadow: 1px 1px 2px #000; touch-action: none; transition: transform 0.1s, box-shadow 0.1s; }
-.slot-btn:active { transform: translateY(6px); box-shadow: 0 0 0 #222, 0 4px 5px rgba(0,0,0,0.6); }
-#btn-slot-bet { width: 60px; height: 60px; background: radial-gradient(circle, #00f, #005); border: 4px solid #00a; font-size: 14px; }
-#btn-slot-max { width: 60px; height: 60px; background: radial-gradient(circle, #0a0, #050); border: 4px solid #080; font-size: 14px; }
-#btn-slot-spin { width: 90px; height: 90px; background: radial-gradient(circle, #f00, #a00); border: 6px solid #c00; font-size: 22px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -140,14 +103,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
     </div>
     
     <canvas id="gameCanvas" width="200" height="300"></canvas>
-    
-    <div id="v86-container" style="display: none; width: 100%; height: 100%; background: #000; position: absolute; top: 0; left: 0; z-index: 10; align-items: center; justify-content: center; overflow: hidden;">
-        <div id="v86-screen" style="transform: scale(0.65); transform-origin: center center;">
-            <div style="white-space: pre; font: 14px monospace; line-height: 14px; color: #fff;"></div>
-            <canvas style="display: none"></canvas>
-        </div>
-    </div>
-    
   </div>
   
   <div id="controls">
@@ -164,16 +119,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
         <div class="btn-label" id="label-b">B</div>
         <div class="a-btn" id="btn-a">A</div>
         <div class="btn-label" id="label-a">A</div>
-      </div>
-    </div>
-
-    <div id="slot-controls">
-      <div class="slot-row">
-        <div class="slot-btn" id="btn-slot-bet">BET</div>
-        <div class="slot-btn" id="btn-slot-max">MAX</div>
-      </div>
-      <div class="slot-row">
-        <div class="slot-btn" id="btn-slot-spin">SPIN / STOP</div>
       </div>
     </div>
 
@@ -196,8 +141,6 @@ const bootInterval = setInterval(() => {
   }
 }, 100);
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/v86@latest/build/libv86.js"></script>
 
 <script src="sprites.js"></script>
 <script src="pc.js"></script>
