@@ -239,9 +239,10 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
+    // ★ 9in1 に書き換え！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('8in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v14.0', 60, 40);
+    ctx.fillText('9in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v15.0', 60, 40);
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
