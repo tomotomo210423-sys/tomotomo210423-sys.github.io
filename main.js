@@ -109,9 +109,6 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-// ============================================
-// ★ ここにテクスチャを完全直書き（ハードコーディング）
-// ============================================
 window.sprs = {
     player: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
     heroNew: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
@@ -127,7 +124,6 @@ const universalPal = {
     'd': '#840', 'e': '#8f8', 'f': '#88f'
 };
 
-// ★ バグを完全に排除した最強のドット絵描画関数
 function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     let targetCtx = ctx, x, y, color, spriteObj, scale=1, flip=false;
     
@@ -149,7 +145,6 @@ function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     for (let r = 0; r < s.h; r++) {
         for (let col = 0; col < s.w; col++) {
             let p = s.d[r * s.w + col];
-            
             if (p === '.' || p === ' ' || p === '0') continue;
             
             let fillCol = color || '#fff';
@@ -187,11 +182,13 @@ function applyShake() {
 }
 function resetShake() { if (isShaking) { ctx.restore(); isShaking = false; } }
 
-let transTimer = 0; let nextApp = null; 
+// ★ メニューに戻った時にキャンバスの解像度を 200x300 に戻す魔法！
 function switchApp(app) { 
     nextApp = app; transTimer = 20; playSnd('sel'); 
     document.body.className = '';
     document.getElementById('gameboy').className = '';
+    canvas.width = 200; 
+    canvas.height = 300;
 }
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
@@ -200,7 +197,6 @@ function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(le
 // ============================================
 const Menu = {
   cur: 0, 
-  // ★ 10in1 メニュー追加！
   apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'システム設定', '王様の間'], 
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#888', '#fa0'],
   holdTimer: 0,
@@ -209,6 +205,8 @@ const Menu = {
       this.cur = 0; this.holdTimer = 0; BGM.play('menu'); 
       document.body.className = '';
       document.getElementById('gameboy').className = '';
+      canvas.width = 200; // 念のためここでもリセット
+      canvas.height = 300;
   },
   
   update() {
@@ -228,7 +226,7 @@ const Menu = {
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
-            typeof Biotope !== 'undefined' ? Biotope : null, // ★ BIOTOPE起動
+            typeof Biotope !== 'undefined' ? Biotope : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -239,7 +237,6 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
-    // ★ 10in1 に書き換え！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
     ctx.fillText('10in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
     ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.0', 60, 40);
