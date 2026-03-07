@@ -1,10 +1,12 @@
-// === PIXEL BIOTOPE - AI EVOLUTION (Instinct & Balance Edition) ===
-// 人類に「本能(初期Q値)」を与え、ウサギの繁殖速度など生態系バランスを調整！
+// === PIXEL BIOTOPE - AI EVOLUTION (Performance & Generation Edition) ===
+// 処理落ち対策の最大数制限と「寿命（老衰）」システムを追加した安定稼働版！
 
 const Biotope = {
     grid: [], entities: [], logs: [], 
     W: 50, H: 60, cellSize: 4, 
     frame: 0, speed: 1,
+    
+    maxEntities: 150, // ★ 処理落ちを防ぐための「世界の定員」
     
     pals: [
         {id: 3, type:'M', name: '🪨土(整地)', col: '#853'},
@@ -31,40 +33,20 @@ const Biotope = {
         
         this.generateWorld();
 
-        // ★ 人類の脳（Qテーブル）の初期化と「本能(DNA)」の注入
         this.Q = Array(8).fill(0).map(() => Array(12).fill(0));
         this.injectInstincts();
         
-        this.addLog("WORLD GENERATED. ECOSYSTEM BALANCED.");
-        this.addLog("人類は「本能」に目覚めました。");
+        this.addLog("WORLD GENERATED. PERFORMANCE OPTIMIZED.");
+        this.addLog("「寿命」が導入され、世代交代が始まります。");
         BGM.play('menu');
     },
 
-    // 🧬 人類に最低限の基礎知識（本能）をセットする
     injectInstincts() {
-        // 状態: (threat << 2) | (res << 1) | friend
         for (let s = 0; s < 8; s++) {
-            let threat = (s & 4) !== 0;
-            let res = (s & 2) !== 0;
-            let friend = (s & 1) !== 0;
-
-            // アクション対応表
-            // 0:IDLE, 1:WANDER, 2:ESCAPE, 3:GATHER, 4:APPROACH, 5:BUILD
-            // 6:DESTROY, 7:ATTACK, 8:PLANT, 9:IGNITE, 10:COMMUNICATE, 11:REPRODUCE
-
-            if (threat) {
-                this.Q[s][2] += 30;  // 脅威があれば「逃げる」のは本能！
-                this.Q[s][7] += 5;   // 勇敢な奴は「戦う」
-                this.Q[s][5] += 5;   // 「壁(家)を作る」のも生存本能
-            }
-            if (res) {
-                this.Q[s][3] += 20;  // 飯(資源)があれば「採集」する
-            }
-            if (friend) {
-                this.Q[s][4] += 10;  // 仲間に寄り添う
-                this.Q[s][10] += 15; // 「会話」して知識を共有する
-            }
-            // 火遊びは危険だと最初から教えておく
+            let threat = (s & 4) !== 0; let res = (s & 2) !== 0; let friend = (s & 1) !== 0;
+            if (threat) { this.Q[s][2] += 30; this.Q[s][7] += 5; this.Q[s][5] += 5; }
+            if (res) { this.Q[s][3] += 20; }
+            if (friend) { this.Q[s][4] += 10; this.Q[s][10] += 15; }
             this.Q[s][9] -= 20; 
         }
     },
@@ -92,14 +74,9 @@ const Biotope = {
             for(let y=0; y<this.H; y++) {
                 if(this.grid[x][y] === 3) {
                     let isCoast = false;
-                    for(let dx=-1; dx<=1; dx++) {
-                        for(let dy=-1; dy<=1; dy++) {
-                            if(this.getGrid(x+dx, y+dy) === 1) isCoast = true;
-                        }
-                    }
-                    if(isCoast) {
-                        this.grid[x][y] = 2; 
-                    } else {
+                    for(let dx=-1; dx<=1; dx++) for(let dy=-1; dy<=1; dy++) if(this.getGrid(x+dx, y+dy) === 1) isCoast = true;
+                    if(isCoast) { this.grid[x][y] = 2; } 
+                    else {
                         let r = Math.random();
                         if(r < 0.05) this.grid[x][y] = 7;      
                         else if(r < 0.25) this.grid[x][y] = 5;  
@@ -113,9 +90,7 @@ const Biotope = {
     drawBlob(cx, cy, rad, id) {
         for(let x = Math.floor(cx-rad); x <= Math.ceil(cx+rad); x++) {
             for(let y = Math.floor(cy-rad); y <= Math.ceil(cy+rad); y++) {
-                if(x>=0 && x<this.W && y>=0 && y<this.H && Math.hypot(x-cx, y-cy) < rad) {
-                    this.grid[x][y] = id;
-                }
+                if(x>=0 && x<this.W && y>=0 && y<this.H && Math.hypot(x-cx, y-cy) < rad) this.grid[x][y] = id;
             }
         }
     },
@@ -165,18 +140,29 @@ const Biotope = {
             if(this.frame % e.tick !== 0) continue;
 
             e.hp--; 
+            e.age = (e.age || 0) + 1; // ★ 年齢を重ねる
             if(e.chatTimer > 0) e.chatTimer--;
 
-            if(e.hp <= 0 || this.getGrid(e.x, e.y) === 6) {
-                if(e.type === 12 && this.getGrid(e.x, e.y) === 6 && e.lastState !== undefined) {
-                    this.Q[e.lastState][e.lastAction] -= 100; // マグマ死の強烈なペナルティ
-                    if(Math.random() < 0.3) this.addLog("☠️ 人間が炎に焼かれた！");
-                }
+            // ★ 寿命（老衰）システム
+            let lifespan = e.type === 12 ? 3000 : (e.type === 11 ? 2000 : 1000);
+            if(e.age > lifespan) {
+                if(e.type === 12 && Math.random() < 0.1) this.addLog("👼 人類が寿命を全うした");
+                this.setGrid(e.x, e.y, 3); // 死体は土の養分になる
                 this.entities.splice(i, 1);
                 continue;
             }
 
-            // --- ウサギ (大増殖を制限) ---
+            if(e.hp <= 0 || this.getGrid(e.x, e.y) === 6) {
+                if(e.type === 12 && this.getGrid(e.x, e.y) === 6 && e.lastState !== undefined) {
+                    this.Q[e.lastState][e.lastAction] -= 100; 
+                    if(Math.random() < 0.3) this.addLog("☠️ 人間が炎に焼かれた！");
+                }
+                this.setGrid(e.x, e.y, 3); // 死体は土に還る
+                this.entities.splice(i, 1);
+                continue;
+            }
+
+            // --- ウサギ ---
             if(e.type === 10) { 
                 let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
                 let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
@@ -184,12 +170,14 @@ const Biotope = {
                 if(nextGrid !== 1 && nextGrid !== 7 && nextGrid !== 6) { e.x += dx; e.y += dy; } 
                 
                 if(this.getGrid(e.x, e.y) === 4) {
-                    if(Math.random() < 0.3) this.setGrid(e.x, e.y, 3); // 確実に草を消費する確率アップ
+                    if(Math.random() < 0.3) this.setGrid(e.x, e.y, 3); 
                     e.hp += 40; 
-                    // ★ 繁殖に必要なHPを激増させ、増殖スピードをマイルドに
+                    // ★ 上限チェック付き繁殖
                     if(e.hp > 400) { 
                         e.hp = 200; 
-                        this.entities.push({type:10, x:e.x, y:e.y, hp:200, tick:4, chatTimer:0}); 
+                        if(this.entities.length < this.maxEntities) {
+                            this.entities.push({type:10, x:e.x, y:e.y, hp:200, tick:4, chatTimer:0, age:0}); 
+                        }
                     }
                 }
             } 
@@ -205,7 +193,12 @@ const Biotope = {
                     if(Math.abs(target.x - e.x) <= 1 && Math.abs(target.y - e.y) <= 1) {
                         target.hp -= 200; e.hp += 150;
                         if(target.type === 12) this.addLog("🐺 オオカミが人間を襲った");
-                        if(e.hp > 350) { e.hp = 150; this.entities.push({type:11, x:e.x, y:e.y, hp:150, tick:3, chatTimer:0}); }
+                        if(e.hp > 350) { 
+                            e.hp = 150; 
+                            if(this.entities.length < this.maxEntities) {
+                                this.entities.push({type:11, x:e.x, y:e.y, hp:150, tick:3, chatTimer:0, age:0}); 
+                            }
+                        }
                     }
                 } else if(Math.random() < 0.4) {
                     let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
@@ -224,7 +217,6 @@ const Biotope = {
         }
     },
 
-    // 🧠 12のアクションを持つ人類のガチAI
     humanAI(e) {
         let threatX = e.x, threatY = e.y, resX = e.x, resY = e.y, friendX = e.x, friendY = e.y;
         let threat = 0, res = 0, friend = 0;
@@ -249,9 +241,9 @@ const Biotope = {
         let state = (threat << 2) | (res << 1) | friend;
         
         if (e.lastState !== undefined) {
-            let reward = -0.1; // 基礎生存コスト
-            if (e.hp > e.lastHp) reward += 5; // 回復はプラス
-            if (e.hp < e.lastHp) reward -= 15; // ダメージはマイナス
+            let reward = -0.1; 
+            if (e.hp > e.lastHp) reward += 5; 
+            if (e.hp < e.lastHp) reward -= 15; 
             let maxQ = Math.max(...this.Q[state]);
             this.Q[e.lastState][e.lastAction] += 0.2 * (reward + 0.9 * maxQ - this.Q[e.lastState][e.lastAction]);
         }
@@ -273,72 +265,44 @@ const Biotope = {
             if(n !== 1 && n !== 7 && n !== 6) { e.x += dx; e.y += dy; } 
         };
 
-        if(action === 0) { // 0: IDLE
-            e.hp += 2; 
-        } 
-        else if(action === 1) { // 1: WANDER
+        if(action === 0) { e.hp += 2; } 
+        else if(action === 1) { 
             let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
             let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let n = this.getGrid(e.x+dx, e.y+dy);
             if(n !== 1 && n !== 6) { e.x += dx; e.y += dy; }
         } 
-        else if(action === 2 && threat) { // 2: ESCAPE
-            moveTowards(threatX, threatY, true);
-        } 
-        else if(action === 3 && res) { // 3: GATHER
+        else if(action === 2 && threat) { moveTowards(threatX, threatY, true); } 
+        else if(action === 3 && res) { 
             moveTowards(resX, resY, false);
             let foot = this.getGrid(e.x, e.y);
-            if(foot === 4 || foot === 5) {
-                this.setGrid(e.x, e.y, 3); e.hp += 100; // 人類は一気に回復
-            }
+            if(foot === 4 || foot === 5) { this.setGrid(e.x, e.y, 3); e.hp += 100; }
         } 
-        else if(action === 4 && friend) { // 4: APPROACH FRIEND
-            moveTowards(friendX, friendY, false);
-        }
-        else if(action === 5) { // 5: BUILD
-            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
-            let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
+        else if(action === 4 && friend) { moveTowards(friendX, friendY, false); }
+        else if(action === 5) { 
+            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0; let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let tg = this.getGrid(e.x+dx, e.y+dy);
-            if(tg === 3 || tg === 2 || tg === 4) { 
-                this.setGrid(e.x+dx, e.y+dy, 7); 
-                this.Q[state][action] += 2; 
-            }
+            if(tg === 3 || tg === 2 || tg === 4) { this.setGrid(e.x+dx, e.y+dy, 7); this.Q[state][action] += 2; }
         } 
-        else if(action === 6) { // 6: DESTROY
-            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
-            let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
+        else if(action === 6) { 
+            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0; let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let tg = this.getGrid(e.x+dx, e.y+dy);
-            if(tg === 7 || tg === 5) { 
-                this.setGrid(e.x+dx, e.y+dy, 3); 
-                this.Q[state][action] += 1;
-            }
+            if(tg === 7 || tg === 5) { this.setGrid(e.x+dx, e.y+dy, 3); this.Q[state][action] += 1; }
         }
-        else if(action === 7 && threat) { // 7: ATTACK
+        else if(action === 7 && threat) { 
             let target = this.entities.find(t => t.type === 11 && Math.abs(t.x-e.x)<=2 && Math.abs(t.y-e.y)<=2);
-            if(target) { 
-                target.hp -= 150; this.Q[state][action] += 15; 
-                if(target.hp <= 0) this.addLog("⚔️ 人類が脅威を排除した！"); 
-            }
+            if(target) { target.hp -= 150; this.Q[state][action] += 15; if(target.hp <= 0) this.addLog("⚔️ 人類が脅威を排除した！"); }
         } 
-        else if(action === 8) { // 8: PLANT
-            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
-            let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
-            if(this.getGrid(e.x+dx, e.y+dy) === 3) { 
-                this.setGrid(e.x+dx, e.y+dy, 4); 
-                this.Q[state][action] += 3;
-            }
+        else if(action === 8) { 
+            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0; let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
+            if(this.getGrid(e.x+dx, e.y+dy) === 3) { this.setGrid(e.x+dx, e.y+dy, 4); this.Q[state][action] += 3; }
         }
-        else if(action === 9) { // 9: IGNITE
-            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
-            let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
+        else if(action === 9) { 
+            let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0; let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let tg = this.getGrid(e.x+dx, e.y+dy);
-            if(tg === 4 || tg === 5) { 
-                this.setGrid(e.x+dx, e.y+dy, 6); 
-                this.Q[state][action] -= 5; 
-                if(Math.random() < 0.05) this.addLog("🔥 人間が森に火を放った！");
-            }
+            if(tg === 4 || tg === 5) { this.setGrid(e.x+dx, e.y+dy, 6); this.Q[state][action] -= 5; }
         }
-        else if(action === 10 && friend) { // 10: COMMUNICATE
+        else if(action === 10 && friend) { 
             e.chatTimer = 40;
             e.chatMsg = ["・ー・", "ーー", "・・", "ー・", "SOS"][Math.floor(Math.random()*5)];
             let count = 0;
@@ -350,12 +314,15 @@ const Biotope = {
             }
             if(count > 0 && Math.random() < 0.03) this.addLog(`💬 知識の伝達(${count}人)`);
         }
-        else if(action === 11) { // 11: REPRODUCE
-            if(e.hp > 300) { // 十分に栄養があるときのみ
+        else if(action === 11) { 
+            if(e.hp > 300) { 
                 e.hp -= 150;
-                this.entities.push({type:12, x:e.x, y:e.y, hp:200, tick:5, chatTimer:0}); 
-                this.addLog("👶 人類が新たな命を育んだ");
-                this.Q[state][action] += 10; // 繁殖成功は最高の報酬
+                // ★ 繁殖時も世界の定員をチェック！
+                if(this.entities.length < this.maxEntities) {
+                    this.entities.push({type:12, x:e.x, y:e.y, hp:200, tick:5, chatTimer:0, age:0}); 
+                    this.addLog("👶 人類が新たな命を育んだ");
+                }
+                this.Q[state][action] += 10; 
             } else {
                 this.Q[state][action] -= 5; 
             }
@@ -379,8 +346,13 @@ const Biotope = {
                 if(pItem.type === 'M') { 
                     this.setGrid(px, py, pItem.id);
                 } else if(pItem.type === 'E' && this.frame % 5 === 0) {
-                    this.entities.push({ type: pItem.id, x: px, y: py, hp: 200, tick: pItem.tick, chatTimer: 0 });
-                    playSnd('jmp');
+                    // ★ 神の手による配置も定員制限をかける
+                    if(this.entities.length < this.maxEntities) {
+                        this.entities.push({ type: pItem.id, x: px, y: py, hp: 200, tick: pItem.tick, chatTimer: 0, age: 0 });
+                        playSnd('jmp');
+                    } else {
+                        if(Math.random()<0.05) this.addLog("⚠️ 世界の定員(150匹)に達しています");
+                    }
                 }
             }
         }
