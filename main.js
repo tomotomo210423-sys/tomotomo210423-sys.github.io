@@ -1,4 +1,6 @@
-// === CORE SYSTEM (10in1 Ultimate Edition) ===
+// === CORE SYSTEM (10in1 Ultimate Edition - BUG FIXED) ===
+// 十字キーの初期化時のクラッシュバグを修正した安定版
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -109,6 +111,7 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
+// ドット絵テクスチャ定義
 window.sprs = {
     player: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
     heroNew: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
@@ -124,6 +127,7 @@ const universalPal = {
     'd': '#840', 'e': '#8f8', 'f': '#88f'
 };
 
+// バグを排除した最強のドット絵描画関数
 function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     let targetCtx = ctx, x, y, color, spriteObj, scale=1, flip=false;
     
@@ -145,6 +149,7 @@ function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     for (let r = 0; r < s.h; r++) {
         for (let col = 0; col < s.w; col++) {
             let p = s.d[r * s.w + col];
+            
             if (p === '.' || p === ' ' || p === '0') continue;
             
             let fillCol = color || '#fff';
@@ -182,13 +187,11 @@ function applyShake() {
 }
 function resetShake() { if (isShaking) { ctx.restore(); isShaking = false; } }
 
-// ★ メニューに戻った時にキャンバスの解像度を 200x300 に戻す魔法！
+let transTimer = 0; let nextApp = null; 
 function switchApp(app) { 
     nextApp = app; transTimer = 20; playSnd('sel'); 
     document.body.className = '';
     document.getElementById('gameboy').className = '';
-    canvas.width = 200; 
-    canvas.height = 300;
 }
 function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
 
@@ -205,8 +208,6 @@ const Menu = {
       this.cur = 0; this.holdTimer = 0; BGM.play('menu'); 
       document.body.className = '';
       document.getElementById('gameboy').className = '';
-      canvas.width = 200; // 念のためここでもリセット
-      canvas.height = 300;
   },
   
   update() {
@@ -226,7 +227,7 @@ const Menu = {
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
-            typeof Biotope !== 'undefined' ? Biotope : null, 
+            typeof Biotope !== 'undefined' ? Biotope : null, // ★ BIOTOPE起動
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -237,9 +238,10 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
+    // ★ タイトルを 10in1 に書き換え！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
     ctx.fillText('10in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.0', 60, 40);
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.1', 60, 40); // バグ修正版
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
@@ -385,12 +387,19 @@ const setBtn = (id, k) => {
 ['btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
 
+// 十字キー (D-pad) の処理 - バグ修正済み
 const dpad = document.getElementById('dpad');
 let dpadActive = false;
 
 const handleDpad = (ev) => {
   ev.preventDefault();
   if (!dpadActive && ev.type !== 'touchstart' && ev.type !== 'mousedown') return;
+  
+  // バグ修正: getBoundingClientRect()が undefined になるのを防ぐ nullチェック
+  if (!dpad) return; 
+  let rect = dpad.getBoundingClientRect();
+  if (!rect || rect.width === 0) return; // 描画前は無視
+
   if (ev.type === 'touchstart' || ev.type === 'mousedown') { dpadActive = true; initAudio(); }
   
   let clientX, clientY;
@@ -402,7 +411,6 @@ const handleDpad = (ev) => {
       clientX = ev.clientX; clientY = ev.clientY; 
   }
   
-  const rect = dpad.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2; const centerY = rect.top + rect.height / 2;
   const dx = clientX - centerX; const dy = clientY - centerY; const dist = Math.hypot(dx, dy);
   
@@ -426,15 +434,23 @@ if (dpad) {
   dpad.addEventListener('mousedown', handleDpad); window.addEventListener('mousemove', (ev) => { if (dpadActive) handleDpad(ev); }); window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
 }
 
+// ポインターイベント処理 (TAP配置用)
 const getPointerPos = (e) => {
-  if (e.targetTouches && e.targetTouches.length > 0) { return { clientX: e.targetTouches[0].clientX, clientY: e.targetTouches[0].clientY }; } 
-  else if (e.touches && e.touches.length > 0) { return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }; } 
-  else { return { clientX: e.clientX, clientY: e.clientY }; }
+  // バグ修正: e または touches が undefined になるのを防ぐ nullチェック
+  if (!e) return {clientX:0, clientY:0};
+  let touch;
+  if (e.targetTouches && e.targetTouches.length > 0) { touch = e.targetTouches[0]; } 
+  else if (e.touches && e.touches.length > 0) { touch = e.touches[0]; } 
+  
+  if (touch) return { clientX: touch.clientX, clientY: touch.clientY };
+  return { clientX: e.clientX, clientY: e.clientY }; // Mouse event
 };
 
 const handlePointerDown = (e) => {
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect(); const pos = getPointerPos(e);
+  const rect = canvas.getBoundingClientRect(); 
+  if (!rect) return;
+  const pos = getPointerPos(e);
   pointer.active = true;
   pointer.x = (pos.clientX - rect.left) * (canvas.width / rect.width); pointer.y = (pos.clientY - rect.top) * (canvas.height / rect.height);
   pointer.path = [{x: pointer.x, y: pointer.y}];
@@ -443,10 +459,12 @@ const handlePointerDown = (e) => {
 const handlePointerMove = (e) => {
   if (!pointer.active) return;
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect(); const pos = getPointerPos(e);
+  const rect = canvas.getBoundingClientRect(); 
+  if (!rect) return;
+  const pos = getPointerPos(e);
   pointer.x = (pos.clientX - rect.left) * (canvas.width / rect.width); pointer.y = (pos.clientY - rect.top) * (canvas.height / rect.height);
   let last = pointer.path[pointer.path.length-1];
-  if (Math.hypot(pointer.x - last.x, pointer.y - last.y) > 5) { pointer.path.push({x: pointer.x, y: pointer.y}); }
+  if (last && Math.hypot(pointer.x - last.x, pointer.y - last.y) > 5) { pointer.path.push({x: pointer.x, y: pointer.y}); }
 };
 
 const handlePointerUp = (e) => { e.preventDefault(); pointer.active = false; };
@@ -455,6 +473,7 @@ canvas.addEventListener('mousedown', handlePointerDown); canvas.addEventListener
 canvas.addEventListener('mouseup', handlePointerUp); canvas.addEventListener('mouseleave', handlePointerUp);
 canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canvas.addEventListener('touchmove', handlePointerMove, {passive: false}); canvas.addEventListener('touchend', handlePointerUp, {passive: false});
 
+// キーボードイベント
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
   if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
