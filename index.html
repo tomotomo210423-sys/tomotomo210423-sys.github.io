@@ -37,7 +37,6 @@
   ctx.fillStyle = '#8bac0f';
   rr(25, 25, 130, 70, 5);
 
-  // ★ ロゴ文字を 10in1 に変更
   ctx.fillStyle = '#306230';
   ctx.font = 'bold 36px monospace';
   ctx.textAlign = 'center';
@@ -109,17 +108,20 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-abyss #sys-buttons .s-btn { background: #306; }
 #gameboy.mode-abyss #gameCanvas { aspect-ratio: 400 / 240; box-shadow: none; border-radius: 0; }
 
-#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
-#boot.hidden { opacity: 0; }
-.boot-text { font-size: 10px; margin: 4px 0; }
-.boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
-.boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
-
-#gameCanvas { 
-  background: #000; height: 100%; width: auto; max-width: 100%; max-height: 100%; 
-  aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); 
-  z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; 
+/* ★ BIOTOPE用！超ワイド横画面モードのCSS */
+#gameboy.mode-landscape {
+  max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row;
+  background: linear-gradient(135deg, #112 0%, #000 100%);
+  border-radius: 20px;
 }
+#gameboy.mode-landscape #screen-container { margin: 15px; z-index: 10; flex: 1; border-color: #0f0; box-shadow: inset 0 0 20px rgba(0,255,0,0.2); }
+#gameboy.mode-landscape #controls { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; background: transparent; }
+#gameboy.mode-landscape #classic-controls { pointer-events: auto; }
+#gameboy.mode-landscape #dpad { left: 30px; top: 50%; transform: translateY(-50%); }
+#gameboy.mode-landscape #action-buttons { right: 30px; top: 50%; transform: translateY(-50%) rotate(-15deg); left: auto; }
+#gameboy.mode-landscape #sys-buttons { bottom: 15px; width: 100%; pointer-events: auto; }
+#gameboy.mode-landscape #gameCanvas { aspect-ratio: auto; width: 100%; height: 100%; box-shadow: none; border-radius: 4px; }
+
 
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; pointer-events: none; } 
@@ -178,6 +180,13 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #btn-slot-bet { width: 60px; height: 60px; background: radial-gradient(circle, #00f, #005); border: 4px solid #00a; font-size: 14px; }
 #btn-slot-max { width: 60px; height: 60px; background: radial-gradient(circle, #0a0, #050); border: 4px solid #080; font-size: 14px; }
 #btn-slot-spin { width: 90px; height: 90px; background: radial-gradient(circle, #f00, #a00); border: 6px solid #c00; font-size: 22px; margin-top: 10px; }
+
+#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
+#boot.hidden { opacity: 0; }
+.boot-text { font-size: 10px; margin: 4px 0; }
+.boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
+.boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
+#gameCanvas { background: #000; height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; }
 </style>
 </head>
 <body>
@@ -189,7 +198,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
       <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
     </div>
-    
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
   
