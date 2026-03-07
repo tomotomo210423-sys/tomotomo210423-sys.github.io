@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Ultimate Texture & Safety Net Edition) ===
+// === CORE SYSTEM (10in1 Ultimate Edition) ===
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -131,7 +131,6 @@ const universalPal = {
 function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     let targetCtx = ctx, x, y, color, spriteObj, scale=1, flip=false;
     
-    // 引数の渡し方がゲームによって違うため、自動で判別する処理
     if (arg1 && arg1.fillRect) {
         targetCtx = arg1; x = arg2; y = arg3; color = arg4; spriteObj = arg5; scale = arg6 || 1; flip = arguments[6] || false;
     } else if (typeof arg1 === 'number') {
@@ -151,12 +150,11 @@ function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
         for (let col = 0; col < s.w; col++) {
             let p = s.d[r * s.w + col];
             
-            // 完全に透明にする文字（0はスロットの透明部分）
             if (p === '.' || p === ' ' || p === '0') continue;
             
             let fillCol = color || '#fff';
-            if (s.pal && s.pal[p]) { fillCol = s.pal[p]; } // 専用パレット優先
-            else if (!s.pal && universalPal[p]) { fillCol = universalPal[p]; } // スロット等の共通パレット
+            if (s.pal && s.pal[p]) { fillCol = s.pal[p]; } 
+            else if (!s.pal && universalPal[p]) { fillCol = universalPal[p]; } 
             
             targetCtx.fillStyle = fillCol;
             targetCtx.fillRect(col * scale, r * scale, scale, scale);
@@ -202,8 +200,9 @@ function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(le
 // ============================================
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'システム設定', '王様の間'], 
-  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#888', '#fa0'],
+  // ★ 10in1 メニュー追加！
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'システム設定', '王様の間'], 
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#888', '#fa0'],
   holdTimer: 0,
   
   init() { 
@@ -229,6 +228,7 @@ const Menu = {
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
+            typeof Biotope !== 'undefined' ? Biotope : null, // ★ BIOTOPE起動
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -239,10 +239,10 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
-    // ★ 9in1 に書き換え！
+    // ★ 10in1 に書き換え！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('9in1 RETRO', 55, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v15.0', 60, 40);
+    ctx.fillText('10in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.0', 60, 40);
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
@@ -353,7 +353,6 @@ function loop() {
   } catch (err) {
     console.error(err); 
     
-    // エラー発生時にCanvasの描画状態を完全に初期化（バグの連鎖を防ぐ）
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.shadowBlur = 0;
