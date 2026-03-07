@@ -1,10 +1,9 @@
-// === PIXEL BIOTOPE - AI EVOLUTION (Landscape Edition) ===
-// 強化学習AI搭載の人間、モールス信号による知識共有、横画面・高解像度シミュレーション
+// === PIXEL BIOTOPE - AI EVOLUTION (WorldBOX Style Gen) ===
+// 強化学習AI搭載、モールス会話、そしてWorldBOX風の自動マップ生成に対応！
 
 const Biotope = {
     grid: [], entities: [], logs: [], 
-    // ★ 解像度を横長（400x240）に拡張！
-    W: 100, H: 45, cellSize: 4, 
+    W: 50, H: 60, cellSize: 4, // 200x240 の描画エリア
     frame: 0, speed: 1,
     
     // パレット定義
@@ -22,15 +21,10 @@ const Biotope = {
     ],
     curPal: 0,
     
-    // 人類共有のQテーブル (8状態 × 6行動)
+    // 人類共有のQテーブル
     Q: [], 
     
     init() {
-        // ★ ここでゲーム機を横画面に変形し、Canvas解像度を2倍にする！
-        document.getElementById('gameboy').className = 'mode-landscape';
-        canvas.width = 400;
-        canvas.height = 240;
-
         this.grid = []; this.entities = []; this.logs = [];
         this.frame = 0; this.speed = 1;
         for(let x=0; x<this.W; x++) {
@@ -38,34 +32,93 @@ const Biotope = {
             for(let y=0; y<this.H; y++) this.grid[x][y] = 0;
         }
         
-        // Qテーブルの初期化 (0:ランダム, 1:逃避, 2:接近, 3:建築, 4:攻撃, 5:会話)
+        // ★ WorldBOX風：自動マップ生成（海、大地、山、森）
+        this.generateWorld();
+
+        // Qテーブルの初期化
         this.Q = Array(8).fill(0).map(() => Array(6).fill(0));
         
-        this.addLog("SYSTEM BOOT: BIOTOPE V1");
-        this.addLog("神(あなた)の力で世界を創造してください");
+        this.addLog("WORLD GENERATED. WELCOME GOD.");
+        this.addLog("Bボタンで倍速、仲間を投入して観察しましょう");
         BGM.play('menu');
     },
 
+    // 🌎 世界の自動生成ロジック
+    generateWorld() {
+        // 1. 地下（石）と土台（土）
+        for(let x=0; x<this.W; x++) {
+            for(let y=0; y<this.H; y++) {
+                if(y > this.H * 0.8) this.grid[x][y] = 7; // 最下層は石
+                else if(y > this.H * 0.5) this.grid[x][y] = 3; // 下半分は土
+            }
+        }
+
+        // 2. 地形の起伏（ランダムな山）
+        for(let i=0; i<5; i++) {
+            let cx = Math.floor(Math.random() * this.W);
+            let cy = Math.floor(this.H * 0.5);
+            let rad = 5 + Math.random() * 8;
+            this.drawBlob(cx, cy, rad, 3); // 土の塊
+            if(Math.random() < 0.5) this.drawBlob(cx, cy+5, rad*0.7, 7); // 芯に石
+        }
+
+        // 3. 海（水）の注入
+        for(let x=0; x<this.W; x++) {
+            for(let y=0; y<this.H; y++) {
+                if(this.grid[x][y] === 0 && y > this.H * 0.6) {
+                    this.grid[x][y] = 1; // 空白かつ一定の深さなら水
+                }
+            }
+        }
+        // 水辺に砂
+        for(let i=0; i<3; i++) this.simPhysicalSteps(); // 物理を少し進めて水を落ち着かせる
+        for(let x=0; x<this.W; x++) {
+            for(let y=0; y<this.H; y++) {
+                if(this.grid[x][y] === 3) { // 土
+                    let isWaterNear = false;
+                    for(let dx=-1; dx<=1; dx++) for(let dy=-1; dy<=1; dy++) if(this.getGrid(x+dx,y+dy)===1) isWaterNear=true;
+                    if(isWaterNear && Math.random() < 0.7) this.grid[x][y] = 2; // 水辺の土を砂に
+                }
+            }
+        }
+
+        // 4. 生態系の初期配置（草、木）
+        for(let x=0; x<this.W; x++) {
+            for(let y=1; y<this.H; y++) {
+                if(this.grid[x][y] === 3 && this.grid[x][y-1] === 0) { // 土の上
+                    if(Math.random() < 0.3) this.grid[x][y-1] = 4; // 草
+                    if(Math.random() < 0.05) this.grid[x][y-1] = 5; // 木
+                }
+            }
+        }
+    },
+
+    // 円形の塊を描画する補助関数
+    drawBlob(cx, cy, rad, id) {
+        for(let x = Math.floor(cx-rad); x <= Math.ceil(cx+rad); x++) {
+            for(let y = Math.floor(cy-rad); y <= Math.ceil(cy+rad); y++) {
+                if(Math.hypot(x-cx, y-cy) < rad) this.setGrid(x, y, id);
+            }
+        }
+    },
+
     addLog(msg) {
-        this.logs.push({ text: msg, life: 240 });
+        this.logs.push({ text: msg, life: 180 });
         if(this.logs.length > 3) this.logs.shift();
     },
 
     getGrid(x, y) { if(x<0||x>=this.W||y<0||y>=this.H) return 7; return this.grid[x][y]; },
     setGrid(x, y, v) { if(x>=0&&x<this.W&&y>=0&&y<this.H) this.grid[x][y] = v; },
 
-    // --- メインシミュレーションステップ ---
-    simStep() {
-        this.frame++;
-
-        // 1. セルオートマトン（物質の物理演算）
+    // --- 物質の物理演算（砂・水・炎） ---
+    simPhysicalSteps() {
         for(let y = this.H - 1; y >= 0; y--) {
-            // 左右ランダムに走査して自然な動きに
             let xs = Array.from({length:this.W}, (_,i)=>i).sort(()=>Math.random()-0.5);
             for(let x of xs) {
                 let id = this.grid[x][y];
-                if(id === 0 || id === 7) continue; 
+                if(id === 0 || id === 7) continue;
 
+                // 重力で落ちる粉体（砂2、土3）
                 if(id === 2 || id === 3) {
                     let b = this.getGrid(x, y+1);
                     if(b === 0 || b === 1) { this.setGrid(x, y+1, id); this.setGrid(x, y, b); continue; }
@@ -73,28 +126,34 @@ const Biotope = {
                     b = this.getGrid(x+dir, y+1);
                     if(b === 0 || b === 1) { this.setGrid(x+dir, y+1, id); this.setGrid(x, y, b); continue; }
                 }
+                // 流体（水1、炎/マグマ6）
                 else if(id === 1 || id === 6) {
                     if(this.getGrid(x, y+1) === 0) { this.setGrid(x, y+1, id); this.setGrid(x, y, 0); continue; }
                     let dir = Math.random() < 0.5 ? -1 : 1;
                     if(this.getGrid(x+dir, y) === 0) { this.setGrid(x+dir, y, id); this.setGrid(x, y, 0); continue; }
                     
+                    // 炎(6)の破壊と延焼
                     if(id === 6) {
                         let neighbors = [[x,y+1],[x,y-1],[x+1,y],[x-1,y]];
                         for(let [nx, ny] of neighbors) {
                             let n = this.getGrid(nx, ny);
                             if(n === 1) { this.setGrid(x, y, 7); this.setGrid(nx, ny, 0); break; } 
-                            if(n === 4 || n === 5) { this.setGrid(nx, ny, 6); } 
+                            if(n === 4 || n === 5) { this.setGrid(nx, ny, 6); } // 草木に引火
                         }
+                        if(Math.random()<0.1) this.setGrid(x,y,0); // 鎮火
                     }
-                    if(id === 1 && Math.random() < 0.05) {
-                        if(this.getGrid(x, y+1) === 3 && this.getGrid(x, y-1) === 0) this.setGrid(x, y-1, 4);
+                    // 水(1)の生命効果
+                    if(id === 1 && Math.random() < 0.02) {
+                        if((this.getGrid(x, y+1) === 3 || this.getGrid(x, y+1) === 2) && this.getGrid(x, y-1) === 0) this.setGrid(x, y-1, 4);
                     }
-                }
-                else if(id === 4 && Math.random() < 0.01) {
-                    if(this.getGrid(x, y-1) === 0) this.setGrid(x, y-1, 5); 
                 }
             }
         }
+    },
+
+    simStep() {
+        this.frame++;
+        this.simPhysicalSteps();
 
         // 2. エンティティ（生物）の行動
         for(let i = this.entities.length - 1; i >= 0; i--) {
@@ -104,49 +163,52 @@ const Biotope = {
 
             if(e.hp <= 0 || this.getGrid(e.x, e.y) === 6) {
                 if(e.type === 12 && this.getGrid(e.x, e.y) === 6 && e.lastState !== undefined) {
-                    this.Q[e.lastState][e.lastAction] -= 50; 
-                    this.addLog("☠️ 人間がマグマに飲まれた！");
+                    this.Q[e.lastState][e.lastAction] -= 50; // マグマ死の学習
+                    this.addLog("☠️ 人間が炎に焼かれた！");
                 }
                 this.entities.splice(i, 1);
                 continue;
             }
 
-            if(this.getGrid(e.x, e.y+1) === 0 || this.getGrid(e.x, e.y+1) === 1) {
-                e.y++; continue; 
+            // 重力落下
+            let foot = this.getGrid(e.x, e.y+1);
+            if(foot === 0 || foot === 1) {
+                e.y++; 
+                if(foot === 1) e.hp -= 2; // 水中は少しダメージ
+                continue; 
             }
 
-            if(e.type === 10) { 
+            // AI行動
+            if(e.type === 10) { // ウサギ: 草(4)を食う
                 let dx = Math.random() < 0.5 ? -1 : 1;
                 if(this.getGrid(e.x+dx, e.y) === 0) e.x += dx;
-                if(this.getGrid(e.x, e.y) === 4 || this.getGrid(e.x, e.y+1) === 4) {
-                    this.setGrid(e.x, e.y, 0); this.setGrid(e.x, e.y+1, 3); 
-                    e.hp += 50;
-                    if(e.hp > 200) { e.hp = 100; this.entities.push({type:10, x:e.x, y:e.y-1, hp:100, chatTimer:0}); } 
+                if(this.getGrid(e.x, e.y+1) === 4) {
+                    this.setGrid(e.x, e.y+1, 3); e.hp += 50;
+                    if(e.hp > 200) { e.hp = 100; this.entities.push({type:10, x:e.x, y:e.y, hp:100, chatTimer:0}); }
                 }
             } 
-            else if (e.type === 11) { 
-                let target = this.entities.find(t => (t.type===10 || t.type===12) && Math.abs(t.x-e.x)<10 && Math.abs(t.y-e.y)<5);
+            else if (e.type === 11) { // オオカミ: 捕食
+                let target = this.entities.find(t => (t.type===10 || t.type===12) && Math.abs(t.x-e.x)<12 && Math.abs(t.y-e.y)<6);
                 if(target) {
                     e.x += (target.x > e.x ? 1 : -1);
                     if(Math.abs(target.x - e.x) <= 1 && Math.abs(target.y - e.y) <= 1) {
-                        target.hp -= 200; e.hp += 100; 
-                        if(target.type === 12) this.addLog("🐺 オオカミが人間を捕食した");
-                        if(e.hp > 300) { e.hp = 100; this.entities.push({type:11, x:e.x, y:e.y-1, hp:150, chatTimer:0}); }
+                        target.hp -= 200; e.hp += 150;
+                        if(target.type === 12) this.addLog("🐺 オオカミが人間を襲った");
+                        if(e.hp > 300) { e.hp = 150; this.entities.push({type:11, x:e.x, y:e.y, hp:150, chatTimer:0}); }
                     }
-                } else {
-                    if(Math.random() < 0.3) e.x += (Math.random() < 0.5 ? -1 : 1);
-                }
+                } else if(Math.random() < 0.3) e.x += (Math.random() < 0.5 ? -1 : 1);
             }
-            else if (e.type === 12) { 
+            else if (e.type === 12) { // 人間
                 this.humanAI(e);
             }
             
+            // 画面外脱出防止
             e.x = Math.max(0, Math.min(this.W-1, e.x));
             e.y = Math.max(0, Math.min(this.H-1, e.y));
         }
     },
 
-    // 🧠 人類の強化学習AIエンジン
+    // 🧠 強化学習AI & モールス会話
     humanAI(e) {
         let threatX = 0, resX = 0, friendX = 0;
         let threat = 0, res = 0, friend = 0;
@@ -154,88 +216,74 @@ const Biotope = {
         for(let t of this.entities) {
             if(t === e) continue;
             let dist = Math.abs(t.x - e.x) + Math.abs(t.y - e.y);
-            if(dist < 5) {
+            if(dist < 7) {
                 if(t.type === 11) { threat = 1; threatX = t.x; } 
                 if(t.type === 12) { friend = 1; friendX = t.x; } 
                 if(t.type === 10) { res = 1; resX = t.x; }       
             }
         }
         for(let dx=-3; dx<=3; dx++){
-            for(let dy=-3; dy<=3; dy++){
+            for(let dy=-2; dy<=2; dy++){
                 let v = this.getGrid(e.x+dx, e.y+dy);
-                if(v === 6) { threat = 1; threatX = e.x+dx; } 
-                if(v === 5 || v === 4) { res = 1; resX = e.x+dx; } 
+                if(v === 6) { threat = 1; threatX = e.x+dx; } // 炎
+                if(v === 5 || v === 4) { res = 1; resX = e.x+dx; } // 木
             }
         }
 
         let state = (threat << 2) | (res << 1) | friend;
         
+        // 学習
         if (e.lastState !== undefined) {
-            let reward = -0.1; 
-            if (e.hp > e.lastHp) reward += 5; 
-            if (e.hp < e.lastHp) reward -= 10; 
-            
+            let reward = -0.1;
+            if (e.hp > e.lastHp) reward += 10;
+            if (e.hp < e.lastHp) reward -= 15;
             let maxQ = Math.max(...this.Q[state]);
             this.Q[e.lastState][e.lastAction] += 0.2 * (reward + 0.9 * maxQ - this.Q[e.lastState][e.lastAction]);
         }
 
+        // 行動決定
         let action = 0;
-        if(Math.random() < 0.1) {
-            action = Math.floor(Math.random() * 6);
-        } else {
+        if(Math.random() < 0.1) action = Math.floor(Math.random() * 6);
+        else {
             let maxVal = -9999;
-            for(let a=0; a<6; a++) {
-                if(this.Q[state][a] > maxVal) { maxVal = this.Q[state][a]; action = a; }
-            }
+            for(let a=0; a<6; a++) if(this.Q[state][a] > maxVal) { maxVal = this.Q[state][a]; action = a; }
         }
-
         e.lastState = state; e.lastAction = action; e.lastHp = e.hp;
 
-        if(action === 0) { 
-            if(Math.random() < 0.5 && this.getGrid(e.x+(Math.random()<0.5?1:-1), e.y) === 0) e.x += (Math.random()<0.5?1:-1);
+        // 行動実行
+        if(action === 0) { // RAND
+            if(Math.random() < 0.6) e.x += (Math.random()<0.5?1:-1);
         } 
-        else if(action === 1 && threat) { 
+        else if(action === 1 && threat) { // ESCAPE
             e.x += (e.x > threatX ? 1 : -1);
         } 
-        else if(action === 2 && res) { 
+        else if(action === 2 && res) { // APPROACH
             e.x += (e.x < resX ? 1 : -1);
-            let foot = this.getGrid(e.x, e.y); let head = this.getGrid(e.x, e.y-1);
-            if(foot === 4 || foot === 5 || head === 4 || head === 5) {
-                this.setGrid(e.x, e.y, 0); this.setGrid(e.x, e.y-1, 0);
-                e.hp += 100;
-                if(e.hp > 300) { e.hp = 150; this.entities.push({type:12, x:e.x, y:e.y-1, hp:150, chatTimer:0}); this.addLog("🧍 人類が繁殖した！"); }
+            if(this.getGrid(e.x, e.y+1) === 4 || this.getGrid(e.x, e.y+1) === 5) {
+                this.setGrid(e.x, e.y+1, 3); e.hp += 120;
+                if(e.hp > 300) { e.hp = 150; this.entities.push({type:12, x:e.x, y:e.y, hp:150, chatTimer:0}); this.addLog("🧍 人類が繁殖した！"); }
             }
         } 
-        else if(action === 3) { 
+        else if(action === 3) { // BUILD
             let dx = Math.random() < 0.5 ? -1 : 1;
-            if(this.getGrid(e.x+dx, e.y) === 0) {
-                this.setGrid(e.x+dx, e.y, 7); 
-                this.Q[state][action] += 1; 
-            }
+            if(this.getGrid(e.x+dx, e.y) === 0) { this.setGrid(e.x+dx, e.y, 7); this.Q[state][action] += 2; }
         } 
-        else if(action === 4 && threat) { 
-            let target = this.entities.find(t => t.type===11 && Math.abs(t.x-e.x)<=2 && Math.abs(t.y-e.y)<=2);
-            if(target) {
-                target.hp -= 100; 
-                this.Q[state][action] += 5; 
-                if(target.hp <= 0) this.addLog("⚔️ 人類がオオカミを討伐した！");
-            }
+        else if(action === 4 && threat) { // ATTACK
+            let target = this.entities.find(t => t.type === 11 && Math.abs(t.x-e.x)<=2);
+            if(target) { target.hp -= 120; this.Q[state][action] += 10; if(target.hp <= 0) this.addLog("⚔️ 人類が狼を討伐した！"); }
         } 
-        else if(action === 5 && friend) { 
-            e.chatTimer = 30;
-            e.chatMsg = ["・ー・", "ーー・", "・・・", "ー・ー"][Math.floor(Math.random()*4)];
+        else if(action === 5 && friend) { // 💬 COMMUNICATE (Morse)
+            e.chatTimer = 40;
+            e.chatMsg = ["・ー・", "ーー", "・・", "ー・"][Math.floor(Math.random()*4)];
+            // 知識の共有（Qテーブルの同期）
             let count = 0;
             for(let t of this.entities) {
-                if(t !== e && t.type === 12 && Math.abs(t.x-e.x)<8 && Math.abs(t.y-e.y)<8) {
-                    for(let s=0; s<8; s++) {
-                        for(let a=0; a<6; a++) {
-                            this.Q[s][a] += (this.Q[s][a] - this.Q[s][a]) * 0.1; 
-                        }
-                    }
-                    t.chatTimer = 15; t.chatMsg = "！"; count++;
+                if(t !== e && t.type === 12 && Math.abs(t.x-e.x)<10) {
+                    for(let s=0; s<8; s++) for(let a=0; a<6; a++) this.Q[s][a] += (this.Q[s][a] - this.Q[s][a]) * 0.15;
+                    t.chatTimer = 20; t.chatMsg = "！"; count++;
                 }
             }
-            if(count > 0 && Math.random() < 0.05) this.addLog(`💬 人間が知識を共有した(${count}人)`);
+            if(count > 0 && Math.random() < 0.03) this.addLog(`💬 知識共有が発生(${count}人)`);
         }
     },
 
@@ -246,29 +294,24 @@ const Biotope = {
         if(keysDown.left) { this.curPal = (this.curPal - 1 + this.pals.length) % this.pals.length; playSnd('sel'); }
         if(keysDown.right) { this.curPal = (this.curPal + 1) % this.pals.length; playSnd('sel'); }
 
+        // TAP/Aボタン配置
         if(pointer.active || keys.a) {
-            // ★ 解像度400x240に合わせた座標計算！
             let px = Math.floor(pointer.x / this.cellSize);
             let py = Math.floor((pointer.y - 30) / this.cellSize); 
-            
             if(!pointer.active && keys.a) { px = Math.floor(this.W/2); py = Math.floor(this.H/2); }
 
             if(px >= 0 && px < this.W && py >= 0 && py < this.H) {
                 let pItem = this.pals[this.curPal];
-                if(pItem.type === 'M') { 
-                    this.setGrid(px, py, pItem.id);
-                } else if(pItem.type === 'E') { 
-                    if(this.frame % 5 === 0) {
-                        this.entities.push({ type: pItem.id, x: px, y: py, hp: 200, chatTimer: 0 });
-                        playSnd('jmp');
-                    }
+                if(pItem.type === 'M') { this.setGrid(px, py, pItem.id);
+                } else if(pItem.type === 'E' && this.frame % 5 === 0) {
+                    this.entities.push({ type: pItem.id, x: px, y: py, hp: 200, chatTimer: 0 });
+                    playSnd('jmp');
                 }
             }
         }
 
-        for(let s=0; s<this.speed; s++) {
-            this.simStep();
-        }
+        // 倍速対応ループ
+        for(let s=0; s<this.speed; s++) this.simStep();
 
         for(let i=this.logs.length-1; i>=0; i--) {
             this.logs[i].life--;
@@ -277,70 +320,39 @@ const Biotope = {
     },
 
     draw() {
-        // ★ 背景 400x240！
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 400, 240);
-
-        // 1. シミュレーション領域 (Y: 30 ~ 210)
-        ctx.save();
-        ctx.translate(0, 30);
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
+        ctx.save(); ctx.translate(0, 30);
         
-        const cols = {0:null, 1:'#0af', 2:'#fd8', 3:'#853', 4:'#2c2', 5:'#161', 6:'#f40', 7:'#999'};
+        // 物質
+        const cols = {0:null, 1:'#08f', 2:'#fd8', 3:'#853', 4:'#2d2', 5:'#531', 6:'#f40', 7:'#999'};
         for(let x=0; x<this.W; x++){
             for(let y=0; y<this.H; y++){
                 let id = this.grid[x][y];
-                if(id !== 0) {
-                    ctx.fillStyle = cols[id];
-                    ctx.fillRect(x * this.cellSize, y * this.cellSize, this.cellSize, this.cellSize);
-                    if(id === 6) { ctx.fillStyle = '#ff0'; ctx.fillRect(x * this.cellSize + 1, y * this.cellSize + 1, 2, 2); }
-                }
+                if(id !== 0) { ctx.fillStyle = cols[id]; ctx.fillRect(x * this.cellSize, y * this.cellSize, this.cellSize, this.cellSize); }
             }
         }
-
+        // 生物
         for(let e of this.entities) {
             let px = e.x * this.cellSize; let py = e.y * this.cellSize;
-            if(e.type === 10) { 
-                ctx.fillStyle = '#fff'; ctx.fillRect(px, py, 4, 4);
-                ctx.fillStyle = '#fbb'; ctx.fillRect(px, py-2, 1, 2); ctx.fillRect(px+3, py-2, 1, 2);
-            } else if (e.type === 11) { 
-                ctx.fillStyle = '#666'; ctx.fillRect(px-1, py-1, 6, 5);
-                ctx.fillStyle = '#f00'; ctx.fillRect(px, py, 1, 1); 
-            } else if (e.type === 12) { 
-                ctx.fillStyle = '#fcc'; ctx.fillRect(px+1, py-2, 2, 2); 
-                ctx.fillStyle = '#00f'; ctx.fillRect(px, py, 4, 4);     
-                
-                if(e.chatTimer > 0) {
-                    ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace';
-                    ctx.fillText(e.chatMsg, px - 8, py - 4);
-                }
+            ctx.fillStyle = (e.type===10)?'#fff':(e.type===11)?'#666':'#fcc';
+            ctx.fillRect(px, py, 4, 4);
+            if(e.type===12 && e.chatTimer > 0) { // モールス
+                ctx.fillStyle = '#ff0'; ctx.font = '8px monospace'; ctx.fillText(e.chatMsg, px - 6, py - 4);
             }
         }
         ctx.restore();
 
-        // 2. ログ領域 (Y: 0 ~ 30) 幅400
-        ctx.fillStyle = 'rgba(0, 10, 0, 0.8)'; ctx.fillRect(0, 0, 400, 30);
-        ctx.strokeStyle = '#0f0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0,30); ctx.lineTo(400,30); ctx.stroke();
-        ctx.fillStyle = '#0f0'; ctx.font = '12px monospace';
-        for(let i=0; i<this.logs.length; i++) {
-            ctx.globalAlpha = Math.min(1.0, this.logs[i].life / 20);
-            ctx.fillText(this.logs[i].text, 10, 12 + i * 14);
-        }
+        // ログ
+        ctx.fillStyle = 'rgba(0, 15, 0, 0.8)'; ctx.fillRect(0, 0, 200, 30);
+        ctx.strokeStyle = '#0f0'; ctx.beginPath(); ctx.moveTo(0,30); ctx.lineTo(200,30); ctx.stroke();
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 9px monospace';
+        for(let i=0; i<this.logs.length; i++) { ctx.globalAlpha = Math.min(1.0, this.logs[i].life / 20); ctx.fillText(this.logs[i].text, 5, 10 + i * 10); }
         ctx.globalAlpha = 1.0;
 
-        // 3. UI・パレット領域 (Y: 210 ~ 240) 幅400
-        ctx.fillStyle = '#111'; ctx.fillRect(0, 210, 400, 30);
-        ctx.strokeStyle = '#333'; ctx.beginPath(); ctx.moveTo(0,210); ctx.lineTo(400,210); ctx.stroke();
-        
-        ctx.fillStyle = '#fff'; ctx.font = '14px monospace';
-        let pName = this.pals[this.curPal].name;
-        ctx.fillText(`◀ [ ${pName} ] ▶`, 15, 230);
-        
-        if(this.speed > 1) {
-            ctx.fillStyle = '#ff0'; ctx.fillText('>> SPEED x3', 150, 230);
-        } else {
-            ctx.fillStyle = '#aaa'; ctx.fillText('SPEED x1 (B)', 150, 230);
-        }
-        
-        ctx.fillStyle = '#666'; ctx.font = '12px monospace'; 
-        ctx.fillText('A/TAP:配置   SEL:全消去', 260, 230);
+        // UI
+        ctx.fillStyle = '#111'; ctx.fillRect(0, 270, 200, 30);
+        ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+        ctx.fillText(`◀ [ ${this.pals[this.curPal].name} ] ▶`, 10, 288);
+        ctx.fillStyle = (this.speed>1)?'#ff0':'#aaa'; ctx.fillText('>> x3 (B)', 130, 288);
     }
 };
