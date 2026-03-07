@@ -1,5 +1,5 @@
-// === PIXEL BIOTOPE - AI EVOLUTION (Balanced & 12 Actions Edition) ===
-// 生態系の崩壊スピードを調整し、人類のアクションを12種類に拡張した完全版！
+// === PIXEL BIOTOPE - AI EVOLUTION (Instinct & Balance Edition) ===
+// 人類に「本能(初期Q値)」を与え、ウサギの繁殖速度など生態系バランスを調整！
 
 const Biotope = {
     grid: [], entities: [], logs: [], 
@@ -14,7 +14,7 @@ const Biotope = {
         {id: 5, type:'M', name: '🌲木', col: '#161'},
         {id: 6, type:'M', name: '🌋炎/マグマ', col: '#f40'},
         {id: 7, type:'M', name: '🧱石(山)', col: '#999'},
-        {id: 10, type:'E', name: '🐇兎', col: '#fff', tick: 4}, // 行動頻度(tick)
+        {id: 10, type:'E', name: '🐇兎', col: '#fff', tick: 4}, 
         {id: 11, type:'E', name: '🐺狼', col: '#444', tick: 3},
         {id: 12, type:'E', name: '🧍人', col: '#fcc', tick: 5}
     ],
@@ -31,12 +31,42 @@ const Biotope = {
         
         this.generateWorld();
 
-        // ★ Qテーブル拡張: 8状態 × 12アクション
+        // ★ 人類の脳（Qテーブル）の初期化と「本能(DNA)」の注入
         this.Q = Array(8).fill(0).map(() => Array(12).fill(0));
+        this.injectInstincts();
         
-        this.addLog("WORLD GENERATED. ECOSYSTEM STABILIZED.");
-        this.addLog("人類に12の自由(アクション)を与えました。");
+        this.addLog("WORLD GENERATED. ECOSYSTEM BALANCED.");
+        this.addLog("人類は「本能」に目覚めました。");
         BGM.play('menu');
+    },
+
+    // 🧬 人類に最低限の基礎知識（本能）をセットする
+    injectInstincts() {
+        // 状態: (threat << 2) | (res << 1) | friend
+        for (let s = 0; s < 8; s++) {
+            let threat = (s & 4) !== 0;
+            let res = (s & 2) !== 0;
+            let friend = (s & 1) !== 0;
+
+            // アクション対応表
+            // 0:IDLE, 1:WANDER, 2:ESCAPE, 3:GATHER, 4:APPROACH, 5:BUILD
+            // 6:DESTROY, 7:ATTACK, 8:PLANT, 9:IGNITE, 10:COMMUNICATE, 11:REPRODUCE
+
+            if (threat) {
+                this.Q[s][2] += 30;  // 脅威があれば「逃げる」のは本能！
+                this.Q[s][7] += 5;   // 勇敢な奴は「戦う」
+                this.Q[s][5] += 5;   // 「壁(家)を作る」のも生存本能
+            }
+            if (res) {
+                this.Q[s][3] += 20;  // 飯(資源)があれば「採集」する
+            }
+            if (friend) {
+                this.Q[s][4] += 10;  // 仲間に寄り添う
+                this.Q[s][10] += 15; // 「会話」して知識を共有する
+            }
+            // 火遊びは危険だと最初から教えておく
+            this.Q[s][9] -= 20; 
+        }
     },
 
     generateWorld() {
@@ -98,7 +128,6 @@ const Biotope = {
     getGrid(x, y) { if(x<0||x>=this.W||y<0||y>=this.H) return 1; return this.grid[x][y]; },
     setGrid(x, y, v) { if(x>=0&&x<this.W&&y>=0&&y<this.H) this.grid[x][y] = v; },
 
-    // 自然環境のシミュレーション（ゆっくり進行）
     simPhysicalSteps() {
         let updates = []; 
         for(let x=0; x<this.W; x++) {
@@ -108,16 +137,16 @@ const Biotope = {
 
                 let neighbors = [[x,y-1], [x,y+1], [x-1,y], [x+1,y]];
 
-                if(id === 6) { // 炎
+                if(id === 6) { 
                     for(let [nx, ny] of neighbors) {
                         let n = this.getGrid(nx, ny);
                         if(n === 1) updates.push({x, y, v: 7}); 
-                        if((n === 4 || n === 5) && Math.random() < 0.2) updates.push({x: nx, y: ny, v: 6}); // 燃え広がりを遅く
+                        if((n === 4 || n === 5) && Math.random() < 0.2) updates.push({x: nx, y: ny, v: 6}); 
                     }
-                    if(Math.random() < 0.3) updates.push({x, y, v: 3}); // 鎮火しやすい
+                    if(Math.random() < 0.3) updates.push({x, y, v: 3}); 
                 }
                 
-                if((id === 4 || id === 5) && Math.random() < 0.002) { // 繁殖を遅く
+                if((id === 4 || id === 5) && Math.random() < 0.002) { 
                     let [nx, ny] = neighbors[Math.floor(Math.random()*4)];
                     if(this.getGrid(nx, ny) === 3) updates.push({x: nx, y: ny, v: id});
                 }
@@ -128,13 +157,11 @@ const Biotope = {
 
     simStep() {
         this.frame++;
-        // ★ 環境の更新を10フレームに1回にして自然崩壊を防ぐ
         if(this.frame % 10 === 0) this.simPhysicalSteps(); 
 
         for(let i = this.entities.length - 1; i >= 0; i--) {
             let e = this.entities[i];
             
-            // ★ 各生物に設定された tick（行動間隔）で動かすことでワチャワチャ感を抑える
             if(this.frame % e.tick !== 0) continue;
 
             e.hp--; 
@@ -142,14 +169,14 @@ const Biotope = {
 
             if(e.hp <= 0 || this.getGrid(e.x, e.y) === 6) {
                 if(e.type === 12 && this.getGrid(e.x, e.y) === 6 && e.lastState !== undefined) {
-                    this.Q[e.lastState][e.lastAction] -= 50; 
-                    this.addLog("☠️ 人間が炎に焼かれた！(痛い学習)");
+                    this.Q[e.lastState][e.lastAction] -= 100; // マグマ死の強烈なペナルティ
+                    if(Math.random() < 0.3) this.addLog("☠️ 人間が炎に焼かれた！");
                 }
                 this.entities.splice(i, 1);
                 continue;
             }
 
-            // --- ウサギ ---
+            // --- ウサギ (大増殖を制限) ---
             if(e.type === 10) { 
                 let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
                 let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
@@ -157,10 +184,13 @@ const Biotope = {
                 if(nextGrid !== 1 && nextGrid !== 7 && nextGrid !== 6) { e.x += dx; e.y += dy; } 
                 
                 if(this.getGrid(e.x, e.y) === 4) {
-                    // ★ 草を一瞬で食い尽くさず、少し残す(確率で土になる)
-                    if(Math.random() < 0.2) this.setGrid(e.x, e.y, 3); 
-                    e.hp += 30; 
-                    if(e.hp > 150) { e.hp = 80; this.entities.push({type:10, x:e.x, y:e.y, hp:80, tick:4, chatTimer:0}); }
+                    if(Math.random() < 0.3) this.setGrid(e.x, e.y, 3); // 確実に草を消費する確率アップ
+                    e.hp += 40; 
+                    // ★ 繁殖に必要なHPを激増させ、増殖スピードをマイルドに
+                    if(e.hp > 400) { 
+                        e.hp = 200; 
+                        this.entities.push({type:10, x:e.x, y:e.y, hp:200, tick:4, chatTimer:0}); 
+                    }
                 }
             } 
             // --- オオカミ ---
@@ -173,9 +203,9 @@ const Biotope = {
                     if(nextGrid !== 1 && nextGrid !== 7 && nextGrid !== 6) { e.x += dx; e.y += dy; }
 
                     if(Math.abs(target.x - e.x) <= 1 && Math.abs(target.y - e.y) <= 1) {
-                        target.hp -= 200; e.hp += 100;
+                        target.hp -= 200; e.hp += 150;
                         if(target.type === 12) this.addLog("🐺 オオカミが人間を襲った");
-                        if(e.hp > 250) { e.hp = 100; this.entities.push({type:11, x:e.x, y:e.y, hp:100, tick:3, chatTimer:0}); }
+                        if(e.hp > 350) { e.hp = 150; this.entities.push({type:11, x:e.x, y:e.y, hp:150, tick:3, chatTimer:0}); }
                     }
                 } else if(Math.random() < 0.4) {
                     let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
@@ -219,14 +249,13 @@ const Biotope = {
         let state = (threat << 2) | (res << 1) | friend;
         
         if (e.lastState !== undefined) {
-            let reward = -0.1;
-            if (e.hp > e.lastHp) reward += 5;
-            if (e.hp < e.lastHp) reward -= 15;
+            let reward = -0.1; // 基礎生存コスト
+            if (e.hp > e.lastHp) reward += 5; // 回復はプラス
+            if (e.hp < e.lastHp) reward -= 15; // ダメージはマイナス
             let maxQ = Math.max(...this.Q[state]);
             this.Q[e.lastState][e.lastAction] += 0.2 * (reward + 0.9 * maxQ - this.Q[e.lastState][e.lastAction]);
         }
 
-        // 探索率 (ε) = 0.15 にして色々な行動を試させる
         let action = 0;
         if(Math.random() < 0.15) action = Math.floor(Math.random() * 12);
         else {
@@ -241,76 +270,75 @@ const Biotope = {
             if(isEscape) { dx *= -1; dy *= -1; }
             if(Math.random()<0.5 && dx !== 0) dy = 0; else if(dy !== 0) dx = 0; 
             let n = this.getGrid(e.x+dx, e.y+dy);
-            if(n !== 1 && n !== 7 && n !== 6) { e.x += dx; e.y += dy; } // 海・山・炎を避ける
+            if(n !== 1 && n !== 7 && n !== 6) { e.x += dx; e.y += dy; } 
         };
 
-        // ★ 12種類のアクション実行
-        if(action === 0) { // 0: IDLE (休む)
+        if(action === 0) { // 0: IDLE
             e.hp += 2; 
         } 
-        else if(action === 1) { // 1: WANDER (歩き回る)
+        else if(action === 1) { // 1: WANDER
             let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
             let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let n = this.getGrid(e.x+dx, e.y+dy);
             if(n !== 1 && n !== 6) { e.x += dx; e.y += dy; }
         } 
-        else if(action === 2 && threat) { // 2: ESCAPE (逃避)
+        else if(action === 2 && threat) { // 2: ESCAPE
             moveTowards(threatX, threatY, true);
         } 
-        else if(action === 3 && res) { // 3: GATHER (採集)
+        else if(action === 3 && res) { // 3: GATHER
             moveTowards(resX, resY, false);
             let foot = this.getGrid(e.x, e.y);
             if(foot === 4 || foot === 5) {
-                this.setGrid(e.x, e.y, 3); e.hp += 80; 
+                this.setGrid(e.x, e.y, 3); e.hp += 100; // 人類は一気に回復
             }
         } 
-        else if(action === 4 && friend) { // 4: APPROACH FRIEND (仲間に寄る)
+        else if(action === 4 && friend) { // 4: APPROACH FRIEND
             moveTowards(friendX, friendY, false);
         }
-        else if(action === 5) { // 5: BUILD (建築・壁作り)
+        else if(action === 5) { // 5: BUILD
             let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
             let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let tg = this.getGrid(e.x+dx, e.y+dy);
             if(tg === 3 || tg === 2 || tg === 4) { 
                 this.setGrid(e.x+dx, e.y+dy, 7); 
-                this.Q[state][action] += 2; // 少し報酬
+                this.Q[state][action] += 2; 
             }
         } 
-        else if(action === 6) { // 6: DESTROY (整地・破壊)
+        else if(action === 6) { // 6: DESTROY
             let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
             let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let tg = this.getGrid(e.x+dx, e.y+dy);
             if(tg === 7 || tg === 5) { 
-                this.setGrid(e.x+dx, e.y+dy, 3); // 土に戻す
+                this.setGrid(e.x+dx, e.y+dy, 3); 
                 this.Q[state][action] += 1;
             }
         }
-        else if(action === 7 && threat) { // 7: ATTACK (攻撃)
+        else if(action === 7 && threat) { // 7: ATTACK
             let target = this.entities.find(t => t.type === 11 && Math.abs(t.x-e.x)<=2 && Math.abs(t.y-e.y)<=2);
             if(target) { 
                 target.hp -= 150; this.Q[state][action] += 15; 
                 if(target.hp <= 0) this.addLog("⚔️ 人類が脅威を排除した！"); 
             }
         } 
-        else if(action === 8) { // 8: PLANT (緑化・植林)
+        else if(action === 8) { // 8: PLANT
             let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
             let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             if(this.getGrid(e.x+dx, e.y+dy) === 3) { 
-                this.setGrid(e.x+dx, e.y+dy, 4); // 草を植える
+                this.setGrid(e.x+dx, e.y+dy, 4); 
                 this.Q[state][action] += 3;
             }
         }
-        else if(action === 9) { // 9: IGNITE (放火)
+        else if(action === 9) { // 9: IGNITE
             let dx = Math.random() < 0.5 ? (Math.random()<0.5?-1:1) : 0;
             let dy = dx === 0 ? (Math.random()<0.5?-1:1) : 0;
             let tg = this.getGrid(e.x+dx, e.y+dy);
             if(tg === 4 || tg === 5) { 
-                this.setGrid(e.x+dx, e.y+dy, 6); // 火をつける
-                this.Q[state][action] -= 5; // 危険なので基本ペナルティだが…
+                this.setGrid(e.x+dx, e.y+dy, 6); 
+                this.Q[state][action] -= 5; 
                 if(Math.random() < 0.05) this.addLog("🔥 人間が森に火を放った！");
             }
         }
-        else if(action === 10 && friend) { // 10: COMMUNICATE (会話)
+        else if(action === 10 && friend) { // 10: COMMUNICATE
             e.chatTimer = 40;
             e.chatMsg = ["・ー・", "ーー", "・・", "ー・", "SOS"][Math.floor(Math.random()*5)];
             let count = 0;
@@ -322,14 +350,14 @@ const Biotope = {
             }
             if(count > 0 && Math.random() < 0.03) this.addLog(`💬 知識の伝達(${count}人)`);
         }
-        else if(action === 11) { // 11: REPRODUCE (繁殖)
-            // お腹がいっぱいの時だけ増える
-            if(e.hp > 250) {
-                e.hp -= 100;
-                this.entities.push({type:12, x:e.x, y:e.y, hp:150, tick:5, chatTimer:0}); 
+        else if(action === 11) { // 11: REPRODUCE
+            if(e.hp > 300) { // 十分に栄養があるときのみ
+                e.hp -= 150;
+                this.entities.push({type:12, x:e.x, y:e.y, hp:200, tick:5, chatTimer:0}); 
                 this.addLog("👶 人類が新たな命を育んだ");
+                this.Q[state][action] += 10; // 繁殖成功は最高の報酬
             } else {
-                this.Q[state][action] -= 2; // 空腹時は失敗ペナルティ
+                this.Q[state][action] -= 5; 
             }
         }
     },
