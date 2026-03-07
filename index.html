@@ -8,8 +8,61 @@
 <meta name="theme-color" content="#000000">
 <title>9in1 RETRO SYSTEM</title>
 
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjMTExIiByeD0iMTIiLz48cmVjdCB4PSI4IiB5PSI4IiB3aWR0aD0iNDgiIGhlaWdodD0iMzIiIGZpbGw9IiM4YmFjMGYiIHJ4PSI0Ii8+PHRleHQgeD0iMzIiIHk9IjMwIiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzMwNjIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OWluMTwvdGV4dD48Y2lyY2xlIGN4PSI0NCIgY3k9IjUwIiByPSI2IiBmaWxsPSIjZjAwIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI0NCIgcj0iNiIgZmlsbD0iIzAwZiIvPjxyZWN0IHg9IjEyIiB5PSI0NiIgd2lkdGg9IjE2IiBoZWlnaHQ9IjQiIGZpbGw9IiMzMzMiLz48cmVjdCB4PSIxOCIgeT0iNDAiIHdpZHRoPSI0IiBoZWlnaHQ9IjE2IiBmaWxsPSIjMzMzIi8+PC9zdmc+" type="image/svg+xml">
-<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjMTExIiByeD0iMTIiLz48cmVjdCB4PSI4IiB5PSI4IiB3aWR0aD0iNDgiIGhlaWdodD0iMzIiIGZpbGw9IiM4YmFjMGYiIHJ4PSI0Ii8+PHRleHQgeD0iMzIiIHk9IjMwIiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE2IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzMwNjIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OWluMTwvdGV4dD48Y2lyY2xlIGN4PSI0NCIgY3k9IjUwIiByPSI2IiBmaWxsPSIjZjAwIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI0NCIgcj0iNiIgZmlsbD0iIzAwZiIvPjxyZWN0IHg9IjEyIiB5PSI0NiIgd2lkdGg9IjE2IiBoZWlnaHQ9IjQiIGZpbGw9IiMzMzMiLz48cmVjdCB4PSIxOCIgeT0iNDAiIHdpZHRoPSI0IiBoZWlnaHQ9IjE2IiBmaWxsPSIjMzMzIi8+PC9zdmc+">
+<link id="favicon" rel="icon" type="image/png" href="">
+<link id="apple-icon" rel="apple-touch-icon" href="">
+
+<script>
+// ★ 裏技：iOSの制限を回避するため、ページ読み込み時にJSでアイコン(PNG)を描画して動的セットする
+(function() {
+  var c = document.createElement('canvas');
+  c.width = 180; c.height = 180;
+  var ctx = c.getContext('2d');
+
+  // 丸角の四角形を描画する関数
+  function rr(x,y,w,h,r) {
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y); ctx.fill();
+  }
+
+  // 筐体の背景（黒）
+  ctx.fillStyle = '#1a1a1a';
+  rr(0, 0, 180, 180, 30);
+
+  // 画面のフチ
+  ctx.fillStyle = '#000';
+  rr(15, 15, 150, 90, 15);
+
+  // 緑色のモニター
+  ctx.fillStyle = '#8bac0f';
+  rr(25, 25, 130, 70, 5);
+
+  // ロゴ文字
+  ctx.fillStyle = '#306230';
+  ctx.font = 'bold 42px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('9in1', 90, 60);
+
+  // 十字キー
+  ctx.fillStyle = '#333';
+  ctx.fillRect(30, 135, 45, 15);
+  ctx.fillRect(45, 120, 15, 45);
+
+  // A・Bボタン
+  ctx.fillStyle = '#f00';
+  ctx.beginPath(); ctx.arc(150, 130, 15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#00f';
+  ctx.beginPath(); ctx.arc(115, 155, 15, 0, Math.PI*2); ctx.fill();
+
+  // Canvasの絵をPNGデータに変換してiOS用アイコンに上書き！
+  var dataURL = c.toDataURL('image/png');
+  document.getElementById('apple-icon').href = dataURL;
+  document.getElementById('favicon').href = dataURL;
+})();
+</script>
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
