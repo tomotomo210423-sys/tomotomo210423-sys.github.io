@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>8in1 RETRO SYSTEM</title>
+<title>9in1 RETRO SYSTEM</title>
 
 <link rel="icon" href="icon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
@@ -36,7 +36,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   transform: rotate(-10deg); pointer-events: none;
 }
 
-/* ★ 修正完了: スロットモードの変形CSS */
 #gameboy.mode-slot { 
   background: linear-gradient(135deg, #600 0%, #200 100%); border-radius: 15px 15px 50px 50px; 
   box-shadow: inset -5px -5px 15px rgba(0,0,0,0.8), inset 3px 3px 10px rgba(255,100,100,0.2), 0 0 40px rgba(255,50,50,0.6); 
@@ -46,7 +45,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-slot #classic-controls { opacity: 0; transform: translateY(100px); pointer-events: none; }
 #gameboy.mode-slot #slot-controls { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-/* ★ 修正完了: アビス・ジェネラルの横画面変形CSS */
 #gameboy.mode-abyss {
   max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row-reverse;
   background: linear-gradient(135deg, #1a0022 0%, #000 100%); 
@@ -73,7 +71,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; 
 }
 
-/* ★ 修正完了: リズムゲームの縦画面変形CSS */
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; pointer-events: none; } 
 
@@ -137,7 +134,7 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 <div id="gameboy">
   <div id="screen-container">
     <div id="boot">
-      <div class="boot-text">8in1 RETRO SYSTEM</div>
+      <div class="boot-text">9in1 RETRO SYSTEM</div>
       <div class="boot-text">SYSTEM BOOTING...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
       <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
