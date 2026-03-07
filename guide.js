@@ -54,6 +54,11 @@ const Guide = {
             text: "呪いの靴のせいで、歩くたびに爆音と「超巨大な文字」が出る最悪のステルスゲームじゃ！\n\n【操作】\n十字キー: 移動\nAボタン: 敵の背後で暗殺 / デコイシャウト\nAボタン(長押し): 端末のハッキング\nBボタン: 虹色ダンボールを被る\n\n【⚠呪いのステルス靴】\n歩くたびに巨大な擬音語が画面を覆い尽くし、自分の視界がまったく見えなくなるぞ！敵の視界(赤い範囲)やレーザーに触れてしまうと即ゲームオーバーじゃ！\n\n【デコイシャウト】\n敵がいない場所でAボタンを押すと、大声を出して敵をおびき寄せることができる！ただし、超絶巨大な文字が出るので注意じゃ。\n\n【虹色ダンボールとO2ゲージ】\nBボタンでダンボールを被ると敵の視界をやり過ごせるが、移動速度が激減し、画面上の【O2ゲージ】が減っていく。ゼロになると酸欠でしばらく使えなくなるぞ！\n\n【ギミック】\n・青いロッカー: 重なると完全に隠れられる！(O2ゲージも減らない)\n・黄色い端末: 全てを100%までハッキングしないとゴールが開かない！\n・カラー扉: 同じ色のスイッチを踏むと開くぞ！\n\n(※タイトル画面の DATABASE で、最高にくだらない裏設定が読めるぞ！)"
         },
         {
+            name: "ハッカーズ15",
+            icon: "0000000006666660061111600616616006111160066666600000000000000000",
+            text: "スマホの好きな画像を読み込んで遊べる、ハッカー仕様の15パズルじゃ！\n\n【操作】\n十字キー: カーソル移動\nAボタン: ピースのスライド / 決定\nBボタン: ハックメニューを開く\n\n【システム】\nタイトル画面で「HACKER MODE」を選ぶと、スマホの写真をパズルにできるぞ！\nパズルが解けない時は、Bボタンで「合法チート」を使って強引にクリアするのじゃ！\n\n【OVERRIDE MENU (チート)】\nHPを消費して強力なチートを使えるぞ！\n・SWAP: 離れたピースを強制入れ替え！\n・SCAN: ピースに正解の数字が透視される！\n・DELETE: 邪魔なピースを木っ端微塵に破壊して空白を増やす！\n\n※正しい場所にピースをスライドさせるとHPが回復するぞ！"
+        },
+        {
             name: "王様の間 (AI)",
             icon: "0300003003033030333333333333333333333333033333300033330000000000",
             text: "なんと！わし(AI)と自由におしゃべりができる魔法の部屋じゃ！\n\n【コマンド解説】\n・ほうこくする: ゲームの記録をわしに教える\n・じゆうにはなす: 好きな言葉を入力する\n\n【⚠王様の魔力について】\nわしも歳じゃから、連続で話しかけられると魔力が尽きて疲れてしまうんじゃ。\n「休ませてくれ」と言われた時は、【1分ほど】待ってから話しかけてくれい！\n\n(※ヒント：わしは甘いものが大好物じゃ)"
@@ -68,7 +73,6 @@ const Guide = {
         this.targetScrollY = 0;
     },
     
-    // 長いテキストを画面幅に合わせて自動で改行させる関数
     getWrappedLines(text, maxWidth) {
         let result = [];
         let paragraphs = text.split('\n');
@@ -94,7 +98,6 @@ const Guide = {
     
     update() {
         this.tmr++;
-        // 滑らかなスクロール処理
         this.scrollY += (this.targetScrollY - this.scrollY) * 0.3;
         
         if (this.st === 'list') {
@@ -112,7 +115,6 @@ const Guide = {
             if (keysDown.a) {
                 this.st = 'detail';
                 this.lines = this.getWrappedLines(this.games[this.cur].text, 175);
-                // 最大スクロール位置を計算 (行数 × 行の高さ - 描画領域の高さ)
                 this.maxScrollY = Math.max(0, this.lines.length * 15 - 200);
                 this.scrollY = 0;
                 this.targetScrollY = 0;
@@ -125,13 +127,8 @@ const Guide = {
                 return;
             }
             
-            // スクロール操作
-            if (keys.down) {
-                this.targetScrollY = Math.min(this.targetScrollY + 6, this.maxScrollY);
-            }
-            if (keys.up) {
-                this.targetScrollY = Math.max(this.targetScrollY - 6, 0);
-            }
+            if (keys.down) { this.targetScrollY = Math.min(this.targetScrollY + 6, this.maxScrollY); }
+            if (keys.up) { this.targetScrollY = Math.max(this.targetScrollY - 6, 0); }
         }
     },
     
@@ -149,60 +146,48 @@ const Guide = {
     draw() {
         ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
         
-        // サイバーグリッド背景
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)'; ctx.lineWidth = 1;
         for(let i = 0; i < 200; i += 20) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 300); ctx.stroke(); }
         for(let i = 0; i < 300; i += 20) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(200, i); ctx.stroke(); }
         
         if (this.st === 'list') {
-            // ヘッダー
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace';
             ctx.fillText('DATA ARCHIVE', 45, 30);
             ctx.strokeStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(10, 40); ctx.lineTo(190, 40); ctx.stroke();
             
-            // リスト描画
             let startY = 55;
             let drawStart = Math.max(0, this.cur - 4);
             for (let i = drawStart; i < Math.min(this.games.length, drawStart + 6); i++) {
                 let y = startY + (i - drawStart) * 35;
                 
                 if (i === this.cur) {
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
-                    ctx.fillRect(10, y - 10, 175, 30);
-                    ctx.strokeStyle = '#0ff';
-                    ctx.strokeRect(10, y - 10, 175, 30);
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.2)'; ctx.fillRect(10, y - 10, 175, 30);
+                    ctx.strokeStyle = '#0ff'; ctx.strokeRect(10, y - 10, 175, 30);
                 }
                 
-                // アイコン
                 this.drawSpriteData(20, y - 5, this.games[i].icon, 2);
                 
-                ctx.fillStyle = i === this.cur ? '#fff' : '#888';
-                ctx.font = 'bold 11px monospace';
+                ctx.fillStyle = i === this.cur ? '#fff' : '#888'; ctx.font = 'bold 11px monospace';
                 ctx.fillText(this.games[i].name, 45, y + 8);
             }
             
-            // スクロールバー
             ctx.fillStyle = '#112'; ctx.fillRect(190, 50, 4, 210);
             let barH = 210 * (6 / this.games.length);
             let barY = 50 + (210 - barH) * (this.cur / (this.games.length - 1));
             ctx.fillStyle = '#0ff'; ctx.fillRect(190, barY, 4, barH);
             
-            // フッター
             ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
             ctx.fillText('A: READ   SELECT/B: BACK', 20, 285);
             
         } else if (this.st === 'detail') {
             let g = this.games[this.cur];
             
-            // 詳細ヘッダー
             ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 50);
             this.drawSpriteData(10, 15, g.icon, 2.5);
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 12px monospace';
             ctx.fillText(g.name, 35, 28);
             ctx.strokeStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(0, 45); ctx.lineTo(200, 45); ctx.stroke();
             
-            // テキストクリッピング領域
             ctx.save();
             ctx.beginPath(); ctx.rect(0, 46, 190, 215); ctx.clip();
             ctx.translate(0, -this.scrollY);
@@ -210,22 +195,15 @@ const Guide = {
             ctx.font = '10px monospace';
             let lineY = 65;
             for (let line of this.lines) {
-                // 自動ハイライト機能
-                if (line.includes('【')) {
-                    ctx.fillStyle = '#ff0';
-                } else if (line.includes('⚠') || line.includes('ゲームオーバー')) {
-                    ctx.fillStyle = '#f55';
-                } else if (line.includes('※')) {
-                    ctx.fillStyle = '#0fa';
-                } else {
-                    ctx.fillStyle = '#fff';
-                }
+                if (line.includes('【')) { ctx.fillStyle = '#ff0'; } 
+                else if (line.includes('⚠') || line.includes('ゲームオーバー')) { ctx.fillStyle = '#f55'; } 
+                else if (line.includes('※')) { ctx.fillStyle = '#0fa'; } 
+                else { ctx.fillStyle = '#fff'; }
                 ctx.fillText(line, 10, lineY);
                 lineY += 15;
             }
             ctx.restore();
             
-            // 詳細画面スクロールバー
             if (this.maxScrollY > 0) {
                 ctx.fillStyle = '#112'; ctx.fillRect(192, 50, 4, 210);
                 let scrollRatio = this.scrollY / this.maxScrollY;
@@ -233,7 +211,6 @@ const Guide = {
                 ctx.fillStyle = '#0ff'; ctx.fillRect(192, 50 + (210 - barH) * scrollRatio, 4, barH);
             }
             
-            // フッター
             ctx.fillStyle = '#001'; ctx.fillRect(0, 265, 200, 35);
             ctx.strokeStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(0, 265); ctx.lineTo(200, 265); ctx.stroke();
             ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
