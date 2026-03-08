@@ -1,19 +1,22 @@
-// === BEAT BROS - VJ VISUALIZER & HI-SPEED EDITION ===
-// リアルタイムビジュアライザ、同時押しライン、ハイスピード調整、UI超強化！
+// === BEAT BROS - VJ VISUALIZER & SKIN CUSTOMIZE EDITION ===
+// 同時押しを廃止し爽快感重視へ。ノーツの見た目を変更できるスキン機能を追加！
 
 const Rhythm = {
-  st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0,
+  st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0,
   audioBuffer: null, source: null, analyser: null, dataArray: null,
   startTime: 0, notes: [],
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, 
   pendingFile: null, playlist: [], trackIndex: 0, 
   isEndless: false, endlessBpm: 120, endlessBeat: 0, logicalBeatTime: 0, life: 5, finalTime: 0,
-  touchBound: false, laneTouch: [false,false,false,false], laneGlow: [0,0,0,0], // レーン発光用
+  touchBound: false, laneTouch: [false,false,false,false], laneGlow: [0,0,0,0], 
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
   video: null, isVideo: false, bgTimer: 0,
 
+  // スキンの種類
+  skins: ['CLASSIC', 'CYBER', 'DOT', 'GEM'],
+
   init() {
-    this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0; this.hiSpeed = 1.0;
+    this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0; this.hiSpeed = 1.0; this.noteSkin = 0;
     this.laneTouch = [false,false,false,false]; this.laneGlow = [0,0,0,0];
     this.audioBuffer = null; this.playlist = []; this.trackIndex = 0;
     if(this.source){ this.source.stop(); this.source.disconnect(); this.source=null; }
@@ -56,7 +59,6 @@ const Rhythm = {
     }
   },
 
-  // ★ 曲選択UIを超絶サイバー強化！
   showFileUI() {
     let ui = document.getElementById('rhythm-file-ui');
     if(!ui) {
@@ -145,45 +147,38 @@ const Rhythm = {
     reader.readAsArrayBuffer(file);
   },
 
-  // ★ ノーツ生成アルゴリズムの強化（密度大幅アップ！）
+  // ★ 同時押しを廃止し、純粋な単押しで爽快感重視の譜面に変更！
   generateNotes(buffer) {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0; for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // ★ 難易度ごとの敷居値（低いほどノーツが増える）
-    let threshold = avgVol * (this.mode === 'nightmare' ? 0.3 : this.mode === 'hard' ? 0.7 : this.mode === 'normal' ? 1.1 : 1.6);
+    let threshold = avgVol * (this.mode === 'nightmare' ? 0.4 : this.mode === 'hard' ? 0.8 : this.mode === 'normal' ? 1.3 : 1.8);
     if(threshold < 0.01) threshold = 0.01;
     
-    // ★ ノーツの最小間隔（短いほど連打になる）
-    let minGap = this.mode === 'nightmare' ? 0.06 : this.mode === 'hard' ? 0.12 : this.mode === 'normal' ? 0.2 : 0.35;
+    // 間隔を調整（同時押しがない分、少し密度を上げても叩きやすい）
+    let minGap = this.mode === 'nightmare' ? 0.08 : this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.22 : 0.35;
     
     let lastTime = 0, lastLane = -1;
     for(let i=0; i<raw.length; i+=256) {
       if(Math.abs(raw[i]) > threshold) {
         let t = i / buffer.sampleRate; 
         if(t - lastTime > minGap) {
-          // 同時押し（和音）の確率を上げる
-          let isSimultaneous = Math.random() < (this.mode === 'nightmare' ? 0.35 : this.mode === 'hard' ? 0.2 : 0.05);
-          let nCnt = isSimultaneous ? (Math.random() < 0.3 ? 3 : 2) : 1;
+          // 常に単押し（1ノーツ）を生成
+          let lane = Math.floor(Math.random() * 4);
+          if(lane === lastLane && Math.random() < 0.7) lane = (lane + 1 + Math.floor(Math.random()*2)) % 4;
           
-          let lanes = [0,1,2,3].sort(()=>Math.random()-0.5).slice(0,nCnt);
-          lanes.forEach(l => {
-              // 少し散らして配置
-              this.notes.push({ time: t + (isSimultaneous ? 0 : Math.random()*0.02), lane: l, hit: false, y: -50, missed: false });
-          });
-          lastLane = lanes[0]; lastTime = t; 
+          this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
+          lastLane = lane; lastTime = t; 
         }
       }
     }
-    // ノーツが少なすぎる場合の救済
+    
     if(this.notes.length < 20) {
        this.notes = []; lastTime = 0; lastLane = -1;
        for(let t=2; t<buffer.duration; t+=minGap*1.2) { let lane = Math.floor(Math.random() * 4); this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false }); }
     }
     
-    // 時間順にソート（同時押しラインの描画で必要）
-    this.notes.sort((a,b) => a.time - b.time);
     this.startPlay();
   },
 
@@ -194,9 +189,8 @@ const Rhythm = {
        this.score = 0; this.combo = 0; this.maxCombo = 0; this.judgements = [];
     }
     
-    // ★ リアルタイム・ビジュアライザ用 AnalyserNodeの準備
     this.analyser = audioCtx.createAnalyser();
-    this.analyser.fftSize = 64; // 荒めのバーにする
+    this.analyser.fftSize = 64; 
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
     if(this.isEndless) {
@@ -204,21 +198,17 @@ const Rhythm = {
        this.life = 5; this.endlessBpm = 120;
        this.endlessBeat = 0; this.logicalBeatTime = 0; this.finalTime = 0;
        this.startTime = audioCtx.currentTime + 1.5;
-       // エンドレス時は全体のDestinationから音を拾う（擬似的）
        return;
     }
 
     this.source = audioCtx.createBufferSource(); this.source.buffer = this.audioBuffer;
     
-    // エフェクトフィルター
     let lastNode = this.source;
     if(this.filterType === 1) { let filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 1.5; lastNode.connect(filter); lastNode = filter; } 
     else if(this.filterType === 2) { let filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 400; lastNode.connect(filter); lastNode = filter; } 
     else if(this.filterType === 3) { let delay = audioCtx.createDelay(); delay.delayTime.value = 0.35; let feedback = audioCtx.createGain(); feedback.gain.value = 0.3; delay.connect(feedback); feedback.connect(delay); lastNode.connect(delay); delay.connect(this.analyser); lastNode.connect(this.analyser); lastNode = null; } 
     
-    if (lastNode) {
-        lastNode.connect(this.analyser);
-    }
+    if (lastNode) { lastNode.connect(this.analyser); }
     this.analyser.connect(audioCtx.destination);
     
     this.source.onended = () => { this.handleTrackEnd(); }; 
@@ -285,19 +275,16 @@ const Rhythm = {
          playOsci(note * (difficulty > 0.8 ? 2 : 1), waveType, 0.1, 0.03);
       }
 
-      let spawnProb = 0.25 + (difficulty * 0.55); 
+      let spawnProb = 0.3 + (difficulty * 0.6); 
       if (bt % 2 !== 0) spawnProb *= 0.5; 
 
       if (Math.random() < spawnProb) {
-         let laneCount = 1;
-         if (difficulty > 0.4 && Math.random() < difficulty * 0.5) laneCount = 2; 
-         let lanes = [0,1,2,3].sort(()=>Math.random()-0.5).slice(0,laneCount);
-         lanes.forEach(l => {
-            let n = { time: this.logicalBeatTime, lane: l, hit: false, y: -50, missed: false };
-            if (elapsed > 240 && Math.random() < 0.15) n.curve = true; 
-            if (elapsed > 270 && Math.random() < 0.1) n.accel = true;  
-            this.notes.push(n);
-         });
+         // エンドレスも単押しに変更！
+         let l = Math.floor(Math.random() * 4);
+         let n = { time: this.logicalBeatTime, lane: l, hit: false, y: -50, missed: false };
+         if (elapsed > 240 && Math.random() < 0.15) n.curve = true; 
+         if (elapsed > 270 && Math.random() < 0.1) n.accel = true;  
+         this.notes.push(n);
       }
       
       this.endlessBeat++;
@@ -329,7 +316,6 @@ const Rhythm = {
         this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
         this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); 
         
-        // コンボによるド派手なエフェクト
         if (this.combo > 0 && this.combo % 50 === 0) {
             screenShake(8); playSnd('combo');
             for(let i=0; i<20; i++) addParticle(Math.random()*200, Math.random()*200, this.colors[Math.floor(Math.random()*4)], 'star');
@@ -347,8 +333,9 @@ const Rhythm = {
     }
     else if(this.st === 'settings') {
       if(kD.select){ this.st = 'menu'; this.showFileUI(); return; }
-      if(kD.up){ this.settingsCur = (this.settingsCur + 3) % 4; playSnd('sel'); } // メニューを4つに
-      if(kD.down){ this.settingsCur = (this.settingsCur + 1) % 4; playSnd('sel'); }
+      // ★ メニュー項目を5つに増やす
+      if(kD.up){ this.settingsCur = (this.settingsCur + 4) % 5; playSnd('sel'); } 
+      if(kD.down){ this.settingsCur = (this.settingsCur + 1) % 5; playSnd('sel'); }
       
       if(this.settingsCur === 0) {
         let m = ['easy','normal','hard','nightmare'];
@@ -358,12 +345,15 @@ const Rhythm = {
         if(kD.left) { this.filterType = (this.filterType + 3) % 4; playSnd('sel'); }
         if(kD.right || kD.a) { this.filterType = (this.filterType + 1) % 4; playSnd('sel'); }
       } else if(this.settingsCur === 2) { 
-        // ★ 新機能：ハイスピード調整
         let spds = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0];
         let idx = spds.indexOf(this.hiSpeed); if(idx===-1) idx=0;
         if(kD.left) { this.hiSpeed = spds[(idx + spds.length - 1) % spds.length]; playSnd('sel'); }
         if(kD.right || kD.a) { this.hiSpeed = spds[(idx + 1) % spds.length]; playSnd('sel'); }
       } else if(this.settingsCur === 3) {
+        // ★ ノーツのスキン変更
+        if(kD.left) { this.noteSkin = (this.noteSkin + 3) % 4; playSnd('sel'); }
+        if(kD.right || kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
+      } else if(this.settingsCur === 4) {
         if(kD.a){ 
           playSnd('jmp'); this.st = 'transform_in'; this.transformTimer = 120; 
           document.getElementById('gameboy').classList.add('mode-tall'); 
@@ -407,9 +397,8 @@ const Rhythm = {
     }
     else if(this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      
-      // ★ 落下速度を根本的に引き上げ＋ハイスピ倍率適用
       let speed = 200;
+      
       if(this.isEndless) {
           this.scheduleEndless(now);
           let diff = Math.min(Math.max(now, 0) / 300, 1.0);
@@ -422,7 +411,7 @@ const Rhythm = {
 
       if(kD.left || kD.l0) this.hitKey(0); if(kD.down || kD.l1) this.hitKey(1); if(kD.up || kD.l2) this.hitKey(2); if(kD.right|| kD.l3) this.hitKey(3);
       
-      for(let i=0; i<4; i++) { if(this.laneGlow[i] > 0) this.laneGlow[i] -= 0.05; } // レーン発光の減衰
+      for(let i=0; i<4; i++) { if(this.laneGlow[i] > 0) this.laneGlow[i] -= 0.05; } 
 
       for(let n of this.notes) {
         let tDiff = n.time - now;
@@ -456,14 +445,11 @@ const Rhythm = {
     
     let now = audioCtx.currentTime - this.startTime;
 
-    // --- 背景描画 (DJクラブ風 VJ演出) ---
     if (this.st === 'menu' || this.st === 'settings') {
         let t = this.bgTimer * 0.05;
         ctx.fillStyle = '#001'; ctx.fillRect(0, 0, cvs.width, cvs.height);
         ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)'; ctx.lineWidth = 2;
-        for(let i=0; i<10; i++) {
-            ctx.beginPath(); ctx.arc(100, 150, (t*50 + i*30)%300, 0, Math.PI*2); ctx.stroke();
-        }
+        for(let i=0; i<10; i++) { ctx.beginPath(); ctx.arc(100, 150, (t*50 + i*30)%300, 0, Math.PI*2); ctx.stroke(); }
     }
 
     if (this.st === 'play' && this.video && !this.video.paused && !this.video.ended) {
@@ -478,7 +464,6 @@ const Rhythm = {
         } catch(e) {} 
     }
     
-    // ★ リアルタイム・ビジュアライザ描画
     if (this.st === 'play' && this.analyser) {
         this.analyser.getByteFrequencyData(this.dataArray);
         let barWidth = (cvs.width / this.analyser.frequencyBinCount) * 1.5;
@@ -496,9 +481,7 @@ const Rhythm = {
        let diff = Math.min(elapsed / 300, 1.0);
        let r = Math.floor(diff * 80); let b = Math.floor((1 - diff) * 80);
        ctx.fillStyle = `rgba(${r}, 0, ${b}, 0.6)`; ctx.fillRect(0,0,200,400);
-       if (elapsed >= 300) {
-           ctx.translate(100, 200); ctx.rotate(Math.sin(Date.now()/400) * 0.15); ctx.translate(-100, -200);
-       }
+       if (elapsed >= 300) { ctx.translate(100, 200); ctx.rotate(Math.sin(Date.now()/400) * 0.15); ctx.translate(-100, -200); }
     }
 
     ctx.save();
@@ -513,28 +496,30 @@ const Rhythm = {
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if(this.st === 'settings') {
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('TRACK LOADED', 45, 50);
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText('TRACK LOADED', 45, 40);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
       
       if(this.isEndless) {
-         ctx.fillText('MODE: ENDLESS TIME SURVIVAL', 5, 110);
-         ctx.fillStyle = '#f00'; ctx.fillText('⚠ DANGER ⚠', 60, 140);
+         ctx.fillText('MODE: ENDLESS TIME SURVIVAL', 5, 80);
+         ctx.fillStyle = '#f00'; ctx.fillText('⚠ DANGER ⚠', 60, 110);
       } else {
          let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
          ctx.fillStyle = this.settingsCur === 0 ? (this.mode === 'nightmare' ? '#f00' : '#ff0') : '#fff';
-         ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 25, 100);
-         ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`  HI-SCORE: ${rData[this.mode]||0}`, 25, 115);
+         ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 25, 80);
+         ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`  HI-SCORE: ${rData[this.mode]||0}`, 25, 95);
          
          ctx.font = '12px monospace';
          const filters = ['OFF', 'RADIO', 'WATER', 'ECHO'];
-         ctx.fillStyle = this.settingsCur === 1 ? '#0ff' : '#fff'; ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 25, 145);
-         
-         // ★ ハイスピードUI
-         ctx.fillStyle = this.settingsCur === 2 ? '#f0f' : '#fff'; ctx.fillText((this.settingsCur===2?'> ':'  ') + `SPEED: x${this.hiSpeed.toFixed(1)}`, 25, 175);
+         ctx.fillStyle = this.settingsCur === 1 ? '#0ff' : '#fff'; ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 25, 125);
+         ctx.fillStyle = this.settingsCur === 2 ? '#f0f' : '#fff'; ctx.fillText((this.settingsCur===2?'> ':'  ') + `SPEED: x${this.hiSpeed.toFixed(1)}`, 25, 155);
       }
       
-      ctx.fillStyle = this.settingsCur === (this.isEndless?3:3) ? '#0f0' : '#888'; 
-      ctx.fillText((this.settingsCur===(this.isEndless?3:3)?'> ':'  ') + `[ EXECUTE ]`, 55, 220);
+      // ★ スキン選択UI
+      ctx.fillStyle = this.settingsCur === (this.isEndless?1:3) ? '#0f0' : '#fff'; 
+      ctx.fillText((this.settingsCur===(this.isEndless?1:3)?'> ':'  ') + `SKIN: ${this.skins[this.noteSkin]}`, 25, 185);
+
+      ctx.fillStyle = this.settingsCur === (this.isEndless?2:4) ? '#0f0' : '#888'; 
+      ctx.fillText((this.settingsCur===(this.isEndless?2:4)?'> ':'  ') + `[ EXECUTE ]`, 55, 230);
       ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 ◀▶:変更  SEL:戻る', 25, 280);
     }
     else if(this.st === 'transform_in' || this.st === 'transform_out') {
@@ -546,18 +531,15 @@ const Rhythm = {
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText('NEXT TRACK LOADING...', 30, 180);
     }
     else if(this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
-      // 奥へ続くパース線
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 1;
       for(let i=0; i<=4; i++) { let cx = 25 + i*50 - 25; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 400); ctx.stroke(); }
       
       let k = typeof keys !== 'undefined' ? keys : {};
       
-      // レーンと判定ラインの描画
       for(let i=0; i<4; i++) {
          let cx = 25 + i * 50; 
          let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
          
-         // ★ レーン発光エフェクト（グラデーション）
          if (this.laneGlow[i] > 0 || isP) {
              let alpha = Math.max(this.laneGlow[i], isP ? 0.3 : 0);
              let grad = ctx.createLinearGradient(0, this.lineY, 0, 0);
@@ -570,32 +552,32 @@ const Rhythm = {
          ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
       }
       
-      // ★ 同時押しラインの描画
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 2;
-      for(let i=0; i<this.notes.length - 1; i++) {
-          let n1 = this.notes[i]; let n2 = this.notes[i+1];
-          if(!n1.missed && !n1.hit && !n2.missed && !n2.hit && Math.abs(n1.time - n2.time) < 0.01) {
-              if (n1.y > 0 && n1.y < 400) {
-                  ctx.beginPath(); ctx.moveTo(25 + n1.lane*50, n1.y); ctx.lineTo(25 + n2.lane*50, n2.y); ctx.stroke();
-              }
-          }
-      }
-
-      // ノーツの描画
+      // ★ カスタムスキンによるノーツ描画
       this.notes.forEach(n => {
         if(!n.missed && !n.hit && n.y > -30 && n.y < 420) {
            let cx = 25 + n.lane * 50;
            if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40; 
            
-           // サイバー風ノーツ
-           ctx.fillStyle = '#000'; ctx.fillRect(cx-18, n.y-8, 36, 16);
-           ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.strokeRect(cx-18, n.y-8, 36, 16);
-           ctx.fillStyle = '#fff'; ctx.fillRect(cx-8, n.y-2, 16, 4);
+           if (this.noteSkin === 0) { // 0: CLASSIC (以前の丸い矢印)
+               ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill();
+               ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke();
+               ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5);
+           } else if (this.noteSkin === 1) { // 1: CYBER (ネオン四角)
+               ctx.fillStyle = '#000'; ctx.fillRect(cx-18, n.y-8, 36, 16);
+               ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.strokeRect(cx-18, n.y-8, 36, 16);
+               ctx.fillStyle = '#fff'; ctx.fillRect(cx-8, n.y-2, 16, 4);
+           } else if (this.noteSkin === 2) { // 2: DOT (ぷよっとした丸)
+               ctx.fillStyle = this.colors[n.lane]; ctx.beginPath(); ctx.arc(cx, n.y, 14, 0, Math.PI * 2); ctx.fill();
+               ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx+4, n.y-4, 4, 0, Math.PI * 2); ctx.fill(); // ハイライト
+           } else if (this.noteSkin === 3) { // 3: GEM (宝石ひし形)
+               ctx.fillStyle = this.colors[n.lane];
+               ctx.beginPath(); ctx.moveTo(cx, n.y-16); ctx.lineTo(cx+16, n.y); ctx.lineTo(cx, n.y+16); ctx.lineTo(cx-16, n.y); ctx.fill();
+               ctx.strokeStyle = '#fff'; ctx.lineWidth=1; ctx.stroke();
+           }
         }
       });
       drawParticles();
 
-      // スコア＆UI
       if(this.isEndless) {
          let elapsed = Math.max(0, now);
          let timeStr = Math.floor(elapsed / 60) + ":" + String(Math.floor(elapsed % 60)).padStart(2, '0');
@@ -605,7 +587,6 @@ const Rhythm = {
          ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 60, 20);
       }
       
-      // ★ コンボの巨大化＆アニメーション
       if(this.combo > 5){ 
           let size = 16 + Math.min(this.combo/10, 10);
           ctx.fillStyle = '#0ff'; ctx.font = `bold ${size}px monospace`; 
