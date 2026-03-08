@@ -25,17 +25,9 @@
     ctx.quadraticCurveTo(x,y,x+r,y); ctx.fill();
   }
 
-  // 筐体の背景（黒）
-  ctx.fillStyle = '#1a1a1a';
-  rr(0, 0, 180, 180, 30);
-
-  // 画面のフチ
-  ctx.fillStyle = '#000';
-  rr(15, 15, 150, 90, 15);
-
-  // 緑色のモニター
-  ctx.fillStyle = '#8bac0f';
-  rr(25, 25, 130, 70, 5);
+  ctx.fillStyle = '#1a1a1a'; rr(0, 0, 180, 180, 30);
+  ctx.fillStyle = '#000'; rr(15, 15, 150, 90, 15);
+  ctx.fillStyle = '#8bac0f'; rr(25, 25, 130, 70, 5);
 
   ctx.fillStyle = '#306230';
   ctx.font = 'bold 36px monospace';
@@ -43,16 +35,9 @@
   ctx.textBaseline = 'middle';
   ctx.fillText('10in1', 90, 60);
 
-  // 十字キー
-  ctx.fillStyle = '#333';
-  ctx.fillRect(30, 135, 45, 15);
-  ctx.fillRect(45, 120, 15, 45);
-
-  // A・Bボタン
-  ctx.fillStyle = '#f00';
-  ctx.beginPath(); ctx.arc(150, 130, 15, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#00f';
-  ctx.beginPath(); ctx.arc(115, 155, 15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#333'; ctx.fillRect(30, 135, 45, 15); ctx.fillRect(45, 120, 15, 45);
+  ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(150, 130, 15, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#00f'; ctx.beginPath(); ctx.arc(115, 155, 15, 0, Math.PI*2); ctx.fill();
 
   var dataURL = c.toDataURL('image/png');
   document.getElementById('apple-icon').href = dataURL;
@@ -108,7 +93,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-abyss #sys-buttons .s-btn { background: #306; }
 #gameboy.mode-abyss #gameCanvas { aspect-ratio: 400 / 240; box-shadow: none; border-radius: 0; }
 
-/* ★ BIOTOPE用！超ワイド横画面モードのCSS */
 #gameboy.mode-landscape {
   max-width: 800px; height: auto; aspect-ratio: 2.2 / 1; flex-direction: row;
   background: linear-gradient(135deg, #112 0%, #000 100%);
@@ -194,9 +178,9 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   <div id="screen-container">
     <div id="boot">
       <div class="boot-text">10in1 RETRO SYSTEM</div>
-      <div class="boot-text">SYSTEM BOOTING...</div>
+      <div class="boot-text">SYNCING CLOUD DATA...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
-      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Loading...</div>
+      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Connecting...</div>
     </div>
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
@@ -234,20 +218,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
   </div>
 </div>
 
-<script>
-let bootProgress = 0;
-const bootInterval = setInterval(() => {
-  bootProgress += Math.random() * 15;
-  if (bootProgress > 100) bootProgress = 100;
-  document.getElementById('bootProgress').style.width = bootProgress + '%';
-  document.getElementById('bootStatus').textContent = bootProgress < 90 ? 'Checking Memory...' : 'OK!';
-  if (bootProgress >= 100) {
-    clearInterval(bootInterval);
-    setTimeout(() => { document.getElementById('boot').classList.add('hidden'); }, 500);
-  }
-}, 100);
-</script>
-
 <script src="sprites.js"></script>
 <script src="pc.js"></script>
 <script src="biotope.js"></script> 
@@ -262,11 +232,34 @@ const bootInterval = setInterval(() => {
 <script src="musou.js"></script>
 <script src="abyss.js"></script>
 <script src="noise.js"></script>
+
 <script>
-window.onload = () => {
-  activeApp = Menu;
-  activeApp.init();
-  requestAnimationFrame(loop);
+// ★ クラウドセーブ対応の非同期起動処理
+window.onload = async () => {
+  let progress = 0;
+  const bar = document.getElementById('bootProgress');
+  const stat = document.getElementById('bootStatus');
+  
+  // 疑似プログレスバーを動かしながらクラウド同期を待つ
+  const anim = setInterval(() => {
+    progress += Math.random() * 10;
+    if(progress > 90) progress = 90; 
+    bar.style.width = progress + '%';
+  }, 100);
+
+  // クラウド初期化＆データロード（Firebase使用）
+  await SaveSys.initCloud();
+  
+  clearInterval(anim);
+  bar.style.width = '100%';
+  stat.textContent = 'SYSTEM READY!';
+  
+  setTimeout(() => { 
+      document.getElementById('boot').classList.add('hidden'); 
+      activeApp = Menu;
+      activeApp.init();
+      requestAnimationFrame(loop);
+  }, 500);
 };
 </script>
 </body>
