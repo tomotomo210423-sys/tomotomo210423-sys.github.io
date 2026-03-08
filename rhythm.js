@@ -1,5 +1,5 @@
-// === BEAT BROS - BALANCED NORMAL & ULTIMATE NIGHTMARE EDITION ===
-// NORMAL/HARDを叩きやすく調整し、NIGHTMAREの画面とノーツ軌道を完全に崩壊させた版！
+// === BEAT BROS - APOCALYPSE NIGHTMARE & VIDEO SYNC FIX EDITION ===
+// メドレー時に動画が出なくなるバグを修正し、動画の再生タイミングを完全同期！
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -129,12 +129,22 @@ const Rhythm = {
   loadFile(file) {
     this.st = 'loading'; BGM.stop(); 
     if(!file) return;
+    
+    // ★ メドレーバグ修正：前の動画を確実にクリーンアップする
+    if(this.video) { 
+        this.video.pause(); 
+        this.video.removeAttribute('src'); 
+        this.video.load(); 
+        this.video = null; 
+    }
+    
     this.isVideo = file.type.startsWith('video/');
     if (this.isVideo) {
-      if(this.video) { this.video.pause(); this.video.removeAttribute('src'); this.video.load(); }
       this.video = document.createElement('video');
       this.video.src = URL.createObjectURL(file);
-      this.video.muted = true; this.video.playsInline = true; this.video.load();
+      this.video.muted = true; 
+      this.video.playsInline = true; 
+      this.video.load();
     }
     const reader = new FileReader();
     reader.onload = e => {
@@ -145,13 +155,11 @@ const Rhythm = {
     reader.readAsArrayBuffer(file);
   },
 
-  // ★ 密度緩和！NORMALとHARDは心地よい単押しに！
   generateNotes(buffer) {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0; for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // ★ 敷居値と間隔を緩和して、ノーツが詰まりすぎないように調整
     let threshold = avgVol * (this.mode === 'nightmare' ? 0.15 : this.mode === 'hard' ? 0.75 : this.mode === 'normal' ? 1.2 : 1.6);
     if(threshold < 0.01) threshold = 0.01;
     
@@ -175,7 +183,6 @@ const Rhythm = {
               lastLane = lanes[0]; lastTime = t; 
 
           } else {
-              // NORMAL / HARDは完全単押しで、適度な間隔を保つ！
               let lane = Math.floor(Math.random() * 4);
               if(lane === lastLane && Math.random() < 0.6) lane = (lane + 1 + Math.floor(Math.random()*2)) % 4;
               
@@ -228,6 +235,7 @@ const Rhythm = {
   },
 
   handleTrackEnd() {
+    // 曲が終わったら動画も一時停止
     if(this.video) { this.video.pause(); }
     if(this.isEndless) return;
     
@@ -327,8 +335,6 @@ const Rhythm = {
 
       if(hitNote) {
         hitNote.hit = true; 
-        
-        // NIGHTMARE時はレーンも揺れているのでエフェクト位置も補正
         let laneOffset = (this.mode === 'nightmare') ? Math.sin(now * 5) * 15 : 0;
         let cx = 25 + lane * 50 + laneOffset;
 
@@ -446,15 +452,20 @@ const Rhythm = {
         if(!this.isEndless) {
            this.startTime = audioCtx.currentTime + 1.5; 
            this.source.start(this.startTime); 
-           if(this.video) { this.video.currentTime = 0; setTimeout(() => { this.video.play().catch(e=>console.log("AutoPlay", e)); }, 1500); }
+           if(this.video) { this.video.currentTime = 0; } // ★ ここではcurrentTimeのリセットのみ
         }
       }
     }
     else if(this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
+      let speed = 200;
       
-      // ★ 落下速度を緩和して遊びやすく！
-      let speed = 150;
+      // ★ 曲が開始した瞬間(now >= 0)に、動画を強制的に再生させて完全に同期する！！
+      if (!this.isEndless && this.video && now >= 0 && this.video.paused && !this.video.ended) {
+          let p = this.video.play();
+          if(p !== undefined) p.catch(e => console.log("Video AutoPlay Blocked", e));
+      }
+
       if(this.isEndless) {
           this.scheduleEndless(now);
           let diff = Math.min(Math.max(now, 0) / 300, 1.0);
@@ -489,8 +500,6 @@ const Rhythm = {
 
       for(let n of this.notes) {
         let tDiff = n.time - now;
-        
-        // ★ NIGHTMARE 狂気のY座標崩壊
         let nightmareWiggle = (this.mode === 'nightmare') ? Math.sin(now * 20 + n.lane) * 30 : 0;
 
         if(n.accel && tDiff > 0) n.y = this.lineY - (tDiff * tDiff) * (speed / 1.5) + nightmareWiggle; 
@@ -564,7 +573,6 @@ const Rhythm = {
 
     ctx.save();
     
-    // ★ NIGHTMARE 狂気の視覚崩壊（さらに激しく！）
     if(this.mode === 'nightmare' && this.st === 'play') { 
         let nNow = Date.now();
         ctx.translate(100, 200); 
@@ -624,7 +632,6 @@ const Rhythm = {
       }
       ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A/▶:変更/決定  SEL:戻る', 15, 280);
     }
-    // ★ NIGHTMARE 警告画面
     else if(this.st === 'warning') {
       ctx.fillStyle = Math.random() < 0.1 ? '#fff' : '#800'; 
       ctx.fillRect(0, 0, 200, 300);
@@ -656,20 +663,17 @@ const Rhythm = {
     }
     else if(this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
       
-      // 同時押しライン（NIGHTMARE用）
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 2;
       for(let i=0; i<this.notes.length - 1; i++) {
           let n1 = this.notes[i]; let n2 = this.notes[i+1];
           if(!n1.missed && !n1.hit && !n2.missed && !n2.hit && Math.abs(n1.time - n2.time) < 0.01) {
               if (n1.y > 0 && n1.y < 400) {
-                  // ★ NIGHTMAREのレーン揺れに合わせて同時押しラインも揺らす
                   let laneOffset = (this.mode === 'nightmare' && this.st === 'play') ? Math.sin(now * 5) * 15 : 0;
                   ctx.beginPath(); ctx.moveTo(25 + n1.lane*50 + laneOffset, n1.y); ctx.lineTo(25 + n2.lane*50 + laneOffset, n2.y); ctx.stroke();
               }
           }
       }
 
-      // ★ レーン全体が左右に揺れる（NIGHTMARE）
       let laneOffset = (this.mode === 'nightmare' && this.st === 'play') ? Math.sin(now * 5) * 15 : 0;
 
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 1;
@@ -701,7 +705,6 @@ const Rhythm = {
            let cx = 25 + n.lane * 50 + laneOffset;
            if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40; 
            
-           // ★ NIGHTMARE 狂気のX座標崩壊（ノーツが蛇行する！）
            if (this.mode === 'nightmare') {
                cx += Math.sin(n.y * 0.05 + now * 10) * 25; 
            }
