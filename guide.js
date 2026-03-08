@@ -1,4 +1,4 @@
-// === GUIDE APP (Remake: Cyber Archive Edition) ===
+// === GUIDE APP (Remake: Cyber Archive Edition - 10in1) ===
 
 const Guide = {
     st: 'list', // 'list', 'detail'
@@ -57,6 +57,11 @@ const Guide = {
             name: "ハッカーズ15",
             icon: "0000000006666660061111600616616006111160066666600000000000000000",
             text: "スマホの好きな画像を読み込んで遊べる、ハッカー仕様の15パズルじゃ！\n\n【操作】\n十字キー: カーソル移動\nAボタン: ピースのスライド / 決定\nBボタン: ハックメニューを開く\n\n【システム】\nタイトル画面で「HACKER MODE」を選ぶと、スマホの写真をパズルにできるぞ！\nパズルが解けない時は、Bボタンで「合法チート」を使って強引にクリアするのじゃ！\n\n【OVERRIDE MENU (チート)】\nHPを消費して強力なチートを使えるぞ！\n・SWAP: 離れたピースを強制入れ替え！\n・SCAN: ピースに正解の数字が透視される！\n・DELETE: 邪魔なピースを木っ端微塵に破壊して空白を増やす！\n\n※正しい場所にピースをスライドさせるとHPが回復するぞ！"
+        },
+        {
+            name: "PIXEL BIOTOPE",
+            icon: "0555555056655555566655555565555555555255555522250555252000000000",
+            text: "プレイヤーは「神」となり、大陸に生命を解き放つ生態系シミュレーションじゃ！\n\n【操作】\n十字キー 左右: パレット(筆)の切り替え\nAボタン/タップ: 選択中の物質や生物を配置\nBボタン: シミュレーションの倍速切り替え(x1 / x3)\nSELECT: メニューに戻る\n\n【システム】\n世界はドット単位で生きておる！水は海となり、土に草木が生え、火は森を燃やす。自然の連鎖をじっくり観察するのじゃ。\n\n【強化学習AIと人類】\n「人(🧍)」は、ガチの【強化学習AI】を積んでおる！\n最初は「火を避ける」「飯を食う」等の本能しか持たんが、失敗と成功を繰り返し、壁を作り、火を使いこなすように進化するぞ！\n\n【💬 モールス信号 (知識共有)】\n人間が頭上に「・ー・」と出したら、それはモールス信号による知識の伝達じゃ！自分が経験していない危険や知恵も、仲間から聞いて学習することができるのじゃ。\n\n【神の怒り】\nパレットの一番右にある「💥全消去」を選んでAボタンを押すと、世界を完全に初期化して海から作り直せるぞ！"
         },
         {
             name: "王様の間 (AI)",
@@ -195,15 +200,22 @@ const Guide = {
             ctx.font = '10px monospace';
             let lineY = 65;
             for (let line of this.lines) {
-                if (line.includes('【')) { ctx.fillStyle = '#ff0'; } 
-                else if (line.includes('⚠') || line.includes('ゲームオーバー')) { ctx.fillStyle = '#f55'; } 
-                else if (line.includes('※')) { ctx.fillStyle = '#0fa'; } 
-                else { ctx.fillStyle = '#fff'; }
+                // 自動ハイライト機能
+                if (line.includes('【')) {
+                    ctx.fillStyle = '#ff0';
+                } else if (line.includes('⚠') || line.includes('ゲームオーバー')) {
+                    ctx.fillStyle = '#f55';
+                } else if (line.includes('※')) {
+                    ctx.fillStyle = '#0fa';
+                } else {
+                    ctx.fillStyle = '#fff';
+                }
                 ctx.fillText(line, 10, lineY);
                 lineY += 15;
             }
             ctx.restore();
             
+            // 詳細画面スクロールバー
             if (this.maxScrollY > 0) {
                 ctx.fillStyle = '#112'; ctx.fillRect(192, 50, 4, 210);
                 let scrollRatio = this.scrollY / this.maxScrollY;
@@ -211,6 +223,7 @@ const Guide = {
                 ctx.fillStyle = '#0ff'; ctx.fillRect(192, 50 + (210 - barH) * scrollRatio, 4, barH);
             }
             
+            // フッター
             ctx.fillStyle = '#001'; ctx.fillRect(0, 265, 200, 35);
             ctx.strokeStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(0, 265); ctx.lineTo(200, 265); ctx.stroke();
             ctx.fillStyle = '#0f0'; ctx.font = '10px monospace';
