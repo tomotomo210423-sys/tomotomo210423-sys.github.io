@@ -1,16 +1,20 @@
-// === CORE SYSTEM (10in1 Ultimate Edition - BUG FIXED) ===
-// 十字キーの初期化時のクラッシュバグを修正した安定版
+// === CORE SYSTEM (10in1 Cloud Save & Bug Fixed Edition) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
+// ★ 変数エラー防止のため、グローバル変数をすべて最上部で宣言
+let transTimer = 0; 
+let nextApp = null; 
+let shakeTimer = 0; 
+let isShaking = false;
+let activeApp = null;
+const pointer = { x: 0, y: 0, active: false, path: [] };
 
 const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false, l0: false, l1: false, l2: false, l3: false };
 const keysDown = { ...keys };
 let prevKeys = { ...keys };
 const keyPressQueue = { ...keys };
-let activeApp = null;
-
-const pointer = { x: 0, y: 0, active: false, path: [] };
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx, noiseBuffer = null, bgmInterval = null;
@@ -26,7 +30,21 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
+// ==========================================
+// ☁️ FIREBASE CLOUD SAVE SYSTEM ☁️
+// ==========================================
 const SaveSys = {
+  // プレイヤー専用の秘密のID（なければ自動生成して保存）
+  userId: (() => {
+      let id = localStorage.getItem('retro_player_id');
+      if (!id) {
+          id = 'player_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('retro_player_id', id);
+      }
+      return id;
+  })(),
+
+  // 初期データ構造
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
     return { 
@@ -36,18 +54,66 @@ const SaveSys = {
         bgTheme: d.bgTheme || 0, 
         bgmVol: d.bgmVol !== undefined ? d.bgmVol : 0.5, 
         seVol: d.seVol !== undefined ? d.seVol : 0.8,    
-        slotCoins: d.slotCoins || 100, 
+        slotCoins: d.slotCoins !== undefined ? d.slotCoins : 100, 
         jackpotPool: d.jackpotPool || 1000, 
         actStage: d.actStage||1, 
         actLives: d.actLives||5, 
         actSeed: d.actSeed||1, 
-        rhythm: d.rhythm||{easy:0,normal:0,hard:0}, 
+        rhythm: d.rhythm||{easy:0,normal:0,hard:0,nightmare:0}, 
         logs: d.logs||[],
         osFiles: d.osFiles||null,
         trashFiles: d.trashFiles||{}
     }; 
   })(),
-  save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
+  
+  isCloudReady: false,
+
+  // Firebaseを読み込み、クラウドからデータをダウンロードする
+  async initCloud() {
+      console.log("☁️ CLOUD SYSTEM BOOTING... ID: " + this.userId);
+      const loadScript = (src) => new Promise(r => {
+        if (document.querySelector(`script[src="${src}"]`)) return r();
+        const s = document.createElement('script'); s.src = src; s.onload = r; document.head.appendChild(s);
+      });
+
+      if (!window.firebase) {
+        await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
+        await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js");
+      }
+      
+      if (window.firebase && !firebase.apps.length) {
+        firebase.initializeApp({
+          apiKey: "AIzaSyDEfsFzw9CKmBDBDqP0L21uDVTZ80HWXPY",
+          authDomain: "gorilla2-e0d2a.firebaseapp.com",
+          databaseURL: "https://gorilla2-e0d2a-default-rtdb.firebaseio.com",
+          projectId: "gorilla2-e0d2a"
+        });
+      }
+      this.isCloudReady = true;
+      
+      // サーバーからデータを取得
+      try {
+          const snapshot = await firebase.database().ref('saves/' + this.userId).once('value');
+          const serverData = snapshot.val();
+          if (serverData) {
+              this.data = { ...this.data, ...serverData };
+              localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
+              console.log("☁️ CLOUD LOAD SUCCESS!");
+          }
+      } catch(err) {
+          console.warn("☁️ CLOUD LOAD ERROR (オフラインかも)", err);
+      }
+  },
+
+  // データを保存（ローカル＆クラウド）
+  save() {
+      localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
+      if (this.isCloudReady) {
+          firebase.database().ref('saves/' + this.userId).set(this.data)
+          .catch(err => console.warn("☁️ CLOUD SAVE ERROR", err));
+      }
+  },
+
   addScore(mode, score) { 
     const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
     rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
@@ -59,6 +125,8 @@ const SaveSys = {
     this.save();
   }
 };
+// ==========================================
+
 
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
@@ -95,6 +163,35 @@ const BGM = {
   }
 };
 
+function screenShake(i = 2) { shakeTimer = i; }
+function applyShake() { 
+    if (shakeTimer > 0) { 
+        isShaking = true; 
+        ctx.save(); 
+        ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); 
+        shakeTimer--; 
+    } else {
+        isShaking = false;
+    }
+}
+function resetShake() { if (isShaking) { ctx.restore(); isShaking = false; } }
+
+function switchApp(app) { 
+    nextApp = app; transTimer = 20; playSnd('sel'); 
+    document.body.className = '';
+    document.getElementById('gameboy').className = '';
+}
+function drawTransition() { 
+    if (transTimer > 0) { 
+        ctx.fillStyle = '#000'; 
+        for(let y=0; y<15; y++) { 
+            for(let x=0; x<20; x++) { 
+                if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); 
+            } 
+        } 
+    } 
+}
+
 let hitStopTimer = 0; function hitStop(f) { hitStopTimer = f; }
 function playSnd(t) {
   if (!audioCtx || SaveSys.data.seVol <= 0) return; 
@@ -111,7 +208,6 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-// ドット絵テクスチャ定義
 window.sprs = {
     player: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
     heroNew: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
@@ -127,7 +223,6 @@ const universalPal = {
     'd': '#840', 'e': '#8f8', 'f': '#88f'
 };
 
-// バグを排除した最強のドット絵描画関数
 function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     let targetCtx = ctx, x, y, color, spriteObj, scale=1, flip=false;
     
@@ -172,32 +267,6 @@ const bgThemes = [
   { name: 'ABYSS', draw: (c) => { c.fillStyle='#000'; c.fillRect(0,0,200,300); let t = Date.now()/1000; for(let i=0; i<3; i++){ c.fillStyle=`hsla(${(t*50+i*120)%360},100%,50%,0.2)`; c.beginPath(); c.arc(100+Math.sin(t+i)*50, 150+Math.cos(t*1.3+i)*80, 80, 0, Math.PI*2); c.fill(); } } }
 ];
 
-let shakeTimer = 0; 
-let isShaking = false;
-function screenShake(i = 2) { shakeTimer = i; }
-function applyShake() { 
-    if (shakeTimer > 0) { 
-        isShaking = true; 
-        ctx.save(); 
-        ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); 
-        shakeTimer--; 
-    } else {
-        isShaking = false;
-    }
-}
-function resetShake() { if (isShaking) { ctx.restore(); isShaking = false; } }
-
-let transTimer = 0; let nextApp = null; 
-function switchApp(app) { 
-    nextApp = app; transTimer = 20; playSnd('sel'); 
-    document.body.className = '';
-    document.getElementById('gameboy').className = '';
-}
-function drawTransition() { if (transTimer > 0) { ctx.fillStyle = '#000'; for(let y=0; y<15; y++) { for(let x=0; x<20; x++) { if ((x + y) < (30 - transTimer)) ctx.fillRect(x * 20, y * 20, 20, 20); } } } }
-
-// ============================================
-// メニュー画面
-// ============================================
 const Menu = {
   cur: 0, 
   apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'システム設定', '王様の間'], 
@@ -227,7 +296,7 @@ const Menu = {
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
-            typeof Biotope !== 'undefined' ? Biotope : null, // ★ BIOTOPE起動
+            typeof Biotope !== 'undefined' ? Biotope : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -238,10 +307,9 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
-    // ★ タイトルを 10in1 に書き換え！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
     ctx.fillText('10in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.1', 60, 40); // バグ修正版
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.2(CLOUD)', 45, 40); 
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
@@ -260,8 +328,10 @@ const Menu = {
         }
     }
     
-    ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('PLAYER: ' + SaveSys.data.playerName, 10, 275); 
-    ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
+    // ★ プレイヤーID（引き継ぎコード）を画面下部に表示
+    ctx.fillStyle = '#888'; ctx.font = '8px monospace'; 
+    ctx.fillText('ID: ' + SaveSys.userId, 10, 275); 
+    ctx.fillStyle = '#666'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };
 
@@ -387,18 +457,15 @@ const setBtn = (id, k) => {
 ['btn-a','btn-b','btn-select'].forEach((id, i) => { setBtn(id, ['a','b','select'][i]); });
 ['btn-slot-bet','btn-slot-max','btn-slot-spin'].forEach((id, i) => { setBtn(id, ['up','b','a'][i]); });
 
-// 十字キー (D-pad) の処理 - バグ修正済み
 const dpad = document.getElementById('dpad');
 let dpadActive = false;
 
 const handleDpad = (ev) => {
   ev.preventDefault();
   if (!dpadActive && ev.type !== 'touchstart' && ev.type !== 'mousedown') return;
-  
-  // バグ修正: getBoundingClientRect()が undefined になるのを防ぐ nullチェック
   if (!dpad) return; 
   let rect = dpad.getBoundingClientRect();
-  if (!rect || rect.width === 0) return; // 描画前は無視
+  if (!rect || rect.width === 0) return; 
 
   if (ev.type === 'touchstart' || ev.type === 'mousedown') { dpadActive = true; initAudio(); }
   
@@ -434,16 +501,13 @@ if (dpad) {
   dpad.addEventListener('mousedown', handleDpad); window.addEventListener('mousemove', (ev) => { if (dpadActive) handleDpad(ev); }); window.addEventListener('mouseup', (ev) => { if (dpadActive) releaseDpad(ev); });
 }
 
-// ポインターイベント処理 (TAP配置用)
 const getPointerPos = (e) => {
-  // バグ修正: e または touches が undefined になるのを防ぐ nullチェック
   if (!e) return {clientX:0, clientY:0};
   let touch;
   if (e.targetTouches && e.targetTouches.length > 0) { touch = e.targetTouches[0]; } 
   else if (e.touches && e.touches.length > 0) { touch = e.touches[0]; } 
-  
   if (touch) return { clientX: touch.clientX, clientY: touch.clientY };
-  return { clientX: e.clientX, clientY: e.clientY }; // Mouse event
+  return { clientX: e.clientX, clientY: e.clientY }; 
 };
 
 const handlePointerDown = (e) => {
@@ -473,7 +537,6 @@ canvas.addEventListener('mousedown', handlePointerDown); canvas.addEventListener
 canvas.addEventListener('mouseup', handlePointerUp); canvas.addEventListener('mouseleave', handlePointerUp);
 canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canvas.addEventListener('touchmove', handlePointerMove, {passive: false}); canvas.addEventListener('touchend', handlePointerUp, {passive: false});
 
-// キーボードイベント
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
   if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
