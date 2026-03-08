@@ -1,5 +1,5 @@
-// === BEAT BROS - VJ VISUALIZER & AUTO PLAY EDITION ===
-// ベースコードから再構築。Aボタン設定切り替え、超密度、全画面発光を実装！
+// === BEAT BROS - VJ VISUALIZER & COMFORT PLAY EDITION ===
+// 密度をマイルドに調整、判定の緩和、スワイプ入力対応で超快適に！
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -13,11 +13,9 @@ const Rhythm = {
   video: null, isVideo: false, bgTimer: 0,
 
   skins: ['CLASSIC', 'CYBER', 'DOT', 'GEM'],
-  spds: [1.0, 1.5, 2.0, 2.5, 3.0, 4.0], // ハイスピードの選択肢
 
   init() {
-    this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0; 
-    this.hiSpeed = 1.0; this.noteSkin = 0; this.autoPlay = false;
+    this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0; this.hiSpeed = 1.0; this.noteSkin = 0; this.autoPlay = false;
     this.laneTouch = [false,false,false,false]; this.laneGlow = [0,0,0,0];
     this.audioBuffer = null; this.playlist = []; this.trackIndex = 0;
     if(this.source){ this.source.stop(); this.source.disconnect(); this.source=null; }
@@ -35,25 +33,47 @@ const Rhythm = {
         if(this.st !== 'play' && this.st !== 'result') return;
         if(e.cancelable) e.preventDefault(); 
         const r = cvs.getBoundingClientRect();
-        if (e.type === 'touchstart' || e.type === 'mousedown') {
-            let ts = e.type === 'mousedown' ? [e] : e.changedTouches;
+        
+        // ★ スワイプ（こすり）入力にも対応！touchmoveでも反応させる
+        if (e.type === 'touchstart' || e.type === 'mousedown' || e.type === 'touchmove') {
+            let ts = (e.type === 'mousedown') ? [e] : (e.type === 'touchmove' ? e.touches : e.changedTouches);
+            let nT = [false,false,false,false];
+
             for(let i=0; i<ts.length; i++) {
                 let x = (ts[i].clientX - r.left) / r.width * cvs.width;
                 let y = (ts[i].clientY - r.top) / r.height * cvs.height;
-                if(y < 40 && x < 60){ this.exitGame(); return; }
-                if(this.st === 'result'){ this.exitGame(); return; }
+                
+                if((e.type === 'touchstart' || e.type === 'mousedown') && y < 40 && x < 60){ this.exitGame(); return; }
+                if((e.type === 'touchstart' || e.type === 'mousedown') && this.st === 'result'){ this.exitGame(); return; }
+                
+                // プレイ中、触れているレーンを判定
+                if(this.st === 'play' && !this.autoPlay && y > 40) {
+                    let l = Math.floor(x / (cvs.width / 4)); 
+                    if(l >= 0 && l <= 3) {
+                        nT[l] = true;
+                        // 新しくそのレーンに触れた（またはスライドしてきた）瞬間だけ叩く！
+                        if (!this.laneTouch[l]) {
+                            this.hitKey(l); 
+                        }
+                    }
+                }
+            }
+            if (this.st === 'play' && !this.autoPlay) {
+                this.laneTouch = nT; // タッチ状態の更新
             }
         }
-        if (this.st === 'play' && !this.autoPlay) {
-            let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
-            let nT = [false,false,false,false];
-            for(let i=0; i<activeTs.length; i++) {
-                let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
-                let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-                if(y > 100) { let l = Math.floor(x / (cvs.width / 4)); if(l >= 0 && l <= 3) nT[l] = true; }
-            }
-            for(let l=0; l<4; l++) { if(nT[l] && !this.laneTouch[l]) { this.hitKey(l); } }
-            this.laneTouch = nT;
+        
+        if (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'mouseup' || e.type === 'mouseleave') {
+             if (this.st === 'play' && !this.autoPlay) {
+                let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
+                let nT = [false,false,false,false];
+                for(let i=0; i<activeTs.length; i++) {
+                    let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
+                    let l = Math.floor(x / (cvs.width / 4)); 
+                    if(l >= 0 && l <= 3) nT[l] = true;
+                }
+                this.laneTouch = nT;
+             }
         }
       };
       ['touchstart','touchmove','touchend','touchcancel','mousedown','mousemove','mouseup','mouseleave'].forEach(E => cvs.addEventListener(E, tH, {passive: false}));
@@ -69,6 +89,7 @@ const Rhythm = {
       ui.style.width = '90%'; ui.style.background = 'rgba(0, 0, 20, 0.85)';
       ui.style.border = '2px solid #0ff'; ui.style.borderRadius = '10px';
       ui.style.padding = '15px 0'; ui.style.boxShadow = '0 0 20px #0ff, inset 0 0 10px #0ff';
+      ui.style.backdropFilter = 'blur(5px)';
       
       let title = document.createElement('div');
       title.style.color = '#0ff'; title.style.fontFamily = 'monospace'; title.style.fontWeight = 'bold';
@@ -81,11 +102,12 @@ const Rhythm = {
       label.style.color = '#000'; label.style.padding = '12px 20px'; label.style.fontFamily = 'monospace'; 
       label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; 
       label.style.cursor = 'pointer'; label.style.boxShadow = '0 4px 0 #005, 0 0 15px #0ff'; 
-      label.style.marginBottom = '15px'; 
+      label.style.marginBottom = '15px'; label.style.transition = 'transform 0.1s';
       label.innerHTML = '📁 LOAD AUDIO / VIDEO';
       
       let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*, video/*'; input.multiple = true; input.style.display = 'none'; 
-      label.onclick = () => { initAudio(); }; label.ontouchstart = () => { initAudio(); };
+      label.onclick = () => { initAudio(); label.style.transform = 'translateY(4px)'; setTimeout(()=>label.style.transform='none', 100); }; 
+      label.ontouchstart = label.onclick;
       
       input.onchange = (e) => {
         if(e.target.files.length > 0) { 
@@ -106,7 +128,8 @@ const Rhythm = {
       btnEndless.innerHTML = '💀 ENDLESS SURVIVAL';
       const startEndless = (e) => { 
           if(e) e.preventDefault(); initAudio(); 
-          this.hideFileUI(); this.isEndless = true; this.st = 'settings'; this.settingsCur = 0; 
+          btnEndless.style.transform = 'translateY(4px)';
+          setTimeout(()=>{ this.hideFileUI(); this.isEndless = true; this.st = 'settings'; this.settingsCur = 0; btnEndless.style.transform = 'none';}, 100); 
       };
       btnEndless.onclick = startEndless; btnEndless.ontouchstart = startEndless;
       ui.appendChild(btnEndless);
@@ -145,18 +168,18 @@ const Rhythm = {
     reader.readAsArrayBuffer(file);
   },
 
-  // ★ ノーツの密度を限界まで引き上げ！同時押しなしの単押し連打譜面！
+  // ★ ノーツの密度をマイルドに下げて快適に！
   generateNotes(buffer) {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0; for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // thresholdを低くして、より多くの音を拾うようにする
-    let threshold = avgVol * (this.mode === 'nightmare' ? 0.3 : this.mode === 'hard' ? 0.5 : this.mode === 'normal' ? 0.8 : 1.2);
+    // thresholdを高くして、ノーツの発生率を下げる
+    let threshold = avgVol * (this.mode === 'nightmare' ? 0.6 : this.mode === 'hard' ? 1.0 : this.mode === 'normal' ? 1.5 : 2.2);
     if(threshold < 0.01) threshold = 0.01;
     
-    // minGapを短くして密度アップ
-    let minGap = this.mode === 'nightmare' ? 0.05 : this.mode === 'hard' ? 0.1 : this.mode === 'normal' ? 0.18 : 0.28;
+    // ノーツ同士の最小間隔を広げて、連打の窮屈さをなくす
+    let minGap = this.mode === 'nightmare' ? 0.12 : this.mode === 'hard' ? 0.20 : this.mode === 'normal' ? 0.30 : 0.45;
     
     let lastTime = 0, lastLane = -1;
     for(let i=0; i<raw.length; i+=256) {
@@ -172,7 +195,7 @@ const Rhythm = {
       }
     }
     
-    if(this.notes.length < 30) {
+    if(this.notes.length < 20) {
        this.notes = []; lastTime = 0; lastLane = -1;
        for(let t=2; t<buffer.duration; t+=minGap*1.2) { let lane = Math.floor(Math.random() * 4); this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false }); }
     }
@@ -187,7 +210,6 @@ const Rhythm = {
        this.score = 0; this.combo = 0; this.maxCombo = 0; this.judgements = [];
     }
     
-    // ビジュアライザ用
     this.analyser = audioCtx.createAnalyser();
     this.analyser.fftSize = 64; 
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
@@ -222,19 +244,18 @@ const Rhythm = {
     } else {
        this.st = 'result'; let finalScore = Math.floor(this.score);
        
-       // ★ オートプレイ時はスコアを保存しない！
        if(!this.autoPlay) {
            let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
            if(finalScore > (rData[this.mode]||0)){ rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
            SaveSys.addLog('BEAT BROS', `${this.playlist.length > 1 ? 'メドレー' : this.mode.toUpperCase()} で スコア${finalScore}`);
        } else {
-           SaveSys.addLog('BEAT BROS', `AUTO PLAY で最高にチルった`);
+           SaveSys.addLog('BEAT BROS', `AUTO PLAY で鑑賞した`);
        }
     }
   },
 
   scheduleEndless(now) {
-    if (!this.isEndless || this.st !== 'play' || (this.life <= 0 && !this.autoPlay)) return;
+    if (!this.isEndless || this.st !== 'play' || this.life <= 0) return;
     
     while(this.logicalBeatTime < now + 2.0) { 
       let targetRealTime = this.startTime + this.logicalBeatTime;
@@ -280,8 +301,9 @@ const Rhythm = {
          playOsci(note * (difficulty > 0.8 ? 2 : 1), waveType, 0.1, 0.03);
       }
 
-      let spawnProb = 0.4 + (difficulty * 0.6); 
-      if (bt % 2 !== 0) spawnProb *= 0.6; 
+      // ★ エンドレスモードの密度も下げる
+      let spawnProb = 0.2 + (difficulty * 0.4); 
+      if (bt % 2 !== 0) spawnProb *= 0.5; 
 
       if (Math.random() < spawnProb) {
          let l = Math.floor(Math.random() * 4);
@@ -298,7 +320,6 @@ const Rhythm = {
     if (this.notes.length > 100) this.notes = this.notes.filter(n => !n.hit && !n.missed && n.y < 500);
   },
 
-  // ★ オートプレイ時は強制Perfect
   hitKey(lane, isAuto=false) {
       if(this.st !== 'play') return;
       let now = audioCtx.currentTime - this.startTime;
@@ -307,7 +328,7 @@ const Rhythm = {
       for(let n of this.notes) {
         if(!n.hit && !n.missed && n.lane === lane) {
           let diff = Math.abs(n.time - now);
-          if(diff < 0.3 && diff < minDiff){ minDiff = diff; hitNote = n; }
+          if(diff < 0.4 && diff < minDiff){ minDiff = diff; hitNote = n; } // 検索範囲も少し拡大
         }
       }
       
@@ -316,8 +337,10 @@ const Rhythm = {
       if(hitNote) {
         hitNote.hit = true; let cx = 25 + lane * 50;
         let msg = '', pts = 0;
-        if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); this.laneGlow[lane] = 1.0; }
-        else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); this.laneGlow[lane] = 0.5; }
+        
+        // ★ 判定の甘やかし（ガバ判定）！スマホでも超気持ちよく繋がるように！
+        if(minDiff < 0.15){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); this.laneGlow[lane] = 1.0; }
+        else if(minDiff < 0.28){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); this.laneGlow[lane] = 0.5; }
         else { msg = 'GOOD'; pts = 10; this.laneGlow[lane] = 0.2; }
         
         this.combo++; if(this.combo > this.maxCombo) this.maxCombo = this.combo;
@@ -337,12 +360,6 @@ const Rhythm = {
       const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 400; 
   },
 
-  nextHiSpeed() {
-      let idx = this.spds.indexOf(this.hiSpeed);
-      if(idx === -1) idx = 0;
-      return this.spds[(idx + 1) % this.spds.length];
-  },
-
   update() {
     this.bgTimer++;
     let kD = typeof keysDown !== 'undefined' ? keysDown : {};
@@ -354,38 +371,34 @@ const Rhythm = {
     else if(this.st === 'settings') {
       if(kD.select){ this.st = 'menu'; this.showFileUI(); return; }
       
-      // ★ 設定項目の数（エンドレスなら4個、通常なら6個）
-      let maxCur = this.isEndless ? 4 : 6;
+      let maxCur = this.isEndless ? 3 : 6;
       if(kD.up){ this.settingsCur = (this.settingsCur + maxCur - 1) % maxCur; playSnd('sel'); } 
       if(kD.down){ this.settingsCur = (this.settingsCur + 1) % maxCur; playSnd('sel'); }
       
-      // ★ Aボタン（または右キー）を押すだけで項目がローテーションする！
-      let advance = kD.a || kD.right;
-
       if (this.isEndless) {
           if (this.settingsCur === 0) {
-              if(advance) { this.hiSpeed = this.nextHiSpeed(); playSnd('sel'); }
+              if(kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
           } else if (this.settingsCur === 1) {
-              if(advance) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
+              if(kD.a) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
           } else if (this.settingsCur === 2) {
-              if(advance) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
-          } else if (this.settingsCur === 3) {
-              if(kD.a) { this.startGame(); } // スタートはAボタンのみ
+              if(kD.a) { this.startGame(); }
           }
       } else {
           if(this.settingsCur === 0) {
-              let m = ['easy','normal','hard','nightmare'];
-              if(advance) { this.mode = m[(m.indexOf(this.mode)+1)%4]; playSnd('sel'); }
+            let m = ['easy','normal','hard','nightmare'];
+            if(kD.a) { this.mode = m[(m.indexOf(this.mode)+1)%4]; playSnd('sel'); }
           } else if(this.settingsCur === 1) { 
-              if(advance) { this.filterType = (this.filterType + 1) % 4; playSnd('sel'); }
+            if(kD.a) { this.filterType = (this.filterType + 1) % 4; playSnd('sel'); }
           } else if(this.settingsCur === 2) { 
-              if(advance) { this.hiSpeed = this.nextHiSpeed(); playSnd('sel'); }
+            let spds = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0];
+            let idx = spds.indexOf(this.hiSpeed); if(idx===-1) idx=0;
+            if(kD.a) { this.hiSpeed = spds[(idx + 1) % spds.length]; playSnd('sel'); }
           } else if(this.settingsCur === 3) {
-              if(advance) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
+            if(kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
           } else if(this.settingsCur === 4) {
-              if(advance) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
+            if(kD.a) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
           } else if(this.settingsCur === 5) {
-              if(kD.a) { this.startGame(); }
+            if(kD.a) { this.startGame(); }
           }
       }
     }
@@ -432,12 +445,11 @@ const Rhythm = {
           let diff = Math.min(Math.max(now, 0) / 300, 1.0);
           speed = (200 + (diff * 300)) * this.hiSpeed;
       } else {
-          let baseSpeed = (this.mode === 'nightmare' ? 800 : this.mode === 'hard' ? 450 : this.mode === 'normal' ? 350 : 200);
+          let baseSpeed = (this.mode === 'nightmare' ? 600 : this.mode === 'hard' ? 400 : this.mode === 'normal' ? 300 : 200);
           speed = baseSpeed * this.hiSpeed;
           if(this.mode === 'nightmare' && this.source) this.source.playbackRate.value = 1.0 + Math.sin(Date.now()/200)*0.3;
       }
 
-      // ★ オートプレイ時は自動で判定！
       if (this.autoPlay) {
           for (let i=0; i<4; i++) this.laneTouch[i] = false; 
           for (let n of this.notes) {
@@ -502,7 +514,7 @@ const Rhythm = {
                 let drawY = (cvs.height - drawH) / 2; 
                 ctx.drawImage(this.video, 0, drawY, drawW, drawH);
             }
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fillRect(0, 0, cvs.width, cvs.height); 
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, cvs.width, cvs.height); 
         } catch(e) {} 
     }
     
@@ -533,7 +545,7 @@ const Rhythm = {
     if(this.st === 'menu') {
       ctx.shadowBlur = 10; ctx.shadowColor = '#0ff'; ctx.fillStyle = '#0ff'; 
       ctx.font = 'bold 24px monospace'; ctx.fillText('BEAT BROS', 35, 80); ctx.shadowBlur = 0;
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('SYSTEM UPGRADE V3', 50, 100);
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('SYSTEM UPGRADE V2', 50, 100);
       ctx.fillStyle = '#ff0'; ctx.fillText('↓画面下部でファイルをロード↓', 20, 140);
       ctx.fillStyle = '#888'; ctx.font = '9px monospace'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
@@ -542,32 +554,34 @@ const Rhythm = {
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
       
       if(this.isEndless) {
-         ctx.fillText('MODE: ENDLESS TIME SURVIVAL', 5, 70);
-         ctx.fillStyle = '#f00'; ctx.fillText('⚠ DANGER ⚠', 60, 90);
+         ctx.fillText('MODE: ENDLESS TIME SURVIVAL', 5, 75);
+         ctx.fillStyle = '#f00'; ctx.fillText('⚠ DANGER ⚠', 60, 95);
          
-         ctx.fillStyle = this.settingsCur === 0 ? '#f0f' : '#fff'; ctx.fillText((this.settingsCur===0?'> ':'  ') + `SPEED: x${this.hiSpeed.toFixed(1)}`, 25, 120);
-         ctx.fillStyle = this.settingsCur === 1 ? '#0f0' : '#fff'; ctx.fillText((this.settingsCur===1?'> ':'  ') + `SKIN: ${this.skins[this.noteSkin]}`, 25, 145);
-         ctx.fillStyle = this.settingsCur === 2 ? '#ff0' : '#fff'; ctx.fillText((this.settingsCur===2?'> ':'  ') + `AUTO: ${this.autoPlay ? 'ON' : 'OFF'}`, 25, 170);
+         ctx.fillStyle = this.settingsCur === 0 ? '#0f0' : '#fff'; 
+         ctx.fillText((this.settingsCur===0?'> ':'  ') + `SKIN: ${this.skins[this.noteSkin]}`, 25, 125);
+         
+         ctx.fillStyle = this.settingsCur === 1 ? '#ff0' : '#fff'; 
+         ctx.fillText((this.settingsCur===1?'> ':'  ') + `AUTO: ${this.autoPlay ? 'ON' : 'OFF'}`, 25, 155);
 
-         ctx.fillStyle = this.settingsCur === 3 ? '#0f0' : '#888'; 
-         ctx.fillText((this.settingsCur===3?'> ':'  ') + `[ EXECUTE ]`, 55, 215);
+         ctx.fillStyle = this.settingsCur === 2 ? '#0f0' : '#888'; 
+         ctx.fillText((this.settingsCur===2?'> ':'  ') + `[ EXECUTE ]`, 55, 200);
       } else {
          let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
          ctx.fillStyle = this.settingsCur === 0 ? (this.mode === 'nightmare' ? '#f00' : '#ff0') : '#fff';
-         ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 25, 70);
-         ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`  HI-SCORE: ${rData[this.mode]||0}`, 25, 85);
+         ctx.fillText((this.settingsCur===0?'> ':'  ') + `MODE: ${this.mode.toUpperCase()}`, 25, 75);
+         ctx.fillStyle = '#aaa'; ctx.font = '10px monospace'; ctx.fillText(`  HI-SCORE: ${rData[this.mode]||0}`, 25, 90);
          
          ctx.font = '12px monospace';
          const filters = ['OFF', 'RADIO', 'WATER', 'ECHO'];
-         ctx.fillStyle = this.settingsCur === 1 ? '#0ff' : '#fff'; ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 25, 110);
-         ctx.fillStyle = this.settingsCur === 2 ? '#f0f' : '#fff'; ctx.fillText((this.settingsCur===2?'> ':'  ') + `SPEED: x${this.hiSpeed.toFixed(1)}`, 25, 135);
-         ctx.fillStyle = this.settingsCur === 3 ? '#0f0' : '#fff'; ctx.fillText((this.settingsCur===3?'> ':'  ') + `SKIN: ${this.skins[this.noteSkin]}`, 25, 160);
-         ctx.fillStyle = this.settingsCur === 4 ? '#ff0' : '#fff'; ctx.fillText((this.settingsCur===4?'> ':'  ') + `AUTO: ${this.autoPlay ? 'ON' : 'OFF'}`, 25, 185);
+         ctx.fillStyle = this.settingsCur === 1 ? '#0ff' : '#fff'; ctx.fillText((this.settingsCur===1?'> ':'  ') + `FILTER: ${filters[this.filterType]}`, 25, 115);
+         ctx.fillStyle = this.settingsCur === 2 ? '#f0f' : '#fff'; ctx.fillText((this.settingsCur===2?'> ':'  ') + `SPEED: x${this.hiSpeed.toFixed(1)}`, 25, 140);
+         ctx.fillStyle = this.settingsCur === 3 ? '#0f0' : '#fff'; ctx.fillText((this.settingsCur===3?'> ':'  ') + `SKIN: ${this.skins[this.noteSkin]}`, 25, 165);
+         ctx.fillStyle = this.settingsCur === 4 ? '#ff0' : '#fff'; ctx.fillText((this.settingsCur===4?'> ':'  ') + `AUTO: ${this.autoPlay ? 'ON' : 'OFF'}`, 25, 190);
 
          ctx.fillStyle = this.settingsCur === 5 ? '#0f0' : '#888'; 
-         ctx.fillText((this.settingsCur===5?'> ':'  ') + `[ EXECUTE ]`, 55, 225);
+         ctx.fillText((this.settingsCur===5?'> ':'  ') + `[ EXECUTE ]`, 55, 230);
       }
-      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A:変更/決定  SEL:戻る', 20, 280);
+      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択  A:変更  SEL:戻る', 25, 280);
     }
     else if(this.st === 'transform_in' || this.st === 'transform_out') {
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
@@ -587,12 +601,10 @@ const Rhythm = {
          let cx = 25 + i * 50; 
          let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
          
-         // ★ 画面下部までズドーンとレーンが発光！
          if (this.laneGlow[i] > 0 || isP) {
              let alpha = Math.max(this.laneGlow[i], isP ? 0.3 : 0);
-             let grad = ctx.createLinearGradient(0, cvs.height, 0, 0); // 下から上へ
-             grad.addColorStop(0, this.colors[i]); // 下が濃い
-             grad.addColorStop(1, 'rgba(0,0,0,0)'); // 上が透明
+             let grad = ctx.createLinearGradient(0, cvs.height, 0, 0);
+             grad.addColorStop(0, this.colors[i]); grad.addColorStop(1, 'rgba(0,0,0,0)');
              ctx.globalAlpha = alpha; ctx.fillStyle = grad; 
              ctx.fillRect(cx - 25, 0, 50, cvs.height); 
              ctx.globalAlpha = 1;
