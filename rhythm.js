@@ -1,5 +1,5 @@
-// === BEAT BROS - VJ VISUALIZER & AUTO PLAY EDITION ===
-// ノーツ密度UP、レーン発光の全画面化、AUTO PLAY機能(鑑賞モード)を搭載！
+// === BEAT BROS - ULTRA RESPONSIVE & AUTO PLAY EDITION ===
+// タッチ感度を超絶改善し、設定変更をAボタンのみでサクサク回せるように最適化！
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -26,6 +26,7 @@ const Rhythm = {
     const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 300; 
     BGM.play('menu'); this.showFileUI();
     
+    // ★ タッチ感度（レスポンス）の超絶改善
     if(!this.touchBound) {
       this.touchBound = true;
       const tH = (e) => {
@@ -33,23 +34,38 @@ const Rhythm = {
         if(this.st !== 'play' && this.st !== 'result') return;
         if(e.cancelable) e.preventDefault(); 
         const r = cvs.getBoundingClientRect();
+        
+        // 1. タップした瞬間のダイレクト判定（抜け防止）
         if (e.type === 'touchstart' || e.type === 'mousedown') {
             let ts = e.type === 'mousedown' ? [e] : e.changedTouches;
             for(let i=0; i<ts.length; i++) {
                 let x = (ts[i].clientX - r.left) / r.width * cvs.width;
                 let y = (ts[i].clientY - r.top) / r.height * cvs.height;
+                
                 if(y < 40 && x < 60){ this.exitGame(); return; }
                 if(this.st === 'result'){ this.exitGame(); return; }
+                
+                // プレイ中、画面下部を叩いた瞬間に即時ヒット処理！
+                if(this.st === 'play' && !this.autoPlay && y > 100) {
+                    let l = Math.floor(x / (cvs.width / 4));
+                    if(l >= 0 && l <= 3) this.hitKey(l);
+                }
             }
         }
+        
+        // 2. 指を滑らせた時（スライド）の判定と、描画状態の更新
         if (this.st === 'play' && !this.autoPlay) {
             let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
             let nT = [false,false,false,false];
             for(let i=0; i<activeTs.length; i++) {
                 let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
                 let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-                if(y > 100) { let l = Math.floor(x / (cvs.width / 4)); if(l >= 0 && l <= 3) nT[l] = true; }
+                if(y > 100) { 
+                    let l = Math.floor(x / (cvs.width / 4)); 
+                    if(l >= 0 && l <= 3) nT[l] = true; 
+                }
             }
+            // 新しくレーンに指が入った時もヒット判定！
             for(let l=0; l<4; l++) { if(nT[l] && !this.laneTouch[l]) { this.hitKey(l); } }
             this.laneTouch = nT;
         }
@@ -146,7 +162,6 @@ const Rhythm = {
     reader.readAsArrayBuffer(file);
   },
 
-  // ★ ノーツの密度をアップ！(thresholdとminGapを調整)
   generateNotes(buffer) {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0; for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
@@ -220,7 +235,6 @@ const Rhythm = {
     } else {
        this.st = 'result'; let finalScore = Math.floor(this.score);
        
-       // ★ オートプレイ時はスコアを保存しない
        if(!this.autoPlay) {
            let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
            if(finalScore > (rData[this.mode]||0)){ rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
@@ -296,7 +310,6 @@ const Rhythm = {
     if (this.notes.length > 100) this.notes = this.notes.filter(n => !n.hit && !n.missed && n.y < 500);
   },
 
-  // ★ オートプレイ時は強制的にPerfect判定を出す
   hitKey(lane, isAuto=false) {
       if(this.st !== 'play') return;
       let now = audioCtx.currentTime - this.startTime;
@@ -305,11 +318,12 @@ const Rhythm = {
       for(let n of this.notes) {
         if(!n.hit && !n.missed && n.lane === lane) {
           let diff = Math.abs(n.time - now);
-          if(diff < 0.3 && diff < minDiff){ minDiff = diff; hitNote = n; }
+          // ★ 判定幅を少し広げて空振りを激減させる (0.3 -> 0.35)
+          if(diff < 0.35 && diff < minDiff){ minDiff = diff; hitNote = n; }
         }
       }
       
-      if(isAuto && hitNote) minDiff = 0; // AUTOなら絶対Perfect
+      if(isAuto && hitNote) minDiff = 0;
 
       if(hitNote) {
         hitNote.hit = true; let cx = 25 + lane * 50;
@@ -346,11 +360,11 @@ const Rhythm = {
     else if(this.st === 'settings') {
       if(kD.select){ this.st = 'menu'; this.showFileUI(); return; }
       
-      // ★ メニュー項目数(エンドレス:3, 通常:6) を Aボタンだけでローテーションできるように！
       let maxCur = this.isEndless ? 3 : 6;
       if(kD.up){ this.settingsCur = (this.settingsCur + maxCur - 1) % maxCur; playSnd('sel'); } 
       if(kD.down){ this.settingsCur = (this.settingsCur + 1) % maxCur; playSnd('sel'); }
       
+      // ★ Aボタン（または左右）だけで項目をサクサク回せる！
       if (this.isEndless) {
           if (this.settingsCur === 0) {
               if(kD.left || kD.right || kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
@@ -430,14 +444,13 @@ const Rhythm = {
           if(this.mode === 'nightmare' && this.source) this.source.playbackRate.value = 1.0 + Math.sin(Date.now()/200)*0.3;
       }
 
-      // ★ オートプレイの自動判定処理
       if (this.autoPlay) {
           for (let i=0; i<4; i++) this.laneTouch[i] = false; 
           for (let n of this.notes) {
               if (!n.hit && !n.missed && n.y > -30 && n.y < 420) {
                   let tDiff = n.time - now;
                   if (tDiff <= 0.05 && tDiff > -0.1) {
-                      this.laneTouch[n.lane] = true; // タッチエフェクト
+                      this.laneTouch[n.lane] = true; 
                       this.hitKey(n.lane, true);
                   }
               }
@@ -458,7 +471,7 @@ const Rhythm = {
            n.missed = true; this.combo = 0; 
            this.judgements.push({ msg: 'MISS', life: 30, color: '#f00', lane: n.lane }); 
            
-           if(this.isEndless && !this.autoPlay) { // オートプレイ時はHPが減らない
+           if(this.isEndless && !this.autoPlay) { 
                this.life--; playSnd('hit'); screenShake(5);
                if(this.life <= 0) { 
                    this.st = 'result'; this.finalTime = Math.max(0, now);
@@ -562,7 +575,7 @@ const Rhythm = {
          ctx.fillStyle = this.settingsCur === 5 ? '#0f0' : '#888'; 
          ctx.fillText((this.settingsCur===5?'> ':'  ') + `[ EXECUTE ]`, 55, 230);
       }
-      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A/◀▶:変更  SEL:戻る', 20, 280);
+      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A(タップ):変更  SEL:戻る', 15, 280);
     }
     else if(this.st === 'transform_in' || this.st === 'transform_out') {
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
@@ -582,7 +595,6 @@ const Rhythm = {
          let cx = 25 + i * 50; 
          let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
          
-         // ★ レーン発光を画面下端（cvs.height）までド派手に延長！
          if (this.laneGlow[i] > 0 || isP) {
              let alpha = Math.max(this.laneGlow[i], isP ? 0.3 : 0);
              let grad = ctx.createLinearGradient(0, cvs.height, 0, 0);
