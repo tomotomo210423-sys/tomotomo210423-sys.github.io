@@ -1,5 +1,5 @@
-// === BEAT BROS - ULTRA RESPONSIVE & AUTO PLAY EDITION ===
-// タッチ感度を超絶改善し、設定変更をAボタンのみでサクサク回せるように最適化！
+// === BEAT BROS - VJ VISUALIZER & PERFECT TOUCH EDITION ===
+// タッチ判定の抜けを完全に解消し、設定をAボタンのみで変更可能に修正！
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -26,7 +26,7 @@ const Rhythm = {
     const cvs = document.getElementById('gameCanvas'); cvs.width = 200; cvs.height = 300; 
     BGM.play('menu'); this.showFileUI();
     
-    // ★ タッチ感度（レスポンス）の超絶改善
+    // ★ タッチ判定ロジックを「即時発動型」に魔改造！！
     if(!this.touchBound) {
       this.touchBound = true;
       const tH = (e) => {
@@ -35,38 +35,34 @@ const Rhythm = {
         if(e.cancelable) e.preventDefault(); 
         const r = cvs.getBoundingClientRect();
         
-        // 1. タップした瞬間のダイレクト判定（抜け防止）
         if (e.type === 'touchstart' || e.type === 'mousedown') {
             let ts = e.type === 'mousedown' ? [e] : e.changedTouches;
             for(let i=0; i<ts.length; i++) {
                 let x = (ts[i].clientX - r.left) / r.width * cvs.width;
                 let y = (ts[i].clientY - r.top) / r.height * cvs.height;
-                
                 if(y < 40 && x < 60){ this.exitGame(); return; }
                 if(this.st === 'result'){ this.exitGame(); return; }
                 
-                // プレイ中、画面下部を叩いた瞬間に即時ヒット処理！
-                if(this.st === 'play' && !this.autoPlay && y > 100) {
-                    let l = Math.floor(x / (cvs.width / 4));
-                    if(l >= 0 && l <= 3) this.hitKey(l);
+                // プレイ中、触れた瞬間に「即座に」hitKeyを発動！これで抜けがなくなる！
+                if(this.st === 'play' && !this.autoPlay && y > 50) {
+                    let l = Math.floor(x / (cvs.width / 4)); 
+                    if(l >= 0 && l <= 3) this.hitKey(l); 
                 }
             }
         }
-        
-        // 2. 指を滑らせた時（スライド）の判定と、描画状態の更新
+
+        // 描画エフェクト用の「押しっぱなし判定」更新
         if (this.st === 'play' && !this.autoPlay) {
             let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
             let nT = [false,false,false,false];
             for(let i=0; i<activeTs.length; i++) {
                 let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
                 let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-                if(y > 100) { 
+                if(y > 50) { 
                     let l = Math.floor(x / (cvs.width / 4)); 
                     if(l >= 0 && l <= 3) nT[l] = true; 
                 }
             }
-            // 新しくレーンに指が入った時もヒット判定！
-            for(let l=0; l<4; l++) { if(nT[l] && !this.laneTouch[l]) { this.hitKey(l); } }
             this.laneTouch = nT;
         }
       };
@@ -318,12 +314,11 @@ const Rhythm = {
       for(let n of this.notes) {
         if(!n.hit && !n.missed && n.lane === lane) {
           let diff = Math.abs(n.time - now);
-          // ★ 判定幅を少し広げて空振りを激減させる (0.3 -> 0.35)
-          if(diff < 0.35 && diff < minDiff){ minDiff = diff; hitNote = n; }
+          if(diff < 0.3 && diff < minDiff){ minDiff = diff; hitNote = n; }
         }
       }
       
-      if(isAuto && hitNote) minDiff = 0;
+      if(isAuto && hitNote) minDiff = 0; 
 
       if(hitNote) {
         hitNote.hit = true; let cx = 25 + lane * 50;
@@ -360,37 +355,33 @@ const Rhythm = {
     else if(this.st === 'settings') {
       if(kD.select){ this.st = 'menu'; this.showFileUI(); return; }
       
+      // ★ Aボタンだけで全ての項目を変更できるように修正！
       let maxCur = this.isEndless ? 3 : 6;
       if(kD.up){ this.settingsCur = (this.settingsCur + maxCur - 1) % maxCur; playSnd('sel'); } 
       if(kD.down){ this.settingsCur = (this.settingsCur + 1) % maxCur; playSnd('sel'); }
       
-      // ★ Aボタン（または左右）だけで項目をサクサク回せる！
       if (this.isEndless) {
           if (this.settingsCur === 0) {
-              if(kD.left || kD.right || kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
+              if(kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
           } else if (this.settingsCur === 1) {
-              if(kD.left || kD.right || kD.a) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
+              if(kD.a) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
           } else if (this.settingsCur === 2) {
               if(kD.a) { this.startGame(); }
           }
       } else {
           if(this.settingsCur === 0) {
             let m = ['easy','normal','hard','nightmare'];
-            if(kD.left) { this.mode = m[(m.indexOf(this.mode)+3)%4]; playSnd('sel'); }
-            else if(kD.right || kD.a) { this.mode = m[(m.indexOf(this.mode)+1)%4]; playSnd('sel'); }
+            if(kD.a) { this.mode = m[(m.indexOf(this.mode)+1)%4]; playSnd('sel'); }
           } else if(this.settingsCur === 1) { 
-            if(kD.left) { this.filterType = (this.filterType + 3) % 4; playSnd('sel'); }
-            else if(kD.right || kD.a) { this.filterType = (this.filterType + 1) % 4; playSnd('sel'); }
+            if(kD.a) { this.filterType = (this.filterType + 1) % 4; playSnd('sel'); }
           } else if(this.settingsCur === 2) { 
             let spds = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0];
             let idx = spds.indexOf(this.hiSpeed); if(idx===-1) idx=0;
-            if(kD.left) { this.hiSpeed = spds[(idx + spds.length - 1) % spds.length]; playSnd('sel'); }
-            else if(kD.right || kD.a) { this.hiSpeed = spds[(idx + 1) % spds.length]; playSnd('sel'); }
+            if(kD.a) { this.hiSpeed = spds[(idx + 1) % spds.length]; playSnd('sel'); }
           } else if(this.settingsCur === 3) {
-            if(kD.left) { this.noteSkin = (this.noteSkin + 3) % 4; playSnd('sel'); }
-            else if(kD.right || kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
+            if(kD.a) { this.noteSkin = (this.noteSkin + 1) % 4; playSnd('sel'); }
           } else if(this.settingsCur === 4) {
-            if(kD.left || kD.right || kD.a) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
+            if(kD.a) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
           } else if(this.settingsCur === 5) {
             if(kD.a) { this.startGame(); }
           }
@@ -456,6 +447,7 @@ const Rhythm = {
               }
           }
       } else {
+          // PCキーボード用
           if(kD.left || kD.l0) this.hitKey(0); if(kD.down || kD.l1) this.hitKey(1); if(kD.up || kD.l2) this.hitKey(2); if(kD.right|| kD.l3) this.hitKey(3);
       }
       
@@ -575,7 +567,8 @@ const Rhythm = {
          ctx.fillStyle = this.settingsCur === 5 ? '#0f0' : '#888'; 
          ctx.fillText((this.settingsCur===5?'> ':'  ') + `[ EXECUTE ]`, 55, 230);
       }
-      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択 A(タップ):変更  SEL:戻る', 15, 280);
+      // ★ Aボタンで変更するようにナビゲーションを修正！
+      ctx.fillStyle = '#666'; ctx.font = '9px monospace'; ctx.fillText('↑↓:選択  A:変更  SEL:戻る', 25, 280);
     }
     else if(this.st === 'transform_in' || this.st === 'transform_out') {
       ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('SYSTEM REBOOT...', cvs.width/2 - 60, cvs.height/2 + (Math.random()-0.5)*10);
