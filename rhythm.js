@@ -1,5 +1,5 @@
-// === BEAT BROS - APOCALYPSE NIGHTMARE & WARNING EDITION ===
-// NORMAL/HARDは完全単押し。NIGHTMAREは画面崩壊＆警告画面付きの真の地獄！
+// === BEAT BROS - BALANCED NORMAL & ULTIMATE NIGHTMARE EDITION ===
+// NORMAL/HARDを叩きやすく調整し、NIGHTMAREの画面とノーツ軌道を完全に崩壊させた版！
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -145,18 +145,17 @@ const Rhythm = {
     reader.readAsArrayBuffer(file);
   },
 
-  // ★ NIGHTMAREは超カオス、HARDとNORMALは完全単押しに調整
+  // ★ 密度緩和！NORMALとHARDは心地よい単押しに！
   generateNotes(buffer) {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0; for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
     
-    // NIGHTMAREの敷居値は激低(音を全部拾う)、それ以外は適正
-    let threshold = avgVol * (this.mode === 'nightmare' ? 0.15 : this.mode === 'hard' ? 0.65 : this.mode === 'normal' ? 1.0 : 1.5);
+    // ★ 敷居値と間隔を緩和して、ノーツが詰まりすぎないように調整
+    let threshold = avgVol * (this.mode === 'nightmare' ? 0.15 : this.mode === 'hard' ? 0.75 : this.mode === 'normal' ? 1.2 : 1.6);
     if(threshold < 0.01) threshold = 0.01;
     
-    // NIGHTMAREのノーツ間隔は極限まで短く
-    let minGap = this.mode === 'nightmare' ? 0.02 : this.mode === 'hard' ? 0.10 : this.mode === 'normal' ? 0.18 : 0.30;
+    let minGap = this.mode === 'nightmare' ? 0.02 : this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.25 : 0.35;
     
     let lastTime = 0, lastLane = -1;
     for(let i=0; i<raw.length; i+=256) {
@@ -165,22 +164,20 @@ const Rhythm = {
         if(t - lastTime > minGap) {
           
           if (this.mode === 'nightmare') {
-              // 【人間卒業・世紀末モード】
-              let isCrazy = Math.random() < 0.7; // 70%で複数ノーツ
-              let nCnt = isCrazy ? (Math.random() < 0.4 ? 4 : 3) : (Math.random() < 0.5 ? 2 : 1);
+              let isCrazy = Math.random() < 0.8; 
+              let nCnt = isCrazy ? (Math.random() < 0.5 ? 4 : 3) : (Math.random() < 0.5 ? 2 : 1);
               let lanes = [0,1,2,3].sort(()=>Math.random()-0.5).slice(0,nCnt);
               
               lanes.forEach((l, idx) => {
-                  // 超理不尽な「微ズレ階段ノーツ」を生成
-                  let offset = (isCrazy && Math.random() < 0.6) ? idx * (0.02 + Math.random() * 0.04) : 0;
+                  let offset = (isCrazy && Math.random() < 0.7) ? idx * (0.02 + Math.random() * 0.05) : 0;
                   this.notes.push({ time: t + offset, lane: l, hit: false, y: -50, missed: false });
               });
               lastLane = lanes[0]; lastTime = t; 
 
           } else {
-              // 【NORMAL / HARD / EASY】絶対に同時押しを生成しない完全単押し！
+              // NORMAL / HARDは完全単押しで、適度な間隔を保つ！
               let lane = Math.floor(Math.random() * 4);
-              if(lane === lastLane && Math.random() < 0.7) lane = (lane + 1 + Math.floor(Math.random()*2)) % 4;
+              if(lane === lastLane && Math.random() < 0.6) lane = (lane + 1 + Math.floor(Math.random()*2)) % 4;
               
               this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
               lastLane = lane; lastTime = t; 
@@ -329,7 +326,12 @@ const Rhythm = {
       if(isAuto && hitNote) minDiff = 0; 
 
       if(hitNote) {
-        hitNote.hit = true; let cx = 25 + lane * 50;
+        hitNote.hit = true; 
+        
+        // NIGHTMARE時はレーンも揺れているのでエフェクト位置も補正
+        let laneOffset = (this.mode === 'nightmare') ? Math.sin(now * 5) * 15 : 0;
+        let cx = 25 + lane * 50 + laneOffset;
+
         let msg = '', pts = 0;
         if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); this.laneGlow[lane] = 1.0; }
         else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); this.laneGlow[lane] = 0.5; }
@@ -399,7 +401,6 @@ const Rhythm = {
               if(advance) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
           } else if(this.settingsCur === 5) {
               if(kD.a) { 
-                  // ★ NIGHTMAREを選んだ時だけ警告画面へ飛ばす！
                   if (this.mode === 'nightmare') {
                       this.st = 'warning';
                       playSnd('hit');
@@ -411,10 +412,9 @@ const Rhythm = {
           }
       }
     }
-    // ★ 警告画面の処理
     else if(this.st === 'warning') {
-      if(kD.a) { this.startGame(); } // 警告を無視して開始
-      if(kD.b || kD.select) { this.st = 'settings'; playSnd('sel'); } // メニューに戻る
+      if(kD.a) { this.startGame(); } 
+      if(kD.b || kD.select) { this.st = 'settings'; playSnd('sel'); } 
     }
     else if(this.st === 'transform_in') {
       this.transformTimer--;
@@ -452,14 +452,15 @@ const Rhythm = {
     }
     else if(this.st === 'play') {
       let now = audioCtx.currentTime - this.startTime;
-      let speed = 200;
       
+      // ★ 落下速度を緩和して遊びやすく！
+      let speed = 150;
       if(this.isEndless) {
           this.scheduleEndless(now);
           let diff = Math.min(Math.max(now, 0) / 300, 1.0);
-          speed = (200 + (diff * 300)) * this.hiSpeed;
+          speed = (150 + (diff * 250)) * this.hiSpeed;
       } else {
-          let baseSpeed = (this.mode === 'nightmare' ? 500 : this.mode === 'hard' ? 450 : this.mode === 'normal' ? 350 : 200);
+          let baseSpeed = (this.mode === 'nightmare' ? 480 : this.mode === 'hard' ? 380 : this.mode === 'normal' ? 280 : 180);
           speed = baseSpeed * this.hiSpeed;
           
           if(this.mode === 'nightmare' && this.source && !this.autoPlay) {
@@ -489,7 +490,8 @@ const Rhythm = {
       for(let n of this.notes) {
         let tDiff = n.time - now;
         
-        let nightmareWiggle = (this.mode === 'nightmare') ? Math.sin(now * 15 + n.lane) * 15 : 0;
+        // ★ NIGHTMARE 狂気のY座標崩壊
+        let nightmareWiggle = (this.mode === 'nightmare') ? Math.sin(now * 20 + n.lane) * 30 : 0;
 
         if(n.accel && tDiff > 0) n.y = this.lineY - (tDiff * tDiff) * (speed / 1.5) + nightmareWiggle; 
         else n.y = this.lineY - tDiff * speed + nightmareWiggle;
@@ -524,7 +526,6 @@ const Rhythm = {
         let t = this.bgTimer * 0.05;
         ctx.fillStyle = '#001'; ctx.fillRect(0, 0, cvs.width, cvs.height);
         
-        // ★ NIGHTMAREを選択中のメニュー画面は背景がバグる！
         if (this.st === 'settings' && this.mode === 'nightmare' && !this.isEndless) {
             if (Math.random() < 0.2) {
                 ctx.translate((Math.random()-0.5)*6, (Math.random()-0.5)*6);
@@ -563,18 +564,19 @@ const Rhythm = {
 
     ctx.save();
     
+    // ★ NIGHTMARE 狂気の視覚崩壊（さらに激しく！）
     if(this.mode === 'nightmare' && this.st === 'play') { 
         let nNow = Date.now();
         ctx.translate(100, 200); 
-        ctx.rotate(Math.sin(nNow/150) * 0.2 + (Math.random()-0.5)*0.05); 
-        ctx.scale(1.0 + Math.sin(nNow/100)*0.1, 1.0 + Math.cos(nNow/130)*0.1);
+        ctx.rotate(Math.sin(nNow/100) * 0.3 + (Math.random()-0.5)*0.1); 
+        ctx.scale(1.0 + Math.sin(nNow/80)*0.2, 1.0 + Math.cos(nNow/110)*0.2);
         ctx.translate(-100, -200);
         
-        if(Math.random() < 0.15) {
-            ctx.fillStyle = ['rgba(255,0,0,0.4)', 'rgba(0,255,0,0.4)', 'rgba(0,0,255,0.4)'][Math.floor(Math.random()*3)];
-            ctx.fillRect(Math.random()*200, Math.random()*400, Math.random()*200, Math.random()*100);
+        if(Math.random() < 0.25) {
+            ctx.fillStyle = ['rgba(255,0,0,0.6)', 'rgba(0,255,0,0.6)', 'rgba(0,0,255,0.6)'][Math.floor(Math.random()*3)];
+            ctx.fillRect(Math.random()*200, Math.random()*400, Math.random()*200, Math.random()*150);
         }
-        if(Math.random() < 0.05) { ctx.globalCompositeOperation = 'difference'; }
+        if(Math.random() < 0.1) { ctx.globalCompositeOperation = 'difference'; }
     }
     
     if(typeof shakeTimer !== 'undefined' && shakeTimer > 0){ ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; }
@@ -603,9 +605,8 @@ const Rhythm = {
       } else {
          let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, nightmare:0};
          
-         // NIGHTMARE選択時は文字が赤く震える
          let mStr = `MODE: ${this.mode.toUpperCase()}`;
-         if(this.mode === 'nightmare') { ctx.fillStyle = '#f00'; if(Math.random()<0.3) mStr = 'M%D#: N1GH!M@R&'; } 
+         if(this.mode === 'nightmare') { ctx.fillStyle = '#f00'; if(Math.random()<0.4) mStr = 'M%D#: N1GH!M@R&'; } 
          else { ctx.fillStyle = this.settingsCur === 0 ? '#ff0' : '#fff'; }
          ctx.fillText((this.settingsCur===0?'> ':'  ') + mStr, 25, 70);
          
@@ -625,7 +626,7 @@ const Rhythm = {
     }
     // ★ NIGHTMARE 警告画面
     else if(this.st === 'warning') {
-      ctx.fillStyle = Math.random() < 0.1 ? '#fff' : '#800'; // 禍々しい赤
+      ctx.fillStyle = Math.random() < 0.1 ? '#fff' : '#800'; 
       ctx.fillRect(0, 0, 200, 300);
       
       ctx.fillStyle = '#000';
@@ -661,18 +662,23 @@ const Rhythm = {
           let n1 = this.notes[i]; let n2 = this.notes[i+1];
           if(!n1.missed && !n1.hit && !n2.missed && !n2.hit && Math.abs(n1.time - n2.time) < 0.01) {
               if (n1.y > 0 && n1.y < 400) {
-                  ctx.beginPath(); ctx.moveTo(25 + n1.lane*50, n1.y); ctx.lineTo(25 + n2.lane*50, n2.y); ctx.stroke();
+                  // ★ NIGHTMAREのレーン揺れに合わせて同時押しラインも揺らす
+                  let laneOffset = (this.mode === 'nightmare' && this.st === 'play') ? Math.sin(now * 5) * 15 : 0;
+                  ctx.beginPath(); ctx.moveTo(25 + n1.lane*50 + laneOffset, n1.y); ctx.lineTo(25 + n2.lane*50 + laneOffset, n2.y); ctx.stroke();
               }
           }
       }
 
+      // ★ レーン全体が左右に揺れる（NIGHTMARE）
+      let laneOffset = (this.mode === 'nightmare' && this.st === 'play') ? Math.sin(now * 5) * 15 : 0;
+
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 1;
-      for(let i=0; i<=4; i++) { let cx = 25 + i*50 - 25; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 400); ctx.stroke(); }
+      for(let i=0; i<=4; i++) { let cx = 25 + i*50 - 25 + laneOffset; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 400); ctx.stroke(); }
       
       let k = typeof keys !== 'undefined' ? keys : {};
       
       for(let i=0; i<4; i++) {
-         let cx = 25 + i * 50; 
+         let cx = 25 + i * 50 + laneOffset; 
          let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
          
          if (this.laneGlow[i] > 0 || isP) {
@@ -692,8 +698,13 @@ const Rhythm = {
       
       this.notes.forEach(n => {
         if(!n.missed && !n.hit && n.y > -30 && n.y < 420) {
-           let cx = 25 + n.lane * 50;
+           let cx = 25 + n.lane * 50 + laneOffset;
            if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40; 
+           
+           // ★ NIGHTMARE 狂気のX座標崩壊（ノーツが蛇行する！）
+           if (this.mode === 'nightmare') {
+               cx += Math.sin(n.y * 0.05 + now * 10) * 25; 
+           }
            
            if (this.noteSkin === 0) { 
                ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill();
@@ -739,7 +750,8 @@ const Rhythm = {
       
       for(let j of this.judgements) {
          ctx.fillStyle = j.color; ctx.font = 'bold 12px monospace'; ctx.globalAlpha = j.life / 30;
-         let jx = (25 + j.lane * 50) - (j.msg.length * 3.5); ctx.fillText(j.msg, jx, this.lineY - 30 - (30 - j.life)); ctx.globalAlpha = 1;
+         let jx = (25 + j.lane * 50) - (j.msg.length * 3.5) + laneOffset; 
+         ctx.fillText(j.msg, jx, this.lineY - 30 - (30 - j.life)); ctx.globalAlpha = 1;
       }
       
       ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(5, 5, 40, 20); ctx.strokeStyle = '#f00'; ctx.strokeRect(5, 5, 40, 20);
