@@ -1,5 +1,42 @@
-// === CURSED MANOR V6 (Smart Pathfinding AI & Novel Story Edition) ===
-// 鍵の数を正常化(謎解き限定)、BFS経路探索による賢い敵AI、ノベル的演出を実装！
+// === CURSED MANOR V7 (Dedicated BGM & Novel Story Edition) ===
+// 専用の重低音BGM、本格的なノベルゲーム風UI、深いストーリーを実装！
+
+// ★ 専用の不気味な重低音ドローンBGMジェネレーター
+let horrorBgmOsc = null, horrorBgmGain = null, horrorLfo = null;
+function startHorrorBGM() {
+    if (!audioCtx || SaveSys.data.bgmVol <= 0) return;
+    stopHorrorBGM();
+    let n = audioCtx.currentTime;
+    
+    // 超低音のサイン波
+    horrorBgmOsc = audioCtx.createOscillator();
+    horrorBgmOsc.type = 'sine';
+    horrorBgmOsc.frequency.setValueAtTime(50, n); 
+    
+    horrorBgmGain = audioCtx.createGain();
+    horrorBgmGain.gain.setValueAtTime(0.2 * SaveSys.data.bgmVol, n);
+    
+    // 音量を波のようにうねらせるLFO（低周波オシレーター）
+    horrorLfo = audioCtx.createOscillator();
+    horrorLfo.type = 'sine';
+    horrorLfo.frequency.setValueAtTime(0.2, n); // ゆっくり揺れる
+    let lfoGain = audioCtx.createGain();
+    lfoGain.gain.setValueAtTime(0.15 * SaveSys.data.bgmVol, n);
+    horrorLfo.connect(lfoGain);
+    lfoGain.connect(horrorBgmGain.gain);
+    
+    horrorBgmOsc.connect(horrorBgmGain);
+    horrorBgmGain.connect(audioCtx.destination);
+    
+    horrorBgmOsc.start(n);
+    horrorLfo.start(n);
+}
+
+function stopHorrorBGM() {
+    if(horrorBgmOsc) { try{horrorBgmOsc.stop();}catch(e){} horrorBgmOsc.disconnect(); horrorBgmOsc = null; }
+    if(horrorLfo) { try{horrorLfo.stop();}catch(e){} horrorLfo.disconnect(); horrorLfo = null; }
+    if(horrorBgmGain) { horrorBgmGain.disconnect(); horrorBgmGain = null; }
+}
 
 function playHSnd(t, param) {
     if (!audioCtx || SaveSys.data.seVol <= 0) return;
@@ -30,26 +67,58 @@ function playHSnd(t, param) {
         g.gain.setValueAtTime(0.2 * vol, n); g.gain.linearRampToValueAtTime(0.01, n + 0.2);
         o.start(n); o.stop(n + 0.2);
     } else if (t === 'type') { // 文字送り音
-        o.type = 'square'; o.frequency.setValueAtTime(600, n); o.frequency.exponentialRampToValueAtTime(200, n + 0.05);
+        o.type = 'square'; o.frequency.setValueAtTime(800, n); o.frequency.exponentialRampToValueAtTime(300, n + 0.05);
         g.gain.setValueAtTime(0.05 * vol, n); g.gain.linearRampToValueAtTime(0.01, n + 0.05);
         o.start(n); o.stop(n + 0.05);
     }
 }
 
+// ★ 深い狂気のストーリー（ノベルデータ）
+const diaryStory = [
+    [
+        "【×月×日】",
+        "あの館の主は狂っている。",
+        "『永遠の命』などと嘯きながら、",
+        "迷い込んだ者たちを次々と",
+        "地下室の実験台にしているのだ。",
+        "隠し金庫の暗証番号は...奴の異常な",
+        "絵画の数、『目・指・首』の順だ。"
+    ],
+    [
+        "【△月〇日】",
+        "地下から恐ろしい呻き声がする。",
+        "肉が裂け、骨が軋む音...",
+        "奴はついに自らの体で実験を始めた。",
+        "隠し扉の仕掛けは呪われたピアノ。",
+        "『ド・ミ・ファ・ソ』と弾けば開くが、",
+        "間違えれば、奴が飛んでくるぞ。"
+    ],
+    [
+        "【？月？日】",
+        "配電盤さえ直せれば外に出られる。",
+        "だが、もう遅いかもしれない。",
+        "巨大な肉塊と化した『元・館の主』が",
+        "今もこの廊下を徘徊している。",
+        "お願いだ、これを読んだなら、",
+        "私の代わりに生きて脱出してくれ..."
+    ]
+];
+
 const Horror = {
     st: 'menu', timer: 0,
     camX: 0, camY: 0,
-    // プレイヤー(1.4) ＞ 鬼(1.0)。経路探索を使うため鬼の速度は少し遅めがちょうどいい！
     p: { x: 30, y: 30, r: 6, spd: 1.4, isHide: false },
     e: { x: 350, y: 350, r: 8, spd: 1.0, state: 'patrol', alert: 0, path: [] },
-    keys: 0, maxKeys: 3, diaries: 0, diaryTimer: 0,
+    keys: 0, maxKeys: 3, diaries: 0,
     msg: '', msgTimer: 0,
     
     pzSafe: [0, 0, 0], pzSafeCur: 0,
     pzPiano: [], pzPianoAns: [0, 2, 3, 4],
     pzPanel: 0,
 
-    // ★ マップ直置きの「4(鍵)」をすべて消去！謎解きでのみ入手可能に！
+    // ノベル用の状態変数
+    novelDiaryIdx: 0, novelLine: 0, novelChar: 0, novelTimer: 0,
+
     mapW: 20, mapH: 20, ts: 20,
     map: [
         1,1,1,1,1,1,1,1,1,2,2,1,1,1,1,1,1,1,1,1,
@@ -74,9 +143,7 @@ const Horror = {
         1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     ],
 
-    sprs: {
-        p: { d: "........01111000121121001111110004444000404404003003300300033000", pal: {'1':'#fcc', '2':'#000', '3':'#222', '4':'#08f'} }
-    },
+    sprs: { p: { d: "........01111000121121001111110004444000404404003003300300033000", pal: {'1':'#fcc', '2':'#000', '3':'#222', '4':'#08f'} } },
 
     init() {
         this.st = 'menu'; this.timer = 0;
@@ -88,7 +155,7 @@ const Horror = {
         let m = [...this.map];
         for(let i=0; i<m.length; i++) if(m[i]>=10) m[i] = m[i]-10;
         this.map = m;
-        BGM.stop(); // 最初のメニューは無音
+        stopHorrorBGM(); // メニュー画面は無音
     },
 
     setMsg(text) { this.msg = text; this.msgTimer = 150; },
@@ -108,32 +175,27 @@ const Horror = {
         return false;
     },
 
-    // 視線判定（間に壁があるか）
     canSee(px, py, ex, ey) {
         let dist = Math.hypot(px-ex, py-ey);
         if (dist > 150) return false; 
         let steps = dist / 4;
         for(let i=0; i<=steps; i++) {
-            let cx = ex + (px-ex)*(i/steps);
-            let cy = ey + (py-ey)*(i/steps);
+            let cx = ex + (px-ex)*(i/steps); let cy = ey + (py-ey)*(i/steps);
             let t = this.getTile(cx, cy);
             if (t === 1 || t === 2 || t === 5 || t === 6 || t === 7) return false;
         }
         return true;
     },
 
-    // ★ BFS(幅優先探索)アルゴリズム！障害物を避けてターゲットへの最短経路を出す
     getPath(sx, sy, gx, gy) {
         let stx = Math.floor(sx / this.ts), sty = Math.floor(sy / this.ts);
         let gtx = Math.floor(gx / this.ts), gty = Math.floor(gy / this.ts);
-        
         let q = [{x: stx, y: sty, path: []}];
-        let visited = new Set();
-        visited.add(stx + "," + sty);
+        let visited = new Set(); visited.add(stx + "," + sty);
         
         while(q.length > 0) {
             let cur = q.shift();
-            if(cur.x === gtx && cur.y === gty) return cur.path; // ゴール到達
+            if(cur.x === gtx && cur.y === gty) return cur.path; 
             
             let adjs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
             for(let a of adjs) {
@@ -147,19 +209,15 @@ const Horror = {
                 }
             }
         }
-        return []; // 経路なし
+        return []; 
     },
 
     drawSprite(x, y, sName) {
-        let s = this.sprs[sName];
-        let scale = 1.5; 
+        let s = this.sprs[sName]; let scale = 1.5; 
         let ox = x - 4 * scale; let oy = y - 4 * scale;
         for(let i=0; i<64; i++) {
             let p = s.d[i];
-            if(p !== '0' && p !== '.') {
-                ctx.fillStyle = s.pal[p];
-                ctx.fillRect(ox + (i%8)*scale, oy + Math.floor(i/8)*scale, scale, scale);
-            }
+            if(p !== '0' && p !== '.') { ctx.fillStyle = s.pal[p]; ctx.fillRect(ox + (i%8)*scale, oy + Math.floor(i/8)*scale, scale, scale); }
         }
     },
 
@@ -171,8 +229,8 @@ const Horror = {
         if (this.st === 'menu') {
             if (kD.a) { 
                 this.st = 'play'; playSnd('jmp'); 
-                this.setMsg('3つの鍵を探して脱出せよ...'); 
-                BGM.play('spell'); // ★ 不気味なBGMを開始！
+                this.setMsg('3つの謎を解き、鍵を探せ...'); 
+                startHorrorBGM(); // ★ ゲーム開始時に専用BGMを鳴らす
             }
         }
         else if (this.st === 'safe_puzzle') {
@@ -229,13 +287,33 @@ const Horror = {
             }
             this.updateEnemyInPuzzle(); 
         }
-        else if (this.st === 'read_diary') {
-            this.diaryTimer++;
-            // 文字送り音
-            if (this.diaryTimer % 4 === 0 && this.diaryTimer < 150) playHSnd('type'); 
+        // ★ ノベルゲーム風 ストーリー進行
+        else if (this.st === 'novel') {
+            this.novelTimer++;
+            let currentLineText = diaryStory[this.novelDiaryIdx][this.novelLine];
             
-            if (kD.a || kD.b) { this.st = 'play'; }
-            this.updateEnemyInPuzzle();
+            // 1文字ずつ表示し、タイプ音を鳴らす
+            if (this.novelChar < currentLineText.length && this.novelTimer % 3 === 0) {
+                playHSnd('type');
+                this.novelChar++;
+            }
+
+            if (kD.a || kD.b) {
+                if (this.novelChar < currentLineText.length) {
+                    this.novelChar = currentLineText.length; // スキップして全表示
+                } else {
+                    this.novelLine++;
+                    this.novelChar = 0;
+                    this.novelTimer = 0;
+                    // 最後まで読んだらプレイに戻る
+                    if (this.novelLine >= diaryStory[this.novelDiaryIdx].length) {
+                        this.st = 'play';
+                        this.map[this.targetTy * this.mapW + this.targetTx] = 0; // 読み終わった日記を消す
+                        this.diaries++;
+                    }
+                }
+            }
+            this.updateEnemyInPuzzle(); // ★ 読んでいる最中も裏で鬼が迫ってくる！
         }
         else if (this.st === 'play') {
             if (!this.p.isHide) {
@@ -274,12 +352,15 @@ const Horror = {
                     let hints = ["肖像画：目が『３つ』描かれている", "油絵：手が『４本』描かれている", "写真：首が『２つ』写っている"];
                     this.setMsg(hints[Math.floor(Math.random()*hints.length)]); playSnd('sel');
                 } else if (tile === 9) {
-                    // 日記を読むとノベル演出スタート
-                    this.st = 'read_diary'; this.diaries++; this.diaryTimer = 0; 
-                    this.map[ty * this.mapW + tx] = 0; playSnd('sel');
+                    // ★ 日記を調べることでノベルパートへ移行！
+                    this.st = 'novel'; 
+                    this.novelDiaryIdx = this.diaries; 
+                    this.novelLine = 0; this.novelChar = 0; this.novelTimer = 0;
+                    this.targetTx = tx; this.targetTy = ty;
+                    playSnd('sel');
                 } else if (ty <= 1 && tile === 0 && this.p.y < 30) {
                     if (this.keys >= this.maxKeys) {
-                        this.st = 'clear'; playHSnd('open'); BGM.stop();
+                        this.st = 'clear'; playHSnd('open'); stopHorrorBGM();
                     } else {
                         this.setMsg('鍵がかかっている...あと' + (this.maxKeys - this.keys) + '個必要だ。'); playHSnd('error');
                     }
@@ -306,11 +387,11 @@ const Horror = {
     updateEnemyInPuzzle() {
         this.updateEnemyAI();
         if (Math.hypot(this.p.x - this.e.x, this.p.y - this.e.y) < this.p.r + this.e.r + 5) {
-            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar'); BGM.stop();
+            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar'); stopHorrorBGM();
         }
     },
 
-    // ★ 究極のAI！BFS(幅優先探索)で絶対に迷子にならず、プレイヤーを追い詰める
+    // ★ BFS経路探索AIで、絶対に壁に引っかからず迷路を攻略してくる
     updateEnemyAI() {
         let dist = Math.hypot(this.p.x - this.e.x, this.p.y - this.e.y);
         
@@ -321,17 +402,14 @@ const Horror = {
         }
         if (this.p.isHide && this.e.alert > 0) this.e.alert -= 0.5; 
 
-        // 経路の計算（5フレームに1回だけ計算して軽くする）
         if (this.timer % 5 === 0) {
             if (this.e.alert > 50 && !this.p.isHide) {
                 this.e.state = 'chase'; 
-                this.e.spd = 1.0; // BFSで無駄なく来るので遅めで丁度いい
-                // プレイヤーを目標に経路探索
+                this.e.spd = 1.2; 
                 this.e.path = this.getPath(this.e.x, this.e.y, this.p.x, this.p.y);
             } else {
                 this.e.state = 'patrol';
-                this.e.spd = 0.5;
-                // パスが無いか、目的地に着きそうならランダムなタイルを目的地に設定
+                this.e.spd = 0.6;
                 if (this.e.path.length === 0 || dist < 5) {
                     let rx = Math.floor(Math.random() * this.mapW) * this.ts + 10;
                     let ry = Math.floor(Math.random() * this.mapH) * this.ts + 10;
@@ -342,7 +420,6 @@ const Horror = {
             }
         }
 
-        // パス（経路）に沿って移動
         if (this.e.path && this.e.path.length > 0) {
             let nextNode = this.e.path[0];
             let tgtX = nextNode.x * this.ts + this.ts/2;
@@ -352,7 +429,6 @@ const Horror = {
             let elen = Math.hypot(edx, edy);
             
             if (elen < this.e.spd) {
-                // ノードに到着したら次のノードへ
                 this.e.path.shift();
             } else {
                 edx /= elen; edy /= elen;
@@ -366,7 +442,7 @@ const Horror = {
         }
 
         if (dist < this.p.r + this.e.r - 2 && !this.p.isHide && this.st === 'play') {
-            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar'); BGM.stop();
+            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar'); stopHorrorBGM();
         }
     },
 
@@ -467,7 +543,7 @@ const Horror = {
             ctx.fillRect(0, 0, 200, 300);
         }
 
-        // --- パズルUI ---
+        // --- UI ---
         if (this.st === 'safe_puzzle') {
             ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(20, 100, 160, 100);
             ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 100, 160, 100);
@@ -502,39 +578,35 @@ const Horror = {
             ctx.fillStyle = '#333'; ctx.fillRect(30, 160, 140, 15);
             ctx.fillStyle = '#0f0'; ctx.fillRect(30, 160, 140 * (this.pzPanel/100), 15);
         }
-        // ★ ノベル風テキスト演出
-        else if (this.st === 'read_diary') {
-            ctx.fillStyle = 'rgba(50,0,0,0.9)'; ctx.fillRect(10, 50, 180, 200);
-            ctx.strokeStyle = '#f00'; ctx.strokeRect(10, 50, 180, 200);
+        // ★ 本格ノベルゲーム風 UI
+        else if (this.st === 'novel') {
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 300);
+            
+            ctx.strokeStyle = '#800'; ctx.lineWidth = 2; ctx.strokeRect(5, 150, 190, 145);
+            ctx.fillStyle = 'rgba(20,0,0,0.9)'; ctx.fillRect(5, 150, 190, 145);
+
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
             
-            let texts = [
-                "「金庫の番号は...絵画の 目・指・首 だ」", 
-                "「ピアノの仕掛け... ド・ミ・ファ・ソ だ」", 
-                "「館の主は、永遠の命を求めバケモノに...」", 
-                "「もう逃げられない...あいつが来る...」"
-            ];
-            ctx.fillText("--- 破られた日記 ---", 25, 70);
-            
-            // タイプライター演出（時間で文字が増える）
-            let str = texts[this.diaries % texts.length];
-            let dispLen = Math.floor(this.diaryTimer / 3);
-            let dispStr = str.substring(0, dispLen);
-            
-            let y = 100;
-            for(let i=0; i<dispStr.length; i+=12) {
-                ctx.fillStyle = '#faa'; ctx.fillText(dispStr.substring(i, i+12), 20, y);
-                y += 15;
+            // これまでに表示した行を描画
+            let y = 170;
+            for (let i = 0; i < this.novelLine; i++) {
+                ctx.fillText(diaryStory[this.novelDiaryIdx][i], 15, y);
+                y += 18;
             }
             
-            ctx.fillStyle = '#fff'; ctx.fillText(`読んだ数: ${this.diaries}/3`, 20, 150);
-            if (dispLen >= str.length) {
-                ctx.fillStyle = (this.timer % 30 < 15) ? '#fff' : '#888';
-                ctx.fillText('A/Bボタンで閉じる', 45, 230);
+            // 現在タイピング中の行を描画
+            let currentLineText = diaryStory[this.novelDiaryIdx][this.novelLine];
+            let dispText = currentLineText.substring(0, this.novelChar);
+            ctx.fillStyle = '#faa'; // 色を変えて目立たせる
+            ctx.fillText(dispText, 15, y);
+
+            if (this.novelChar >= currentLineText.length) {
+                ctx.fillStyle = (this.timer % 30 < 15) ? '#ff0' : 'transparent';
+                ctx.fillText('▼ Aボタン', 130, 280);
             }
         }
 
-        if (this.st === 'play' || this.st.includes('puzzle') || this.st === 'read_diary') {
+        if (this.st === 'play' || this.st.includes('puzzle') || this.st === 'novel') {
             ctx.fillStyle = '#ff0'; ctx.font = '10px monospace';
             ctx.fillText(`鍵: ${this.keys}/${this.maxKeys}`, 140, 15);
 
