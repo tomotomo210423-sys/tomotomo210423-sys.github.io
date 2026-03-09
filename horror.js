@@ -1,5 +1,5 @@
-// === CURSED MANOR V5 (Balanced Chase & Japanese Story Edition) ===
-// 敵の壁抜けバグを修正し、プレイヤーを少し速く調整。日本語ストーリーを完全実装！
+// === CURSED MANOR V6 (Smart Pathfinding AI & Novel Story Edition) ===
+// 鍵の数を正常化(謎解き限定)、BFS経路探索による賢い敵AI、ノベル的演出を実装！
 
 function playHSnd(t, param) {
     if (!audioCtx || SaveSys.data.seVol <= 0) return;
@@ -29,30 +29,35 @@ function playHSnd(t, param) {
         o.type = 'square'; o.frequency.setValueAtTime(300, n); o.frequency.exponentialRampToValueAtTime(50, n + 0.2);
         g.gain.setValueAtTime(0.2 * vol, n); g.gain.linearRampToValueAtTime(0.01, n + 0.2);
         o.start(n); o.stop(n + 0.2);
+    } else if (t === 'type') { // 文字送り音
+        o.type = 'square'; o.frequency.setValueAtTime(600, n); o.frequency.exponentialRampToValueAtTime(200, n + 0.05);
+        g.gain.setValueAtTime(0.05 * vol, n); g.gain.linearRampToValueAtTime(0.01, n + 0.05);
+        o.start(n); o.stop(n + 0.05);
     }
 }
 
 const Horror = {
     st: 'menu', timer: 0,
     camX: 0, camY: 0,
-    // ★ プレイヤー(1.4) ＞ 鬼の追跡(1.2) ＞ 鬼の徘徊(0.6) に速度バランスを調整！
+    // プレイヤー(1.4) ＞ 鬼(1.0)。経路探索を使うため鬼の速度は少し遅めがちょうどいい！
     p: { x: 30, y: 30, r: 6, spd: 1.4, isHide: false },
-    e: { x: 350, y: 350, r: 8, spd: 1.2, state: 'patrol', tgtX: 350, tgtY: 350, alert: 0, lastDx: 0, lastDy: 0 },
-    keys: 0, maxKeys: 3, diaries: 0,
+    e: { x: 350, y: 350, r: 8, spd: 1.0, state: 'patrol', alert: 0, path: [] },
+    keys: 0, maxKeys: 3, diaries: 0, diaryTimer: 0,
     msg: '', msgTimer: 0,
     
     pzSafe: [0, 0, 0], pzSafeCur: 0,
     pzPiano: [], pzPianoAns: [0, 2, 3, 4],
     pzPanel: 0,
 
+    // ★ マップ直置きの「4(鍵)」をすべて消去！謎解きでのみ入手可能に！
     mapW: 20, mapH: 20, ts: 20,
     map: [
         1,1,1,1,1,1,1,1,1,2,2,1,1,1,1,1,1,1,1,1,
-        1,0,0,0,0,1,6,0,0,0,0,0,0,0,1,0,0,0,4,1,
+        1,0,0,0,0,1,6,0,0,0,0,0,0,0,1,0,0,0,0,1,
         1,0,3,0,0,1,0,1,1,1,1,1,1,0,1,0,3,0,0,1,
         1,0,0,0,0,0,0,1,0,0,0,9,1,0,1,1,1,0,0,1,
         1,1,1,0,1,1,0,1,0,3,0,0,1,0,0,0,0,0,8,1,
-        1,0,0,0,1,4,0,1,1,1,0,1,1,1,1,1,1,1,0,1,
+        1,0,0,0,1,0,0,1,1,1,0,1,1,1,1,1,1,1,0,1,
         1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,
         1,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,0,1,0,1,
         1,1,1,0,1,0,1,9,0,0,0,0,0,0,0,1,0,1,0,1,
@@ -76,17 +81,17 @@ const Horror = {
     init() {
         this.st = 'menu'; this.timer = 0;
         this.p = { x: 30, y: 30, r: 6, spd: 1.4, isHide: false };
-        this.e = { x: 350, y: 350, r: 8, spd: 1.2, state: 'patrol', tgtX: 350, tgtY: 350, alert: 0, lastDx: 0, lastDy: 0 };
+        this.e = { x: 350, y: 350, r: 8, spd: 1.0, state: 'patrol', alert: 0, path: [] };
         this.keys = 0; this.diaries = 0; this.msg = ''; this.msgTimer = 0;
         this.pzPiano = []; this.pzPanel = 0;
         
         let m = [...this.map];
         for(let i=0; i<m.length; i++) if(m[i]>=10) m[i] = m[i]-10;
         this.map = m;
-        BGM.stop();
+        BGM.stop(); // 最初のメニューは無音
     },
 
-    setMsg(text) { this.msg = text; this.msgTimer = 150; }, // メッセージ表示時間を少し長く
+    setMsg(text) { this.msg = text; this.msgTimer = 150; },
 
     getTile(x, y) {
         let tx = Math.floor(x / this.ts), ty = Math.floor(y / this.ts);
@@ -103,6 +108,7 @@ const Horror = {
         return false;
     },
 
+    // 視線判定（間に壁があるか）
     canSee(px, py, ex, ey) {
         let dist = Math.hypot(px-ex, py-ey);
         if (dist > 150) return false; 
@@ -111,9 +117,37 @@ const Horror = {
             let cx = ex + (px-ex)*(i/steps);
             let cy = ey + (py-ey)*(i/steps);
             let t = this.getTile(cx, cy);
-            if (t === 1 || t === 2) return false;
+            if (t === 1 || t === 2 || t === 5 || t === 6 || t === 7) return false;
         }
         return true;
+    },
+
+    // ★ BFS(幅優先探索)アルゴリズム！障害物を避けてターゲットへの最短経路を出す
+    getPath(sx, sy, gx, gy) {
+        let stx = Math.floor(sx / this.ts), sty = Math.floor(sy / this.ts);
+        let gtx = Math.floor(gx / this.ts), gty = Math.floor(gy / this.ts);
+        
+        let q = [{x: stx, y: sty, path: []}];
+        let visited = new Set();
+        visited.add(stx + "," + sty);
+        
+        while(q.length > 0) {
+            let cur = q.shift();
+            if(cur.x === gtx && cur.y === gty) return cur.path; // ゴール到達
+            
+            let adjs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+            for(let a of adjs) {
+                let nx = cur.x + a[0], ny = cur.y + a[1];
+                if(nx>=0 && nx<this.mapW && ny>=0 && ny<this.mapH) {
+                    let t = this.map[ny * this.mapW + nx];
+                    if(t !== 1 && t !== 2 && t !== 5 && t !== 6 && t !== 7 && !visited.has(nx + "," + ny)) {
+                        visited.add(nx + "," + ny);
+                        q.push({x: nx, y: ny, path: [...cur.path, {x: nx, y: ny}]});
+                    }
+                }
+            }
+        }
+        return []; // 経路なし
     },
 
     drawSprite(x, y, sName) {
@@ -135,7 +169,11 @@ const Horror = {
         let k = typeof keys !== 'undefined' ? keys : {};
 
         if (this.st === 'menu') {
-            if (kD.a) { this.st = 'play'; playSnd('jmp'); this.setMsg('3つの鍵を探して脱出せよ...'); }
+            if (kD.a) { 
+                this.st = 'play'; playSnd('jmp'); 
+                this.setMsg('3つの鍵を探して脱出せよ...'); 
+                BGM.play('spell'); // ★ 不気味なBGMを開始！
+            }
         }
         else if (this.st === 'safe_puzzle') {
             if (kD.b) { this.st = 'play'; return; }
@@ -144,7 +182,6 @@ const Horror = {
             if (kD.up) { this.pzSafe[this.pzSafeCur] = (this.pzSafe[this.pzSafeCur] + 1) % 10; playSnd('sel'); }
             if (kD.down) { this.pzSafe[this.pzSafeCur] = (this.pzSafe[this.pzSafeCur] + 9) % 10; playSnd('sel'); }
             if (kD.a) {
-                // 絵画のヒントから：目(3)、指(4)、首(2)
                 if(this.pzSafe[0]===3 && this.pzSafe[1]===4 && this.pzSafe[2]===2) {
                     playHSnd('open'); this.keys++; this.setMsg(`金庫が開いた！ 鍵をゲット！ (${this.keys}/${this.maxKeys})`);
                     this.map[this.targetTy * this.mapW + this.targetTx] = 0; 
@@ -173,7 +210,7 @@ const Horror = {
                         this.st = 'play';
                     } else {
                         playHSnd('error'); screenShake(10); this.setMsg('不協和音が響き渡った！！');
-                        this.e.alert = 100; this.e.tgtX = this.p.x; this.e.tgtY = this.p.y; playHSnd('roar');
+                        this.e.alert = 100; playHSnd('roar');
                         this.pzPiano = []; this.st = 'play';
                     }
                 }
@@ -193,6 +230,10 @@ const Horror = {
             this.updateEnemyInPuzzle(); 
         }
         else if (this.st === 'read_diary') {
+            this.diaryTimer++;
+            // 文字送り音
+            if (this.diaryTimer % 4 === 0 && this.diaryTimer < 150) playHSnd('type'); 
+            
             if (kD.a || kD.b) { this.st = 'play'; }
             this.updateEnemyInPuzzle();
         }
@@ -223,9 +264,6 @@ const Horror = {
                     this.p.isHide = false; this.setMsg('ロッカーから出た。'); playHSnd('open');
                 } else if (tile === 3) {
                     this.p.isHide = true; this.setMsg('ロッカーに息を潜めた...'); playHSnd('open');
-                } else if (tile === 4) {
-                    this.keys++; this.map[ty * this.mapW + tx] = 0; 
-                    playHSnd('open'); this.setMsg(`鍵を拾った！ (${this.keys}/${this.maxKeys})`);
                 } else if (tile === 5) {
                     this.st = 'piano_puzzle'; this.pzPiano = []; this.pzPianoCur = 0; this.targetTx = tx; this.targetTy = ty;
                 } else if (tile === 6) {
@@ -236,10 +274,12 @@ const Horror = {
                     let hints = ["肖像画：目が『３つ』描かれている", "油絵：手が『４本』描かれている", "写真：首が『２つ』写っている"];
                     this.setMsg(hints[Math.floor(Math.random()*hints.length)]); playSnd('sel');
                 } else if (tile === 9) {
-                    this.st = 'read_diary'; this.diaries++; this.map[ty * this.mapW + tx] = 0; playSnd('sel');
+                    // 日記を読むとノベル演出スタート
+                    this.st = 'read_diary'; this.diaries++; this.diaryTimer = 0; 
+                    this.map[ty * this.mapW + tx] = 0; playSnd('sel');
                 } else if (ty <= 1 && tile === 0 && this.p.y < 30) {
                     if (this.keys >= this.maxKeys) {
-                        this.st = 'clear'; playHSnd('open');
+                        this.st = 'clear'; playHSnd('open'); BGM.stop();
                     } else {
                         this.setMsg('鍵がかかっている...あと' + (this.maxKeys - this.keys) + '個必要だ。'); playHSnd('error');
                     }
@@ -266,11 +306,11 @@ const Horror = {
     updateEnemyInPuzzle() {
         this.updateEnemyAI();
         if (Math.hypot(this.p.x - this.e.x, this.p.y - this.e.y) < this.p.r + this.e.r + 5) {
-            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar');
+            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar'); BGM.stop();
         }
     },
 
-    // ★ 敵のAI（壁抜けバグ修正版）
+    // ★ 究極のAI！BFS(幅優先探索)で絶対に迷子にならず、プレイヤーを追い詰める
     updateEnemyAI() {
         let dist = Math.hypot(this.p.x - this.e.x, this.p.y - this.e.y);
         
@@ -281,43 +321,44 @@ const Horror = {
         }
         if (this.p.isHide && this.e.alert > 0) this.e.alert -= 0.5; 
 
-        if (this.e.alert > 50 && !this.p.isHide) {
-            this.e.state = 'chase'; 
-            this.e.spd = 1.2; // ★ 追跡速度 (プレイヤー1.4より少し遅い)
-            this.e.tgtX = this.p.x; this.e.tgtY = this.p.y;
-        } else {
-            this.e.state = 'patrol';
-            this.e.spd = 0.6; // ★ 徘徊速度
-            if (Math.hypot(this.e.tgtX - this.e.x, this.e.tgtY - this.e.y) < 2) {
-                let curTx = Math.floor(this.e.x / this.ts); let curTy = Math.floor(this.e.y / this.ts);
-                let adjs = [[1,0], [-1,0], [0,1], [0,-1]];
-                let valid = [];
-                for (let [dx, dy] of adjs) {
-                    let t = this.getTile((curTx+dx)*this.ts, (curTy+dy)*this.ts);
-                    if (t !== 1 && t !== 2 && t !== 5 && t !== 6 && t !== 7) {
-                        if (!(dx === -this.e.lastDx && dy === -this.e.lastDy) || valid.length === 0) valid.push([dx, dy]);
+        // 経路の計算（5フレームに1回だけ計算して軽くする）
+        if (this.timer % 5 === 0) {
+            if (this.e.alert > 50 && !this.p.isHide) {
+                this.e.state = 'chase'; 
+                this.e.spd = 1.0; // BFSで無駄なく来るので遅めで丁度いい
+                // プレイヤーを目標に経路探索
+                this.e.path = this.getPath(this.e.x, this.e.y, this.p.x, this.p.y);
+            } else {
+                this.e.state = 'patrol';
+                this.e.spd = 0.5;
+                // パスが無いか、目的地に着きそうならランダムなタイルを目的地に設定
+                if (this.e.path.length === 0 || dist < 5) {
+                    let rx = Math.floor(Math.random() * this.mapW) * this.ts + 10;
+                    let ry = Math.floor(Math.random() * this.mapH) * this.ts + 10;
+                    if (this.getTile(rx, ry) === 0) {
+                        this.e.path = this.getPath(this.e.x, this.e.y, rx, ry);
                     }
-                }
-                if (valid.length > 0) {
-                    let dir = valid[Math.floor(Math.random() * valid.length)];
-                    this.e.tgtX = (curTx + dir[0]) * this.ts + this.ts/2;
-                    this.e.tgtY = (curTy + dir[1]) * this.ts + this.ts/2;
-                    this.e.lastDx = dir[0]; this.e.lastDy = dir[1];
                 }
             }
         }
 
-        // ★ 移動処理（ここでしっかり当たり判定を再適用！）
-        let edx = this.e.tgtX - this.e.x, edy = this.e.tgtY - this.e.y;
-        let elen = Math.hypot(edx, edy);
-        if (elen > 0) {
-            edx /= elen; edy /= elen;
-            let enx = this.e.x + edx * this.e.spd;
-            let eny = this.e.y + edy * this.e.spd;
+        // パス（経路）に沿って移動
+        if (this.e.path && this.e.path.length > 0) {
+            let nextNode = this.e.path[0];
+            let tgtX = nextNode.x * this.ts + this.ts/2;
+            let tgtY = nextNode.y * this.ts + this.ts/2;
             
-            // 壁にぶつからない場合のみ進む（壁抜け防止！）
-            if (!this.colSq(enx, this.e.y, this.e.r)) this.e.x = enx;
-            if (!this.colSq(this.e.x, eny, this.e.r)) this.e.y = eny;
+            let edx = tgtX - this.e.x, edy = tgtY - this.e.y;
+            let elen = Math.hypot(edx, edy);
+            
+            if (elen < this.e.spd) {
+                // ノードに到着したら次のノードへ
+                this.e.path.shift();
+            } else {
+                edx /= elen; edy /= elen;
+                this.e.x += edx * this.e.spd;
+                this.e.y += edy * this.e.spd;
+            }
         }
 
         if (dist < 150 && !this.p.isHide && this.timer % Math.max(15, Math.floor(dist/3)) === 0) {
@@ -325,7 +366,7 @@ const Horror = {
         }
 
         if (dist < this.p.r + this.e.r - 2 && !this.p.isHide && this.st === 'play') {
-            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar');
+            this.st = 'jumpscare'; this.timer = 0; screenShake(20); playHSnd('roar'); BGM.stop();
         }
     },
 
@@ -387,7 +428,6 @@ const Horror = {
                 } 
                 else if (t === 2) { ctx.fillStyle = '#522'; ctx.fillRect(px, py, this.ts, this.ts); ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('EXIT', px+2, py+12); } 
                 else if (t === 3) { ctx.fillStyle = '#245'; ctx.fillRect(px+2, py+2, this.ts-4, this.ts-4); ctx.fillStyle = '#123'; ctx.fillRect(px+4, py+4, 4, 12); ctx.fillRect(px+12, py+4, 4, 12); } 
-                else if (t === 4) { ctx.fillStyle = '#da0'; ctx.fillRect(px+6, py+8, 8, 4); ctx.fillRect(px+12, py+10, 2, 4); }
                 else if (t === 5) { ctx.fillStyle = '#111'; ctx.fillRect(px, py+5, 20, 15); ctx.fillStyle = '#fff'; ctx.fillRect(px+2, py+10, 16, 5); } 
                 else if (t === 6) { ctx.fillStyle = '#666'; ctx.fillRect(px+2, py+2, 16, 16); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(px+10, py+10, 4, 0, Math.PI*2); ctx.fill(); } 
                 else if (t === 7) { ctx.fillStyle = '#800'; ctx.fillRect(px+4, py, 12, 20); ctx.fillStyle = '#ff0'; ctx.fillRect(px+8, py+8, 4, 4); } 
@@ -416,7 +456,7 @@ const Horror = {
         ctx.restore();
 
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = 'rgba(0, 0, 15, 0.4)'; // 暗闇を適度に調整
+        ctx.fillStyle = 'rgba(0, 0, 15, 0.4)'; 
         ctx.fillRect(0, 0, 200, 300);
 
         let dist = Math.hypot(this.p.x - this.e.x, this.p.y - this.e.y);
@@ -427,7 +467,7 @@ const Horror = {
             ctx.fillRect(0, 0, 200, 300);
         }
 
-        // --- パズルUI (日本語化) ---
+        // --- パズルUI ---
         if (this.st === 'safe_puzzle') {
             ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(20, 100, 160, 100);
             ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 100, 160, 100);
@@ -462,6 +502,7 @@ const Horror = {
             ctx.fillStyle = '#333'; ctx.fillRect(30, 160, 140, 15);
             ctx.fillStyle = '#0f0'; ctx.fillRect(30, 160, 140 * (this.pzPanel/100), 15);
         }
+        // ★ ノベル風テキスト演出
         else if (this.st === 'read_diary') {
             ctx.fillStyle = 'rgba(50,0,0,0.9)'; ctx.fillRect(10, 50, 180, 200);
             ctx.strokeStyle = '#f00'; ctx.strokeRect(10, 50, 180, 200);
@@ -475,16 +516,22 @@ const Horror = {
             ];
             ctx.fillText("--- 破られた日記 ---", 25, 70);
             
-            // 日本語の長文を適当に改行して表示する処理
+            // タイプライター演出（時間で文字が増える）
             let str = texts[this.diaries % texts.length];
+            let dispLen = Math.floor(this.diaryTimer / 3);
+            let dispStr = str.substring(0, dispLen);
+            
             let y = 100;
-            for(let i=0; i<str.length; i+=12) {
-                ctx.fillStyle = '#faa'; ctx.fillText(str.substring(i, i+12), 20, y);
+            for(let i=0; i<dispStr.length; i+=12) {
+                ctx.fillStyle = '#faa'; ctx.fillText(dispStr.substring(i, i+12), 20, y);
                 y += 15;
             }
             
             ctx.fillStyle = '#fff'; ctx.fillText(`読んだ数: ${this.diaries}/3`, 20, 150);
-            ctx.fillText('AかBボタンで閉じる', 45, 230);
+            if (dispLen >= str.length) {
+                ctx.fillStyle = (this.timer % 30 < 15) ? '#fff' : '#888';
+                ctx.fillText('A/Bボタンで閉じる', 45, 230);
+            }
         }
 
         if (this.st === 'play' || this.st.includes('puzzle') || this.st === 'read_diary') {
