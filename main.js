@@ -1,9 +1,8 @@
-// === CORE SYSTEM (10in1 Cloud Save & Bug Fixed Edition) ===
+// === CORE SYSTEM (11in1 Cloud Save & Ultimate Edition) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// ★ 変数エラー防止のため、グローバル変数をすべて最上部で宣言
 let transTimer = 0; 
 let nextApp = null; 
 let shakeTimer = 0; 
@@ -30,11 +29,7 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// ==========================================
-// ☁️ FIREBASE CLOUD SAVE SYSTEM ☁️
-// ==========================================
 const SaveSys = {
-  // プレイヤー専用の秘密のID（なければ自動生成して保存）
   userId: (() => {
       let id = localStorage.getItem('retro_player_id');
       if (!id) {
@@ -44,7 +39,6 @@ const SaveSys = {
       return id;
   })(),
 
-  // 初期データ構造
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
     return { 
@@ -68,7 +62,6 @@ const SaveSys = {
   
   isCloudReady: false,
 
-  // Firebaseを読み込み、クラウドからデータをダウンロードする
   async initCloud() {
       console.log("☁️ CLOUD SYSTEM BOOTING... ID: " + this.userId);
       const loadScript = (src) => new Promise(r => {
@@ -91,7 +84,6 @@ const SaveSys = {
       }
       this.isCloudReady = true;
       
-      // サーバーからデータを取得
       try {
           const snapshot = await firebase.database().ref('saves/' + this.userId).once('value');
           const serverData = snapshot.val();
@@ -101,16 +93,14 @@ const SaveSys = {
               console.log("☁️ CLOUD LOAD SUCCESS!");
           }
       } catch(err) {
-          console.warn("☁️ CLOUD LOAD ERROR (オフラインかも)", err);
+          console.warn("☁️ CLOUD LOAD ERROR", err);
       }
   },
 
-  // データを保存（ローカル＆クラウド）
   save() {
       localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
       if (this.isCloudReady) {
-          firebase.database().ref('saves/' + this.userId).set(this.data)
-          .catch(err => console.warn("☁️ CLOUD SAVE ERROR", err));
+          firebase.database().ref('saves/' + this.userId).set(this.data).catch(err => console.warn("☁️ CLOUD SAVE ERROR", err));
       }
   },
 
@@ -125,8 +115,6 @@ const SaveSys = {
     this.save();
   }
 };
-// ==========================================
-
 
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
@@ -269,9 +257,7 @@ const bgThemes = [
 
 const Menu = {
   cur: 0, 
-  // ★ ホラーゲーム『CURSED MANOR』を追加！
   apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定', '王様の間'], 
-  // ★ ホラーゲームの色に禍々しい赤（#800）を割り当て
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888', '#fa0'],
   holdTimer: 0,
   
@@ -299,7 +285,7 @@ const Menu = {
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
             typeof Biotope !== 'undefined' ? Biotope : null, 
-            typeof Horror !== 'undefined' ? Horror : null, // ★ ホラーゲーム呼び出し！
+            typeof Horror !== 'undefined' ? Horror : null, 
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -310,9 +296,10 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
+    // ★ 11in1 に進化！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('10in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.2(CLOUD)', 45, 40); 
+    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v17.0(CLOUD)', 45, 40); 
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
