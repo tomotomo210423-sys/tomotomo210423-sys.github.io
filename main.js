@@ -269,8 +269,10 @@ const bgThemes = [
 
 const Menu = {
   cur: 0, 
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'システム設定', '王様の間'], 
-  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#888', '#fa0'],
+  // ★ ホラーゲーム『CURSED MANOR』を追加！
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定', '王様の間'], 
+  // ★ ホラーゲームの色に禍々しい赤（#800）を割り当て
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888', '#fa0'],
   holdTimer: 0,
   
   init() { 
@@ -297,6 +299,7 @@ const Menu = {
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
             typeof Biotope !== 'undefined' ? Biotope : null, 
+            typeof Horror !== 'undefined' ? Horror : null, // ★ ホラーゲーム呼び出し！
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -328,7 +331,6 @@ const Menu = {
         }
     }
     
-    // ★ プレイヤーID（引き継ぎコード）を画面下部に表示
     ctx.fillStyle = '#888'; ctx.font = '8px monospace'; 
     ctx.fillText('ID: ' + SaveSys.userId, 10, 275); 
     ctx.fillStyle = '#666'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
