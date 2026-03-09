@@ -1,29 +1,26 @@
-// === CURSED MANOR V8 (BGM Fix & Novel Story Edition) ===
-// システムBGMの重複バグを修正し、タイトルから専用の重低音BGMが流れる完全版！
+// === CURSED MANOR V9 (Full Reset Bug Fix Edition) ===
+// ゲームオーバー時にマップや謎解きの状態が完全にリセットされるように修正！
 
 // ★ 専用の不気味な重低音ドローンBGMジェネレーター
 let horrorBgmOsc = null, horrorBgmGain = null, horrorLfo = null;
 function startHorrorBGM() {
     if (!audioCtx || SaveSys.data.bgmVol <= 0) return;
     
-    // ★ 10in1の陽気なシステムBGMを【絶対に】止める！！
     if(typeof BGM !== 'undefined') BGM.stop(); 
     stopHorrorBGM();
     
     let n = audioCtx.currentTime;
     
-    // 超低音のサイン波
     horrorBgmOsc = audioCtx.createOscillator();
     horrorBgmOsc.type = 'sine';
-    horrorBgmOsc.frequency.setValueAtTime(45, n); // 腹に響く低周波
+    horrorBgmOsc.frequency.setValueAtTime(45, n); 
     
     horrorBgmGain = audioCtx.createGain();
     horrorBgmGain.gain.setValueAtTime(0.4 * SaveSys.data.bgmVol, n);
     
-    // 音量を波のようにうねらせるLFO（低周波オシレーター）
     horrorLfo = audioCtx.createOscillator();
     horrorLfo.type = 'sine';
-    horrorLfo.frequency.setValueAtTime(0.15, n); // ゆっくり揺れる
+    horrorLfo.frequency.setValueAtTime(0.15, n); 
     let lfoGain = audioCtx.createGain();
     lfoGain.gain.setValueAtTime(0.2 * SaveSys.data.bgmVol, n);
     horrorLfo.connect(lfoGain);
@@ -42,7 +39,6 @@ function stopHorrorBGM() {
     if(horrorBgmGain) { horrorBgmGain.disconnect(); horrorBgmGain = null; }
 }
 
-// 専用ホラー効果音
 function playHSnd(t, param) {
     if (!audioCtx || SaveSys.data.seVol <= 0) return;
     let n = audioCtx.currentTime;
@@ -123,7 +119,9 @@ const Horror = {
     novelDiaryIdx: 0, novelLine: 0, novelChar: 0, novelTimer: 0,
 
     mapW: 20, mapH: 20, ts: 20,
-    map: [
+    
+    // ★ マスターマップ（これをベースに毎回リセットする）
+    baseMap: [
         1,1,1,1,1,1,1,1,1,2,2,1,1,1,1,1,1,1,1,1,
         1,0,0,0,0,1,6,0,0,0,0,0,0,0,1,0,0,0,0,1,
         1,0,3,0,0,1,0,1,1,1,1,1,1,0,1,0,3,0,0,1,
@@ -145,6 +143,7 @@ const Horror = {
         1,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
         1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
     ],
+    map: [],
 
     sprs: { p: { d: "........01111000121121001111110004444000404404003003300300033000", pal: {'1':'#fcc', '2':'#000', '3':'#222', '4':'#08f'} } },
 
@@ -152,14 +151,16 @@ const Horror = {
         this.st = 'menu'; this.timer = 0;
         this.p = { x: 30, y: 30, r: 6, spd: 1.4, isHide: false };
         this.e = { x: 350, y: 350, r: 8, spd: 1.0, state: 'patrol', alert: 0, path: [] };
+        
+        // ★ 進行状況と謎解きの完全リセット！
         this.keys = 0; this.diaries = 0; this.msg = ''; this.msgTimer = 0;
-        this.pzPiano = []; this.pzPanel = 0;
+        this.pzSafe = [0, 0, 0]; this.pzSafeCur = 0;
+        this.pzPiano = []; 
+        this.pzPanel = 0;
         
-        let m = [...this.map];
-        for(let i=0; i<m.length; i++) if(m[i]>=10) m[i] = m[i]-10;
-        this.map = m;
+        // ★ マップを初期状態(baseMap)からコピーして完全に復元！
+        this.map = [...this.baseMap];
         
-        // ★ ここでシステムBGMを止めて、ホラー専用BGMを開始する！
         if(typeof BGM !== 'undefined') BGM.stop();
         startHorrorBGM(); 
     },
@@ -233,7 +234,6 @@ const Horror = {
         let k = typeof keys !== 'undefined' ? keys : {};
 
         if (this.st === 'menu') {
-            // ★ メニューに戻る処理を追加！
             if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; }
             if (kD.a) { 
                 this.st = 'play'; playSnd('jmp'); 
@@ -320,7 +320,7 @@ const Horror = {
             this.updateEnemyInPuzzle(); 
         }
         else if (this.st === 'play') {
-            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; } // ★ プレイ中も退出可能に
+            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; } 
 
             if (!this.p.isHide) {
                 let dx = 0, dy = 0;
@@ -386,7 +386,7 @@ const Horror = {
             if (this.timer > 80) { this.init(); } 
         }
         else if (this.st === 'clear') {
-            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; } // クリア画面からも戻れる
+            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; } 
             if (kD.a || kD.start) this.init();
         }
     },
@@ -551,6 +551,7 @@ const Horror = {
             ctx.fillRect(0, 0, 200, 300);
         }
 
+        // --- UI ---
         if (this.st === 'safe_puzzle') {
             ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(20, 100, 160, 100);
             ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 100, 160, 100);
