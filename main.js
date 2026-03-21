@@ -33,11 +33,12 @@ const AISys = {
 // === Sprite Cache System ===
 const SpriteCache = {
   cache: new Map(),
+  clear() { this.cache.clear(); },
   get(texKey, color1, scale = 1, flip = false) {
     const id = `${texKey}_${color1}_${scale}_${flip}`;
     if (this.cache.has(id)) return this.cache.get(id);
     
-    const t = (activeApp && activeApp.tex && activeApp.tex[texKey]) || window.sprs[texKey];
+    const t = (activeApp && activeApp.tex && activeApp.tex[texKey]) || (window.sprs && window.sprs[texKey]);
     if (!t) return null;
     
     const canvas = document.createElement('canvas');

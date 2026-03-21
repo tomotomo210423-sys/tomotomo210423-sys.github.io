@@ -44,6 +44,18 @@ const Action = {
     const themes = ['grass', 'desert', 'lava', 'ice', 'void', 'final', 'neon', 'dark', 'glitch', 'blood', 'space', 'ultimate'];
     this.stageTheme = themes[Math.min(stage - 1, themes.length - 1)];
     
+    // 背景の装飾オブジェクトを初期化
+    this.bgProps = [];
+    for(let i=0; i<15; i++) {
+        this.bgProps.push({
+            x: Math.random() * 4000,
+            y: 50 + Math.random() * 150,
+            s: 10 + Math.random() * 30,
+            v: 0.2 + Math.random() * 0.5,
+            c: `rgba(255,255,255,${0.1 + Math.random() * 0.2})`
+        });
+    }
+    
     if (this.stageTheme === 'desert' || this.stageTheme === 'final') this.sun = {x: 0, y: 50, state: 'wait', timer: 0};
     if (this.stageTheme === 'void' || this.stageTheme === 'final') this.blackHole = {x: -300, y: 150, radius: 40, speed: (this.stageTheme === 'final' ? 1.5 : 1.0)};
 
@@ -204,7 +216,7 @@ const Action = {
         } else if (m.type === 'goal') {
            SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}クリア`);
            SaveSys.data.actStage++; this.checkpointX = 20; SaveSys.save(); playSnd('combo');
-           if (SaveSys.data.actStage > 6) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
+           if (SaveSys.data.actStage > 12) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
         } else {
            if (this.p.vy > 0 && this.p.y + 20 <= m.y + 5) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; }
            else if (nx + 20 > m.x && this.p.x + 20 <= m.x) nx = m.x - 20; 
@@ -294,10 +306,33 @@ const Action = {
   },
   
   drawBlock(x, y, w, h, type, fake) {
-    ctx.fillStyle = fake ? '#432' : (this.stageTheme === 'desert' ? '#c85' : this.stageTheme === 'lava' ? '#300' : this.stageTheme === 'ice' ? '#6be' : this.stageTheme === 'void' ? '#103' : this.stageTheme === 'final' ? (Math.random()<0.1?'#f0f':'#103') : '#642');
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = this.stageTheme === 'grass' ? '#0f0' : this.stageTheme === 'desert' ? '#fb5' : this.stageTheme === 'lava' ? `rgba(255,0,0,${0.5+Math.sin(this.bgTimer/10)*0.5})` : this.stageTheme === 'ice' ? '#fff' : this.stageTheme === 'void' ? '#a0f' : (Math.random()<0.2?'#0ff':'#f00');
-    ctx.fillRect(x, y, w, 4);
+    const theme = this.stageTheme;
+    let base = '#642', top = '#0f0';
+    if (theme === 'desert') { base = '#c85'; top = '#fb5'; }
+    else if (theme === 'lava') { base = '#300'; top = '#f30'; }
+    else if (theme === 'ice') { base = '#6be'; top = '#fff'; }
+    else if (theme === 'void') { base = '#103'; top = '#a0f'; }
+    else if (theme === 'final') { base = (Math.random()<0.05?'#f0f':'#103'); top = (Math.random()<0.1?'#0ff':'#f00'); }
+    else if (theme === 'neon') { base = '#000'; top = '#0ff'; }
+    else if (theme === 'dark') { base = '#111'; top = '#444'; }
+    else if (theme === 'glitch') { base = (Math.random()<0.1?'#0f0':'#000'); top = (Math.random()<0.1?'#f0f':'#0ff'); }
+    else if (theme === 'blood') { base = '#200'; top = '#900'; }
+    else if (theme === 'space') { base = '#001'; top = '#fff'; }
+    else if (theme === 'ultimate') { base = '#222'; top = `hsl(${this.bgTimer % 360}, 100%, 50%)`; }
+
+    if (fake) base = '#432';
+    
+    ctx.fillStyle = base; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = top; ctx.fillRect(x, y, w, 4);
+    
+    // テクスチャ詳細
+    ctx.globalAlpha = 0.1;
+    for(let i=0; i<w; i+=8) {
+        for(let j=0; j<h; j+=8) {
+            if((i+j)%16 === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x+i, y+j, 4, 4); }
+        }
+    }
+    ctx.globalAlpha = 1.0;
     ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeRect(x, y, w, h);
   },
 
@@ -309,14 +344,14 @@ const Action = {
       ctx.shadowBlur = 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText('UNREASONABLE', 30, 80); ctx.fillText('BROTHERS', 45, 105); ctx.shadowBlur = 0;
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('～理不尽なアクション～', 30, 130);
       
-      for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; this.drawTex(x, y, 'hero', 2.5, false, '#00f'); }
+      for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; this.drawTex(x, y, 'act_hero', 2.5, false, '#00f'); }
       
       if (this.st === 'title') {
         ctx.fillStyle = this.titleCur === 0 ? '#ff0' : '#fff'; ctx.font = 'bold 12px monospace'; 
         ctx.fillText((this.titleCur === 0 ? '> ' : '  ') + 'はじめる', 50, 220);
         if (this.titleCur === 0) {
             ctx.fillStyle = '#0f0'; ctx.font = '10px monospace'; ctx.fillText(`[STAGE ${this.stageSelect}]`, 60, 235);
-            if (this.stageSelect > 1) ctx.fillText('◀', 45, 235); if (this.stageSelect < 6) ctx.fillText('▶', 130, 235);
+            if (this.stageSelect > 1) ctx.fillText('◀', 45, 235); if (this.stageSelect < 12) ctx.fillText('▶', 130, 235);
         }
         ctx.fillStyle = this.titleCur === 1 ? '#ff0' : '#ccc'; ctx.font = '10px monospace'; 
         ctx.fillText((this.titleCur === 1 ? '> ' : '  ') + 'データリセット', 45, 255);
@@ -332,13 +367,29 @@ const Action = {
     }
     
     const grad = ctx.createLinearGradient(0, 0, 0, 300);
-    if (this.stageTheme === 'grass') { grad.addColorStop(0, '#4af'); grad.addColorStop(1, '#8cf'); } 
-    else if (this.stageTheme === 'desert') { grad.addColorStop(0, '#fc8'); grad.addColorStop(1, '#fa4'); } 
-    else if (this.stageTheme === 'lava') { grad.addColorStop(0, '#400'); grad.addColorStop(1, '#a00'); }
-    else if (this.stageTheme === 'ice') { grad.addColorStop(0, '#cdf'); grad.addColorStop(1, '#fff'); }
-    else if (this.stageTheme === 'void') { grad.addColorStop(0, '#001'); grad.addColorStop(1, '#204'); }
-    else if (this.stageTheme === 'final') { grad.addColorStop(0, Math.random()<0.1?'#f00':'#100'); grad.addColorStop(1, '#303'); }
+    const theme = this.stageTheme;
+    if (theme === 'grass') { grad.addColorStop(0, '#4af'); grad.addColorStop(1, '#8cf'); } 
+    else if (theme === 'desert') { grad.addColorStop(0, '#fc8'); grad.addColorStop(1, '#fa4'); } 
+    else if (theme === 'lava') { grad.addColorStop(0, '#400'); grad.addColorStop(1, '#a00'); }
+    else if (theme === 'ice') { grad.addColorStop(0, '#cdf'); grad.addColorStop(1, '#fff'); }
+    else if (theme === 'void') { grad.addColorStop(0, '#001'); grad.addColorStop(1, '#204'); }
+    else if (theme === 'final') { grad.addColorStop(0, Math.random()<0.1?'#f00':'#100'); grad.addColorStop(1, '#303'); }
+    else if (theme === 'neon') { grad.addColorStop(0, '#000'); grad.addColorStop(1, '#003'); }
+    else if (theme === 'dark') { grad.addColorStop(0, '#000'); grad.addColorStop(1, '#111'); }
+    else if (theme === 'glitch') { grad.addColorStop(0, '#000'); grad.addColorStop(1, '#222'); }
+    else if (theme === 'blood') { grad.addColorStop(0, '#200'); grad.addColorStop(1, '#000'); }
+    else if (theme === 'space') { grad.addColorStop(0, '#000'); grad.addColorStop(1, '#001'); }
+    else if (theme === 'ultimate') { grad.addColorStop(0, '#000'); grad.addColorStop(1, `hsl(${this.bgTimer % 360}, 30%, 20%)`); }
     ctx.fillStyle = grad; ctx.fillRect(0, 0, 200, 300);
+    
+    // 背景の装飾オブジェクト描画
+    ctx.save(); ctx.translate(-this.camX * 0.5, 0); // パララックス
+    for(let prop of this.bgProps) {
+        ctx.fillStyle = prop.c;
+        if(theme === 'space') { ctx.fillRect(prop.x, prop.y, 2, 2); }
+        else { ctx.beginPath(); ctx.arc(prop.x, prop.y, prop.s, 0, Math.PI*2); ctx.fill(); }
+    }
+    ctx.restore();
     
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     for(let i=0; i<5; i++) {
@@ -388,12 +439,12 @@ const Action = {
     for (let ib of this.invisibleBlocks) { if (ib.x - this.camX > -50 && ib.x - this.camX < 250 && ib.visible) this.drawBlock(ib.x, ib.y, ib.w, ib.h, 'inv', false); }
     for (let fc of this.fakeCoins) {
       if (!fc.touched && fc.x - this.camX > -50 && fc.x - this.camX < 250) {
-        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(fc.x - 4, fc.y + offset - 4, 'coin', 2.0, false, '#f00'); 
+        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(fc.x - 4, fc.y + offset - 4, 'act_coin', 2.0, false, '#f00'); 
       }
     }
     for (let coin of this.coins) {
       if (!coin.collected && coin.x - this.camX > -50 && coin.x - this.camX < 250) {
-        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(coin.x - 4, coin.y + offset - 4, 'coin', 2.0, false, '#ff0'); 
+        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(coin.x - 4, coin.y + offset - 4, 'act_coin', 2.0, false, '#ff0'); 
       }
     }
     for (let s of this.fallingSpikes) { 
@@ -404,7 +455,7 @@ const Action = {
       if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;
         const color = e.troll ? '#f0f' : '#a00'; 
-        this.drawTex(e.x - 4, e.y + offsetY - 4, 'enemy', 2.5, false, color);
+        this.drawTex(e.x - 4, e.y + offsetY - 4, 'act_enemy', 2.5, false, color);
       }
     }
     
@@ -412,10 +463,10 @@ const Action = {
     if (this.st !== 'dead' && this.st !== 'gameover') {
       for(let i=0; i<this.p.trail.length; i++) {
           let tr = this.p.trail[i]; ctx.globalAlpha = 0.5 - (i*0.1);
-          this.drawTex(tr.x, tr.y, 'hero', 2.5, tr.dir < 0, '#0ff');
+          this.drawTex(tr.x, tr.y, 'act_hero', 2.5, tr.dir < 0, '#0ff');
       }
       ctx.globalAlpha = 1;
-      this.drawTex(this.p.x, this.p.y, 'hero', 2.5, this.p.dir < 0, '#00f'); 
+      this.drawTex(this.p.x, this.p.y, 'act_hero', 2.5, this.p.dir < 0, '#00f'); 
     }
     ctx.restore();
 
