@@ -10,6 +10,62 @@ let isShaking = false;
 let activeApp = null;
 const pointer = { x: 0, y: 0, active: false, path: [] };
 
+// === AISys Mock (Fix for King's Room) ===
+const AISys = {
+  async chat(sys, prompt) {
+    console.log("AI Chat Requested:", prompt);
+    // 実際にはバックエンドが必要だが、フロントエンドのみで動作するようにフォールバック
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const replies = [
+          "ほほう、それは すばらしいな！ プリンを つかわそう！",
+          "むむ、そなたの どりょくは わしが いちばん しっておるぞ。",
+          "わしの かたこりが ひどいのも、そなたが がんばっておるからじゃな（？）",
+          "案ずるより プリンじゃ！ そなたなら できる！",
+          "わしの ナイトキャップを かしてやりたいほどじゃわい。"
+        ];
+        resolve(replies[Math.floor(Math.random() * replies.length)]);
+      }, 1500);
+    });
+  }
+};
+
+// === Sprite Cache System ===
+const SpriteCache = {
+  cache: new Map(),
+  get(texKey, color1, scale = 1, flip = false) {
+    const id = `${texKey}_${color1}_${scale}_${flip}`;
+    if (this.cache.has(id)) return this.cache.get(id);
+    
+    const t = (activeApp && activeApp.tex && activeApp.tex[texKey]) || window.sprs[texKey];
+    if (!t) return null;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = t.w * scale;
+    canvas.height = t.h * scale;
+    const cctx = canvas.getContext('2d');
+    
+    if (flip) {
+        cctx.translate(canvas.width, 0);
+        cctx.scale(-1, 1);
+    }
+    
+    for (let r = 0; r < t.h; r++) {
+      for (let c = 0; c < t.w; c++) {
+        const p = t.d[r * t.w + c];
+        if (p !== '.' && p !== ' ') {
+          if (p === '1' && color1) cctx.fillStyle = color1;
+          else if (t.pal) cctx.fillStyle = t.pal[p] || '#fff';
+          else cctx.fillStyle = universalPal[p] || '#fff';
+          cctx.fillRect(c * scale, r * scale, scale, scale);
+        }
+      }
+    }
+    this.cache.set(id, canvas);
+    return canvas;
+  }
+};
+
 const keys = { up: false, down: false, left: false, right: false, a: false, b: false, select: false, l0: false, l1: false, l2: false, l3: false };
 const keysDown = { ...keys };
 let prevKeys = { ...keys };
@@ -64,37 +120,45 @@ const SaveSys = {
 
   async initCloud() {
       console.log("☁️ CLOUD SYSTEM BOOTING... ID: " + this.userId);
-      const loadScript = (src) => new Promise(r => {
-        if (document.querySelector(`script[src="${src}"]`)) return r();
-        const s = document.createElement('script'); s.src = src; s.onload = r; document.head.appendChild(s);
-      });
+      
+      const timeout = new Promise(resolve => setTimeout(() => resolve('timeout'), 5000));
+      
+      const loadProcess = (async () => {
+          const loadScript = (src) => new Promise(r => {
+            if (document.querySelector(`script[src="${src}"]`)) return r();
+            const s = document.createElement('script'); s.src = src; s.onload = r; s.onerror = r; document.head.appendChild(s);
+          });
 
-      if (!window.firebase) {
-        await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
-        await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js");
-      }
-      
-      if (window.firebase && !firebase.apps.length) {
-        firebase.initializeApp({
-          apiKey: "AIzaSyDEfsFzw9CKmBDBDqP0L21uDVTZ80HWXPY",
-          authDomain: "gorilla2-e0d2a.firebaseapp.com",
-          databaseURL: "https://gorilla2-e0d2a-default-rtdb.firebaseio.com",
-          projectId: "gorilla2-e0d2a"
-        });
-      }
-      this.isCloudReady = true;
-      
-      try {
-          const snapshot = await firebase.database().ref('saves/' + this.userId).once('value');
-          const serverData = snapshot.val();
-          if (serverData) {
-              this.data = { ...this.data, ...serverData };
-              localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
-              console.log("☁️ CLOUD LOAD SUCCESS!");
+          if (!window.firebase) {
+            await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
+            await loadScript("https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js");
           }
-      } catch(err) {
-          console.warn("☁️ CLOUD LOAD ERROR", err);
-      }
+          
+          if (window.firebase && !firebase.apps.length) {
+            firebase.initializeApp({
+              apiKey: "AIzaSyDEfsFzw9CKmBDBDqP0L21uDVTZ80HWXPY",
+              authDomain: "gorilla2-e0d2a.firebaseapp.com",
+              databaseURL: "https://gorilla2-e0d2a-default-rtdb.firebaseio.com",
+              projectId: "gorilla2-e0d2a"
+            });
+          }
+          this.isCloudReady = true;
+          
+          try {
+              const snapshot = await firebase.database().ref('saves/' + this.userId).once('value');
+              const serverData = snapshot.val();
+              if (serverData) {
+                  this.data = { ...this.data, ...serverData };
+                  localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
+                  console.log("☁️ CLOUD LOAD SUCCESS!");
+              }
+          } catch(err) {
+              console.warn("☁️ CLOUD LOAD ERROR", err);
+          }
+      })();
+
+      const result = await Promise.race([loadProcess, timeout]);
+      if (result === 'timeout') console.warn("☁️ CLOUD INIT TIMEOUT - Starting in offline mode");
   },
 
   save() {
@@ -212,38 +276,22 @@ const universalPal = {
 };
 
 function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
-    let targetCtx = ctx, x, y, color, spriteObj, scale=1, flip=false;
+    let targetCtx = ctx, x, y, color, spriteKey, scale=1, flip=false;
     
     if (arg1 && arg1.fillRect) {
-        targetCtx = arg1; x = arg2; y = arg3; color = arg4; spriteObj = arg5; scale = arg6 || 1; flip = arguments[6] || false;
+        targetCtx = arg1; x = arg2; y = arg3; color = arg4; spriteKey = arg5; scale = arg6 || 1; flip = arguments[6] || false;
     } else if (typeof arg1 === 'number') {
-        x = arg1; y = arg2; color = arg3; spriteObj = arg4; scale = arg5 || 1; flip = arg6 || false;
+        x = arg1; y = arg2; color = arg3; spriteKey = arg4; scale = arg5 || 1; flip = arg6 || false;
     } else if (typeof arg1 === 'string') {
-        spriteObj = arg1; x = arg2; y = arg3; scale = arg4 || 1; flip = arg5 || false; color = arg6 || null;
+        spriteKey = arg1; x = arg2; y = arg3; scale = arg4 || 1; flip = arg5 || false; color = arg6 || null;
     }
     
-    let s = typeof spriteObj === 'string' ? (window.sprs ? window.sprs[spriteObj] : null) : spriteObj;
-    if (!s || !s.d) return;
+    if (typeof spriteKey !== 'string') return; // Cache system works best with keys
 
-    targetCtx.save();
-    targetCtx.translate(x, y);
-    if (flip) { targetCtx.scale(-1, 1); targetCtx.translate(-s.w * scale, 0); }
-    
-    for (let r = 0; r < s.h; r++) {
-        for (let col = 0; col < s.w; col++) {
-            let p = s.d[r * s.w + col];
-            
-            if (p === '.' || p === ' ' || p === '0') continue;
-            
-            let fillCol = color || '#fff';
-            if (s.pal && s.pal[p]) { fillCol = s.pal[p]; } 
-            else if (!s.pal && universalPal[p]) { fillCol = universalPal[p]; } 
-            
-            targetCtx.fillStyle = fillCol;
-            targetCtx.fillRect(col * scale, r * scale, scale, scale);
-        }
+    const cached = SpriteCache.get(spriteKey, color, scale, flip);
+    if (cached) {
+        targetCtx.drawImage(cached, x, y);
     }
-    targetCtx.restore();
 }
 
 const bgThemes = [

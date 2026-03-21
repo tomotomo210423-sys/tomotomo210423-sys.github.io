@@ -19,8 +19,9 @@ const Musou = {
     texts: [],
     items: [], // ドロップアイテム（ジェム、コイン）
     choices: [], // レベルアップ時の3択
+    grid: {},
     
-    maxEnemies: 250,
+    maxEnemies: 300,
     
     // セーブデータ（永続強化とコイン）
     saveData: {
@@ -45,7 +46,8 @@ const Musou = {
         aura:  { name: 'ダメージ円', maxLv: 5, desc: '近づく敵を自動で燃やす' },
         bomb:  { name: 'ランダム爆撃', maxLv: 5, desc: '敵の足元を定期的に爆破する' },
         haste: { name: '韋駄天', maxLv: 5, desc: '自身の移動速度がアップ(パッシブ)' },
-        regen: { name: '自己再生', maxLv: 5, desc: '定期的にHPが少し回復(パッシブ)' }
+        regen: { name: '自己再生', maxLv: 5, desc: '定期的にHPが少し回復(パッシブ)' },
+        hole:  { name: 'ブラックホール', maxLv: 5, desc: '敵を吸い寄せて継続ダメージ' }
     },
 
     formatNum(num) {
@@ -109,7 +111,8 @@ const Musou = {
             aura:  { lv: 0, dmg: 3, range: 60 },
             bomb:  { lv: 0, dmg: 50, cd: 150, timer: 0, radius: 50 },
             haste: { lv: 0 },
-            regen: { lv: 0, timer: 0 }
+            regen: { lv: 0, timer: 0 },
+            hole:  { lv: 0, dmg: 2, range: 80, cd: 300, timer: 0 }
         };
     },
 
@@ -175,14 +178,38 @@ const Musou = {
         return target;
     },
 
-    checkHitRadius(cx, cy, radius, dmg, source = '') {
+    updateGrid() {
+        this.grid = {};
+        const size = 50;
         for (let e of this.enemies) {
             if (e.hp <= 0) continue;
-            let d = Math.hypot(e.x - cx, e.y - cy);
-            if (d < radius + e.size) {
-                if (source === 'blade' && e.hitTimer > 0) continue;
-                this.damageEnemy(e, dmg);
-                if (source === 'blade') e.hitTimer = 10;
+            const gx = Math.floor(e.x / size);
+            const gy = Math.floor(e.y / size);
+            const key = `${gx},${gy}`;
+            if (!this.grid[key]) this.grid[key] = [];
+            this.grid[key].push(e);
+        }
+    },
+
+    checkHitRadius(cx, cy, radius, dmg, source = '') {
+        const size = 50;
+        const gx = Math.floor(cx / size);
+        const gy = Math.floor(cy / size);
+        const range = Math.ceil(radius / size);
+        
+        for (let x = gx - range; x <= gx + range; x++) {
+            for (let y = gy - range; y <= gy + range; y++) {
+                const key = `${x},${y}`;
+                const cell = this.grid[key];
+                if (!cell) continue;
+                for (let e of cell) {
+                    let d = Math.hypot(e.x - cx, e.y - cy);
+                    if (d < radius + e.size) {
+                        if (source === 'blade' && e.hitTimer > 0) continue;
+                        this.damageEnemy(e, dmg);
+                        if (source === 'blade') e.hitTimer = 10;
+                    }
+                }
             }
         }
     },
@@ -261,6 +288,8 @@ const Musou = {
                 switchApp(Menu); return;
             }
         }
+
+        if (this.st === 'play') this.updateGrid();
 
         if (this.st === 'title') {
             if (typeof keysDown !== 'undefined') {
@@ -485,12 +514,30 @@ const Musou = {
             s.bomb.timer--;
             if (s.bomb.timer <= 0) {
                 s.bomb.timer = s.bomb.cd;
-                let target = this.getRandomEnemy();
+                let target = this.getNearestEnemy();
                 if (target) {
                     this.addVFX('explosion', target.x, target.y, '#f80', { size: s.bomb.radius });
                     this.checkHitRadius(target.x, target.y, s.bomb.radius, s.bomb.dmg * baseDmg, 'bomb');
                     if (typeof playSnd !== 'undefined') playSnd('combo');
                     if (typeof screenShake !== 'undefined') screenShake(8);
+                }
+            }
+        }
+
+        if (s.hole.lv > 0) {
+            s.hole.timer--;
+            if (s.hole.timer <= 0) {
+                s.hole.timer = s.hole.cd;
+                this.addVFX('ring', this.p.x, this.p.y, '#f0f', { size: s.hole.range, life: 60 });
+            }
+            if (s.hole.timer > s.hole.cd - 60) {
+                for (let e of this.enemies) {
+                    let d = Math.hypot(e.x - this.p.x, e.y - this.p.y);
+                    if (d < s.hole.range) {
+                        e.x += (this.p.x - e.x) * 0.05;
+                        e.y += (this.p.y - e.y) * 0.05;
+                        if (this.timer % 10 === 0) this.damageEnemy(e, s.hole.dmg * baseDmg);
+                    }
                 }
             }
         }
@@ -502,12 +549,22 @@ const Musou = {
             this.addVFX('particle', b.x, b.y, '#0ff', { size: 4, life: 5 });
 
             let hit = false;
-            for (let e of this.enemies) {
-                if (e.hp <= 0) continue;
-                if (Math.hypot(b.x - e.x, b.y - e.y) < e.size + 5) {
-                    this.damageEnemy(e, b.dmg);
-                    hit = true; break;
+            const size = 50;
+            const gx = Math.floor(b.x / size);
+            const gy = Math.floor(b.y / size);
+            for (let x = gx - 1; x <= gx + 1; x++) {
+                for (let y = gy - 1; y <= gy + 1; y++) {
+                    const cell = this.grid[`${x},${y}`];
+                    if (!cell) continue;
+                    for (let e of cell) {
+                        if (Math.hypot(b.x - e.x, b.y - e.y) < e.size + 5) {
+                            this.damageEnemy(e, b.dmg);
+                            hit = true; break;
+                        }
+                    }
+                    if (hit) break;
                 }
+                if (hit) break;
             }
             if (hit || b.life <= 0) this.bullets.splice(i, 1);
         }

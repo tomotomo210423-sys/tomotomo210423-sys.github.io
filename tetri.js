@@ -377,15 +377,14 @@ const Tetri = {
 
     drawSpriteData(x, y, data, scale, isRainbow) {
         if(!data) return;
-        for (let row = 0; row < data.length; row++) {
-            for (let col = 0; col < data[row].length; col++) {
-                let p = data[row][col];
-                if (p !== '0') {
-                    if (isRainbow) ctx.fillStyle = `hsl(${(this.tmr*7 + row*12)%360}, 100%, 60%)`;
-                    else ctx.fillStyle = this.PAL[p] || '#fff';
-                    ctx.fillRect(x + col * scale - (data[row].length*scale)/2, y + row * scale - (data.length*scale)/2, scale, scale);
-                }
-            }
+        const key = `tetri_ship_${this.shipIdx}_${isRainbow}`;
+        // キャッシュに存在しない場合は一時的に登録
+        if (!window.sprs[key]) {
+            window.sprs[key] = { w: data[0].length, h: data.length, d: data.join(''), pal: this.PAL };
+        }
+        const cached = SpriteCache.get(key, null, scale, false);
+        if (cached) {
+            ctx.drawImage(cached, x - cached.width/2, y - cached.height/2);
         }
     },
     

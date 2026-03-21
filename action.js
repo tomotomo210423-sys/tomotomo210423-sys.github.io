@@ -17,33 +17,10 @@ const Action = {
 
   // ★ アクションゲーム専用・絶対バグらない描画エンジン
   drawTex(x, y, texKey, scale, flip, color1) {
-      let t = this.tex[texKey];
-      if(!t) return;
-      ctx.save();
-      
-      // 反転処理をここで安全に行う
-      if (flip) {
-          ctx.translate(x + t.w * scale, y);
-          ctx.scale(-1, 1);
-      } else {
-          ctx.translate(x, y);
+      const cached = SpriteCache.get(texKey, color1, scale, flip);
+      if (cached) {
+          ctx.drawImage(cached, x, y);
       }
-      
-      for(let r=0; r<t.h; r++){
-          for(let c=0; c<t.w; c++){
-              let p = t.d[r*t.w + c];
-              if(p !== '.' && p !== ' ') {
-                  // 1番のパレットを指定色で上書き（服の色や敵の色を変えるため）
-                  if (p === '1' && color1) {
-                      ctx.fillStyle = color1;
-                  } else {
-                      ctx.fillStyle = t.pal[p] || '#fff';
-                  }
-                  ctx.fillRect(c*scale, r*scale, Math.ceil(scale), Math.ceil(scale));
-              }
-          }
-      }
-      ctx.restore();
   },
 
   init() { 
@@ -64,8 +41,8 @@ const Action = {
     SaveSys.data.actStage = this.stageSelect; SaveSys.save();
 
     const stage = SaveSys.data.actStage; 
-    const themes = ['grass', 'desert', 'lava', 'ice', 'void', 'final'];
-    this.stageTheme = themes[Math.min(stage - 1, 5)];
+    const themes = ['grass', 'desert', 'lava', 'ice', 'void', 'final', 'neon', 'dark', 'glitch', 'blood', 'space', 'ultimate'];
+    this.stageTheme = themes[Math.min(stage - 1, themes.length - 1)];
     
     if (this.stageTheme === 'desert' || this.stageTheme === 'final') this.sun = {x: 0, y: 50, state: 'wait', timer: 0};
     if (this.stageTheme === 'void' || this.stageTheme === 'final') this.blackHole = {x: -300, y: 150, radius: 40, speed: (this.stageTheme === 'final' ? 1.5 : 1.0)};
@@ -85,7 +62,7 @@ const Action = {
          currentX += 150; continue;
       }
 
-      let trapChance = this.stageTheme === 'final' ? 0.6 : 0.3 + (Math.min(stage, 5) * 0.05);
+      let trapChance = stage >= 6 ? 0.5 + (stage - 6) * 0.05 : 0.3 + (stage * 0.04);
 
       if (trapCooldown <= 0 && rand() < trapChance) {
         let type = Math.floor(rand() * 7); 
@@ -165,7 +142,7 @@ const Action = {
       
       if (this.titleCur === 0) {
           if (keysDown.left && this.stageSelect > 1) { this.stageSelect--; playSnd('sel'); }
-          if (keysDown.right && this.stageSelect < 6) { this.stageSelect++; playSnd('sel'); }
+          if (keysDown.right && this.stageSelect < 12) { this.stageSelect++; playSnd('sel'); }
       }
       
       if (keysDown.a) { 
