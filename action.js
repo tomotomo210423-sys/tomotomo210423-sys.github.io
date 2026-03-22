@@ -74,16 +74,37 @@ const Action = {
          currentX += 150; continue;
       }
 
-      let trapChance = stage >= 6 ? 0.5 + (stage - 6) * 0.05 : 0.3 + (stage * 0.04);
+      let trapChance = stage >= 6 ? 0.4 + (stage - 6) * 0.05 : 0.3 + (stage * 0.04);
+      // ステージごとの個性的なギミック確率
+      let specialGimmickChance = stage >= 7 ? 0.2 : 0;
 
       if (trapCooldown <= 0 && rand() < trapChance) {
-        let type = Math.floor(rand() * 7); 
+        let type = Math.floor(rand() * 8); 
+        if (stage >= 7 && rand() < specialGimmickChance) type = 7; // STAGE 7+ 特殊ギミック
+
         switch(type) {
           case 0:
             this.map.push({x: currentX, y: 270, w: 40, h: 30, type: 'ground'});
             this.invisibleBlocks.push({x: currentX + 80, y: 190, w: 20, h: 20, visible: false, type: 'kaizo'});
             this.map.push({x: currentX + 130, y: 270, w: 90, h: 30, type: 'ground'});
             currentX += 220; break;
+          case 7: // 特殊ギミック（ステージごとに変化）
+            if (this.stageTheme === 'neon') {
+               this.map.push({x: currentX, y: 270, w: 60, h: 30, type: 'ground'});
+               this.spikes.push({x: currentX + 60, y: 250, w: 40, h: 20, blink: true}); // 点滅するトゲ
+               this.map.push({x: currentX + 100, y: 270, w: 60, h: 30, type: 'ground'});
+               currentX += 160;
+            } else if (this.stageTheme === 'glitch') {
+               this.map.push({x: currentX, y: 270, w: 100, h: 30, type: 'ground', glitch: true}); // 崩れる地面
+               currentX += 150;
+            } else if (this.stageTheme === 'space') {
+               this.platforms.push({x: currentX, y: 200, w: 50, h: 10, moving: true, vy: 1, range: 60, startY: 200}); // 縦移動
+               currentX += 120;
+            } else {
+               this.map.push({x: currentX, y: 270, w: 100, h: 30, type: 'ground'});
+               currentX += 100;
+            }
+            break;
           case 1: 
             this.map.push({x: currentX, y: 270, w: 40, h: 30, type: 'ground'});
             this.map.push({x: currentX + 40, y: 270, w: 60, h: 30, type: 'fakeGround'});
@@ -209,8 +230,11 @@ const Action = {
       }
     }
 
-    for (let m of this.map) {
+    for (let i = this.map.length - 1; i >= 0; i--) {
+      let m = this.map[i];
+      if (m.glitch && m.timer === undefined) m.timer = 0;
       if ((m.type === 'ground' || m.type === 'checkpoint' || m.type === 'goal') && nx + 20 > m.x && nx < m.x + m.w && ny + 20 > m.y && ny < m.y + m.h) { 
+        if (m.glitch) { m.timer++; if (m.timer > 30) { this.map.splice(i, 1); playSnd('hit'); addParticle(m.x, m.y, '#555', 'explosion'); continue; } }
         if (m.type === 'checkpoint') {
            if (this.checkpointX !== m.x) { this.checkpointX = m.x; playSnd('combo'); addParticle(m.x, m.y + 20, '#0f0', 'star'); }
         } else if (m.type === 'goal') {
@@ -226,9 +250,20 @@ const Action = {
     }
     
     for (let plat of this.platforms) {
-      if (plat.moving) { plat.x += plat.vx; if (Math.abs(plat.x - plat.startX) > plat.range) plat.vx *= -1; }
+      if (plat.moving) {
+        if (plat.vx) {
+          plat.x += plat.vx; if (Math.abs(plat.x - plat.startX) > plat.range) plat.vx *= -1;
+        }
+        if (plat.vy) {
+          plat.y += plat.vy; if (Math.abs(plat.y - plat.startY) > plat.range) plat.vy *= -1;
+        }
+      }
       if (nx + 20 > plat.x && nx < plat.x + plat.w && ny + 20 > plat.y && ny < plat.y + plat.h) {
-        if (this.p.vy > 0 && this.p.y + 20 <= plat.y + 5) { ny = plat.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; if (plat.moving) nx += plat.vx; }
+        if (this.p.vy > 0 && this.p.y + 20 <= plat.y + 5) { 
+          ny = plat.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; 
+          if (plat.moving && plat.vx) nx += plat.vx;
+          if (plat.moving && plat.vy) ny += plat.vy;
+        }
       }
     }
 
@@ -252,7 +287,10 @@ const Action = {
        if (nx + 20 > s.x && nx < s.x + s.w && ny + 20 > s.y && ny < s.y + s.h) { this.die(s.isIce ? "鋭いツララ" : "頭上からのトゲ"); return; }
     }
 
-    for (let spike of this.spikes) { if (nx + 20 > spike.x && nx < spike.x + spike.w && ny + 20 > spike.y) { this.die("トゲに刺さった"); return; } }
+    for (let spike of this.spikes) { 
+      if (spike.blink && (Math.floor(this.bgTimer / 30) % 2 === 0)) continue;
+      if (nx + 20 > spike.x && nx < spike.x + spike.w && ny + 20 > spike.y) { this.die("トゲに刺さった"); return; } 
+    }
     
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       let e = this.enemies[i];
@@ -450,7 +488,13 @@ const Action = {
     for (let s of this.fallingSpikes) { 
         if (s.x - this.camX > -50 && s.x - this.camX < 250) { ctx.fillStyle = s.isIce ? '#8ff' : '#888'; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x+20, s.y); ctx.lineTo(s.x+10, s.y+20); ctx.fill(); } 
     }
-    for (let spike of this.spikes) { if (spike.x - this.camX > -50 && spike.x - this.camX < 250) this.drawTex(spike.x, spike.y, 'spike', 2.5, false, '#aaa'); }
+    for (let spike of this.spikes) { 
+      if (spike.x - this.camX > -50 && spike.x - this.camX < 250) {
+        if (spike.blink && (Math.floor(this.bgTimer / 30) % 2 === 0)) ctx.globalAlpha = 0.2;
+        this.drawTex(spike.x, spike.y, 'spike', 2.5, false, spike.blink ? '#0ff' : '#aaa'); 
+        ctx.globalAlpha = 1.0;
+      }
+    }
     for (let e of this.enemies) {
       if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;

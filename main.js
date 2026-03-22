@@ -38,12 +38,27 @@ const SpriteCache = {
     const id = `${texKey}_${color1}_${scale}_${flip}`;
     if (this.cache.has(id)) return this.cache.get(id);
     
-    const t = (activeApp && activeApp.tex && activeApp.tex[texKey]) || (window.sprs && window.sprs[texKey]);
+    let t = (activeApp && activeApp.tex && activeApp.tex[texKey]) || (window.sprs && window.sprs[texKey]);
     if (!t) return null;
+
+    // 文字列または配列の場合はオブジェクト形式に正規化
+    if (typeof t === 'string' || Array.isArray(t)) {
+        const d = Array.isArray(t) ? t.join('') : t;
+        const size = Math.sqrt(d.length);
+        if (size % 1 === 0) {
+            t = { w: size, h: size, d: d };
+        } else if (d.length === 256) { // 16x16 fallback
+            t = { w: 16, h: 16, d: d };
+        } else if (d.length === 576) { // 24x24 fallback
+            t = { w: 24, h: 24, d: d };
+        } else { // 8x8 default
+            t = { w: 8, h: 8, d: d };
+        }
+    }
     
     const canvas = document.createElement('canvas');
-    canvas.width = t.w * scale;
-    canvas.height = t.h * scale;
+    canvas.width = (t.w || 8) * scale;
+    canvas.height = (t.h || 8) * scale;
     const cctx = canvas.getContext('2d');
     
     if (flip) {
@@ -51,10 +66,14 @@ const SpriteCache = {
         cctx.scale(-1, 1);
     }
     
-    for (let r = 0; r < t.h; r++) {
-      for (let c = 0; c < t.w; c++) {
-        const p = t.d[r * t.w + c];
-        if (p !== '.' && p !== ' ') {
+    const tw = t.w || 8;
+    const th = t.h || 8;
+    const td = t.d || "";
+    
+    for (let r = 0; r < th; r++) {
+      for (let c = 0; c < tw; c++) {
+        const p = td[r * tw + c];
+        if (p && p !== '.' && p !== ' ') {
           if (p === '1' && color1) cctx.fillStyle = color1;
           else if (t.pal) cctx.fillStyle = t.pal[p] || '#fff';
           else cctx.fillStyle = universalPal[p] || '#fff';
