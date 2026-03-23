@@ -17,9 +17,9 @@ const Action = {
 
   // ★ アクションゲーム専用・絶対バグらない描画エンジン
   drawTex(x, y, texKey, scale, flip, color1) {
-      const cached = SpriteCache.get(texKey, color1, scale, flip);
+      const cached = SpriteCache.get(texKey, color1 || null, scale, flip);
       if (cached) {
-          ctx.drawImage(cached, x, y);
+          ctx.drawImage(cached, Math.floor(x - this.camX), Math.floor(y));
       }
   },
 

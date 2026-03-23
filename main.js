@@ -30,6 +30,13 @@ const AISys = {
   }
 };
 
+const universalPal = {
+    '1': '#000', '2': '#fff', '3': '#444', '4': '#888',
+    '5': '#f00', '6': '#0f0', '7': '#00f', '8': '#ff0',
+    '9': '#f0f', 'a': '#0ff', 'b': '#fa0', 'c': '#f8f',
+    'd': '#840', 'e': '#8f8', 'f': '#88f'
+};
+
 // === Sprite Cache System ===
 const SpriteCache = {
   cache: new Map(),
@@ -39,26 +46,33 @@ const SpriteCache = {
     if (this.cache.has(id)) return this.cache.get(id);
     
     let t = (activeApp && activeApp.tex && activeApp.tex[texKey]) || (window.sprs && window.sprs[texKey]);
-    if (!t) return null;
+    if (!t) {
+        console.warn("Sprite not found:", texKey);
+        return null;
+    }
 
     // 文字列または配列の場合はオブジェクト形式に正規化
     if (typeof t === 'string' || Array.isArray(t)) {
-        const d = Array.isArray(t) ? t.join('') : t;
-        const size = Math.sqrt(d.length);
-        if (size % 1 === 0) {
-            t = { w: size, h: size, d: d };
-        } else if (d.length === 256) { // 16x16 fallback
-            t = { w: 16, h: 16, d: d };
-        } else if (d.length === 576) { // 24x24 fallback
-            t = { w: 24, h: 24, d: d };
-        } else { // 8x8 default
-            t = { w: 8, h: 8, d: d };
+        const d = Array.isArray(t) ? t[0] : t;
+        const len = d.length;
+        let w = 8, h = 8;
+        if (len === 256) { w = 16; h = 16; }
+        else if (len === 576) { w = 24; h = 24; }
+        else if (len === 1024) { w = 32; h = 32; }
+        else if (len === 64) { w = 8; h = 8; }
+        else {
+            const s = Math.sqrt(len);
+            if (s % 1 === 0) { w = s; h = s; }
+            else { w = 16; h = Math.floor(len / 16); }
         }
+        t = { w: w, h: h, d: d, pal: t.pal };
     }
     
     const canvas = document.createElement('canvas');
-    canvas.width = (t.w || 8) * scale;
-    canvas.height = (t.h || 8) * scale;
+    const tw = t.w || 8;
+    const th = t.h || 8;
+    canvas.width = tw * scale;
+    canvas.height = th * scale;
     const cctx = canvas.getContext('2d');
     
     if (flip) {
@@ -66,17 +80,19 @@ const SpriteCache = {
         cctx.scale(-1, 1);
     }
     
-    const tw = t.w || 8;
-    const th = t.h || 8;
     const td = t.d || "";
+    const tpal = t.pal || {};
     
     for (let r = 0; r < th; r++) {
       for (let c = 0; c < tw; c++) {
         const p = td[r * tw + c];
-        if (p && p !== '.' && p !== ' ') {
-          if (p === '1' && color1) cctx.fillStyle = color1;
-          else if (t.pal) cctx.fillStyle = t.pal[p] || '#fff';
-          else cctx.fillStyle = universalPal[p] || '#fff';
+        if (p && p !== '.' && p !== ' ' && p !== '0') {
+          let color = '#fff';
+          if (p === '1' && color1) color = color1;
+          else if (tpal[p]) color = tpal[p];
+          else if (universalPal[p]) color = universalPal[p];
+          
+          cctx.fillStyle = color;
           cctx.fillRect(c * scale, r * scale, scale, scale);
         }
       }
@@ -308,7 +324,7 @@ function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     
     if (typeof spriteKey !== 'string') return; // Cache system works best with keys
 
-    const cached = SpriteCache.get(spriteKey, color, scale, flip);
+    const cached = SpriteCache.get(spriteKey, color || null, scale, flip);
     if (cached) {
         targetCtx.drawImage(cached, x, y);
     }
