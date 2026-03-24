@@ -19,7 +19,11 @@ const Action = {
   drawTex(x, y, texKey, scale, flip, color1) {
       const cached = SpriteCache.get(texKey, color1 || null, scale, flip);
       if (cached) {
-          ctx.drawImage(cached, Math.floor(x - this.camX), Math.floor(y));
+          const screenX = Math.round(x - this.camX);
+          const screenY = Math.round(y);
+          if (screenX > -64 && screenX < 264 && screenY > -64 && screenY < 364) {
+              ctx.drawImage(cached, screenX, screenY);
+          }
       }
   },
 
@@ -360,18 +364,29 @@ const Action = {
 
     if (fake) base = '#432';
     
-    ctx.fillStyle = base; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = top; ctx.fillRect(x, y, w, 4);
-    
-    // テクスチャ詳細
-    ctx.globalAlpha = 0.1;
-    for(let i=0; i<w; i+=8) {
-        for(let j=0; j<h; j+=8) {
-            if((i+j)%16 === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x+i, y+j, 4, 4); }
-        }
+    // 画面内チェック
+    if (x - this.camX > -50 && x - this.camX < 250) {
+        const screenX = Math.round(x - this.camX);
+        const screenY = Math.round(y);
+        ctx.fillStyle = base; 
+        ctx.fillRect(screenX, screenY, w, h);
+        ctx.fillStyle = top; 
+        ctx.fillRect(screenX, screenY, w, 4);
     }
-    ctx.globalAlpha = 1.0;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeRect(x, y, w, h);
+    
+    // テクスチャ詳細（画面内の場合のみ）
+    if (x - this.camX > -50 && x - this.camX < 250) {
+        const screenX = Math.round(x - this.camX);
+        const screenY = Math.round(y);
+        ctx.globalAlpha = 0.1;
+        for(let i=0; i<w; i+=8) {
+            for(let j=0; j<h; j+=8) {
+                if((i+j)%16 === 0) { ctx.fillStyle = '#000'; ctx.fillRect(screenX+i, screenY+j, 4, 4); }
+            }
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeRect(screenX, screenY, w, h);
+    }
   },
 
   draw() {

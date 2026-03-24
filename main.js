@@ -206,7 +206,26 @@ const SaveSys = {
   save() {
       localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
       if (this.isCloudReady) {
-          firebase.database().ref('saves/' + this.userId).set(this.data).catch(err => console.warn("☁️ CLOUD SAVE ERROR", err));
+          // Firebase keys cannot contain ".", "#", "$", "/", "[", or "]"
+          // We sanitize the data by replacing dots in keys with underscores
+          const sanitize = (obj) => {
+              if (Array.isArray(obj)) return obj.map(sanitize);
+              if (obj !== null && typeof obj === 'object') {
+                  const n = {};
+                  Object.keys(obj).forEach(k => {
+                      const nk = k.replace(/[.#$/\[\]]/g, '_');
+                      n[nk] = sanitize(obj[k]);
+                  });
+                  return n;
+              }
+              return obj;
+          };
+          const cleanData = sanitize(this.data);
+          firebase.database().ref('saves/' + this.userId).set(cleanData).catch(err => {
+              console.warn("☁️ CLOUD SAVE ERROR", err);
+              // If it still fails, show a more helpful message on screen if possible
+              if (activeApp && activeApp.error) activeApp.error = err.message;
+          });
       }
   },
 
