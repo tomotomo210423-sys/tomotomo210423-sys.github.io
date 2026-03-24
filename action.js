@@ -365,19 +365,15 @@ const Action = {
     if (fake) base = '#432';
     
     // 画面内チェック
-    if (x - this.camX > -50 && x - this.camX < 250) {
-        const screenX = Math.round(x - this.camX);
-        const screenY = Math.round(y);
+    const screenX = x - this.camX;
+    const screenY = y;
+    if (screenX + w > -50 && screenX < 250) {
         ctx.fillStyle = base; 
         ctx.fillRect(screenX, screenY, w, h);
         ctx.fillStyle = top; 
         ctx.fillRect(screenX, screenY, w, 4);
-    }
-    
-    // テクスチャ詳細（画面内の場合のみ）
-    if (x - this.camX > -50 && x - this.camX < 250) {
-        const screenX = Math.round(x - this.camX);
-        const screenY = Math.round(y);
+        
+        // テクスチャ詳細
         ctx.globalAlpha = 0.1;
         for(let i=0; i<w; i+=8) {
             for(let j=0; j<h; j+=8) {
