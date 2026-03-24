@@ -56,16 +56,22 @@ const SpriteCache = {
         const d = Array.isArray(t) ? t[0] : t;
         const len = d.length;
         let w = 8, h = 8;
+        
+        // サイズ判定をより明示的に
         if (len === 256) { w = 16; h = 16; }
         else if (len === 576) { w = 24; h = 24; }
         else if (len === 1024) { w = 32; h = 32; }
         else if (len === 64) { w = 8; h = 8; }
         else {
+            // 不明なサイズの場合は16x16か8x8か推測
             const s = Math.sqrt(len);
             if (s % 1 === 0) { w = s; h = s; }
             else { w = 16; h = Math.floor(len / 16); }
         }
-        t = { w: w, h: h, d: d, pal: t.pal };
+        
+        // オブジェクトに変換
+        const pal = (typeof t === 'object' && !Array.isArray(t)) ? t.pal : null;
+        t = { w: w, h: h, d: d, pal: pal };
     }
     
     const canvas = document.createElement('canvas');
