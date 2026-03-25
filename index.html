@@ -289,23 +289,27 @@ window.onload = async () => {
   const stat = document.getElementById('bootStatus');
   
   const anim = setInterval(() => {
-    progress += Math.random() * 10;
-    if(progress > 90) progress = 90; 
+    progress += Math.random() * 20;
+    if(progress > 100) progress = 100; 
     bar.style.width = progress + '%';
-  }, 100);
+    if(progress >= 100) {
+        clearInterval(anim);
+        stat.textContent = 'SYSTEM READY!';
+        setTimeout(() => { 
+            document.getElementById('boot').classList.add('hidden'); 
+            if (typeof Menu !== 'undefined') {
+                activeApp = Menu;
+                activeApp.init();
+            }
+        }, 300);
+    }
+  }, 50);
 
-  await SaveSys.initCloud();
+  // システムの基本初期化（キャンバス、キー入力など）
+  if (typeof initSystem !== 'undefined') await initSystem();
   
-  clearInterval(anim);
-  bar.style.width = '100%';
-  stat.textContent = 'SYSTEM READY!';
-  
-  setTimeout(() => { 
-      document.getElementById('boot').classList.add('hidden'); 
-      activeApp = Menu;
-      activeApp.init();
-      requestAnimationFrame(loop);
-  }, 500);
+  // クラウド同期をスキップし、ローカルの初期化のみを実行
+  if (typeof SaveSys !== 'undefined' && SaveSys.init) await SaveSys.init();
 };
 </script>
 </body>

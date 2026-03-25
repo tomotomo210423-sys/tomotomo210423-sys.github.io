@@ -169,11 +169,10 @@ const loop = () => {
   requestAnimationFrame(loop);
 };
 
-window.onload = async () => {
+// システム初期化関数
+const initSystem = async () => {
   canvas = document.getElementById('gameCanvas'); ctx = canvas.getContext('2d');
   canvas.width = 200; canvas.height = 300;
-  
-  await SaveSys.init();
   
   const handleKey = (e, v) => {
     const k = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right', z:'a', x:'b', Enter:'start', Shift:'select'}[e.key];
@@ -182,8 +181,7 @@ window.onload = async () => {
   window.addEventListener('keydown', e => handleKey(e, true));
   window.addEventListener('keyup', e => handleKey(e, false));
   
-  switchApp(Menu);
-  loop();
+  requestAnimationFrame(loop);
 };
 
 const AISys = {
