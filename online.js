@@ -39,6 +39,9 @@ const Online = {
         databaseURL: "https://gorilla2-e0d2a-default-rtdb.firebaseio.com",
         projectId: "gorilla2-e0d2a"
       });
+    } else if (window.firebase && firebase.apps.length > 0) {
+      // main.jsで既に初期化されている場合はそれを使用
+      console.log("🔥 Firebase already initialized, reusing app");
     }
     
     if (!window.Peer) await loadScript("https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js");

@@ -244,7 +244,7 @@ const Action = {
         } else if (m.type === 'goal') {
            SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}クリア`);
            SaveSys.data.actStage++; this.checkpointX = 20; SaveSys.save(); playSnd('combo');
-           if (SaveSys.data.actStage > 12) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else this.load(); return;
+           if (SaveSys.data.actStage > 12) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else { this.stageSelect = SaveSys.data.actStage; this.load(); } return;
         } else {
            if (this.p.vy > 0 && this.p.y + 20 <= m.y + 5) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; }
            else if (nx + 20 > m.x && this.p.x + 20 <= m.x) nx = m.x - 20; 
@@ -542,9 +542,9 @@ const Action = {
     }
     if (this.st === 'clear') { 
       ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(0, 80, 200, 100); ctx.strokeStyle = '#0f0'; ctx.strokeRect(0, 80, 200, 100);
-      ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText(SaveSys.data.actStage > 6 ? 'ALL CLEAR!!' : 'STAGE CLEAR!', 50, 115); 
+      ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.fillText(SaveSys.data.actStage === 1 && this.st === 'clear' ? 'ALL CLEAR!!' : 'STAGE CLEAR!', 50, 115); 
       ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText(`残機: ${SaveSys.data.actLives}`, 70, 140);
-      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(SaveSys.data.actStage > 6 ? '(A) Title' : '(A) Next Stage', 60, 165); 
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(SaveSys.data.actStage === 1 && this.st === 'clear' ? '(A) Title' : '(A) Next Stage', 60, 165); 
     }
     resetShake();
   }
