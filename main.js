@@ -163,73 +163,98 @@ const switchApp = (app) => {
 const loop = () => {
   keysDown = {}; for(let k in keys) { if(keys[k] && !lastKeys[k]) keysDown[k] = true; }
   lastKeys = {...keys};
-  pointer.clicked = false; // 1フレームのみ有効
+  pointer.clicked = false; 
   if(activeApp) { activeApp.update(); activeApp.draw(); }
   requestAnimationFrame(loop);
 };
 
+// --- Menu ---
 const Menu = {
-    cur: 0, tmr: 0,
-    apps: [],
-    init() {
-        console.log("🎮 Menu Initializing...");
-        this.apps = [];
-        const appList = [
-            { name: '理不尽ブラザーズ', key: 'Action' },
-            { name: '無限無双', key: 'Musou' },
-            { name: 'テトリベーダー', key: 'Tetri' },
-            { name: 'ビートブラザーズ', key: 'Rhythm' },
-            { name: 'ロイヤルジョーカー', key: 'Online' },
-            { name: 'アビスジェネラル', key: 'Abyss' },
-            { name: '爆音スニーキング', key: 'Noise' },
-            { name: 'ピクセルビオトープ', key: 'Biotope' },
-            { name: 'カースドマナー', key: 'Horror' },
-            { name: 'ハッカーズ15', key: 'PCApp' },
-            { name: 'レトロスロット', key: 'Slot' },
-            { name: 'ガイド', key: 'Guide' },
-            { name: '王様の間', key: 'KingRoom' }
-        ];
-        
-        appList.forEach(a => {
-            const obj = window[a.key];
-            if (obj) {
-                this.apps.push({ name: a.name, obj: obj });
-            } else {
-                console.warn(`⚠️ App ${a.key} is not defined.`);
-            }
-        });
-
-        if (typeof BGM !== 'undefined') BGM.play('menu');
-        const gb = document.getElementById('gameboy');
-        if (gb) gb.className = '';
-        if (canvas) { canvas.width = 200; canvas.height = 300; }
-        console.log(`🎮 Menu Ready with ${this.apps.length} apps.`);
-    },
-    update() {
-        this.tmr++;
-        if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
-        if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
-        if (keysDown.a) { switchApp(this.apps[this.cur].obj); playSnd('jmp'); }
-    },
-    draw() {
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
-        ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
-        ctx.fillText('11in1 SYSTEM', 100, 40);
-        ctx.strokeStyle = '#0f0'; ctx.beginPath(); ctx.moveTo(20, 50); ctx.lineTo(180, 50); ctx.stroke();
-        
-        ctx.textAlign = 'left'; ctx.font = '12px monospace';
-        for(let i=0; i<this.apps.length; i++) {
-            let y = 80 + i * 16;
-            if (y < 60 || y > 280) continue;
-            if (i === this.cur) {
-                ctx.fillStyle = '#0f0'; ctx.fillRect(15, y-10, 170, 14);
-                ctx.fillStyle = '#000';
-            } else {
-                ctx.fillStyle = '#0f0';
-            }
-            ctx.fillText(this.apps[i].name, 25, y);
-        }
+  cur: 0,
+  apps: [],
+  init() { 
+    this.cur = 0;
+    const allApps = [
+      { name: '操作説明', obj: Manual },
+      { name: 'テトリベーダー(N)', obj: Tetri, mode: 'normal' },
+      { name: 'テトリベーダー(H)', obj: Tetri, mode: 'hard' },
+      { name: '理不尽ブラザーズ', obj: Action },
+      { name: '無限無双', obj: Musou },
+      { name: 'ビートブラザーズ', obj: Rhythm },
+      { name: 'ロイヤルジョーカー', obj: Online },
+      { name: 'アビスジェネラル', obj: Abyss },
+      { name: '爆音スニーキング', obj: Noise },
+      { name: 'ピクセルビオトープ', obj: Biotope },
+      { name: 'カースドマナー', obj: Horror },
+      { name: 'ハッカーズ15', obj: PCApp },
+      { name: 'レトロスロット', obj: Slot },
+      { name: '王様の間', obj: KingRoom },
+      { name: 'ランキング', obj: Ranking }
+    ];
+    this.apps = allApps.filter(a => window[a.obj === Tetri ? 'Tetri' : (a.obj === KingRoom ? 'KingRoom' : a.obj.constructor.name)] || a.obj);
+    if(typeof BGM !== 'undefined') BGM.play('menu');
+    const gb = document.getElementById('gameboy');
+    if (gb) gb.className = '';
+    if (canvas) { canvas.width = 200; canvas.height = 300; }
+  },
+  update() {
+    if(keysDown.down){ this.cur=(this.cur+1)%this.apps.length; playSnd('sel'); }
+    if(keysDown.up){ this.cur=(this.cur+this.apps.length-1)%this.apps.length; playSnd('sel'); }
+    if(keysDown.a){
+      playSnd('jmp');
+      let target = this.apps[this.cur];
+      if(target.mode) target.obj.mode = target.mode;
+      switchApp(target.obj);
     }
+  },
+  draw() {
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,200,300);
+    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0';
+    ctx.fillStyle='#0f0'; ctx.font='bold 16px monospace'; ctx.textAlign='center';
+    ctx.fillText('11in1 RETRO', 100, 30);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle='#fff'; ctx.font='10px monospace';
+    ctx.fillText('ENHANCED EDITION', 100, 45);
+
+    ctx.textAlign='left';
+    for(let i=0; i<this.apps.length; i++){
+      let y = 75 + i * 16;
+      if (y > 280) continue;
+      ctx.fillStyle = i===this.cur?'#0f0':'#aaa'; 
+      ctx.font='11px monospace';
+      ctx.fillText((i===this.cur?'> ':'  ')+this.apps[i].name, 15, y);
+    }
+    ctx.fillStyle='#888'; ctx.font='9px monospace'; ctx.textAlign='center';
+    ctx.fillText('PLAYER: '+SaveSys.data.playerName, 100, 295);
+  }
+};
+
+// --- Manual ---
+const Manual = {
+  init() {},
+  update() { if(keysDown.select || keysDown.b) { switchApp(Menu); } },
+  draw() {
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,200,300);
+    ctx.fillStyle='#0f0'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
+    ctx.fillText('【操作説明】', 100, 25);
+    ctx.fillStyle='#fff'; ctx.font='11px monospace'; ctx.textAlign='left';
+    let t = ["","十字キー: 移動/選択","Aボタン: 決定/攻撃","Bボタン: キャンセル/加速","SELECT: メニューへ戻る","","キーボード:","矢印キー: 移動","Z/Space: A","X: B","Shift: SELECT","","データは自動保存されます"];
+    t.forEach((l,i) => ctx.fillText(l, 15, 45+i*18));
+  }
+};
+
+// --- Ranking Screen ---
+const Ranking = {
+  mode: 'normal',
+  init() { this.mode = 'normal'; },
+  update() { if(keysDown.select || keysDown.b) { switchApp(Menu); } },
+  draw() {
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,200,300);
+    ctx.fillStyle='#0f0'; ctx.font='bold 14px monospace'; ctx.textAlign='center';
+    ctx.fillText('【ランキング】', 100, 25);
+    ctx.fillStyle='#fff'; ctx.font='10px monospace';
+    ctx.fillText('COMING SOON...', 100, 150);
+  }
 };
 
 const initSystem = async () => {
@@ -261,4 +286,6 @@ const initSystem = async () => {
 };
 
 const AISys = { chat: async (msg) => { return "王は沈黙している..."; } };
-window.Menu = Menu; // グローバルに公開
+window.Menu = Menu; 
+window.Manual = Manual;
+window.Ranking = Ranking;
