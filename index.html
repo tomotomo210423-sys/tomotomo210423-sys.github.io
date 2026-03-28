@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>10in1 RETRO SYSTEM</title>
+<title>11in1 RETRO SYSTEM</title>
 
 <link id="favicon" rel="icon" type="image/png" href="">
 <link id="apple-icon" rel="apple-touch-icon" href="">
@@ -33,7 +33,8 @@
   ctx.font = 'bold 36px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('10in1', 90, 60);
+  // ★ ロゴを 11in1 に変更！
+  ctx.fillText('11in1', 90, 60);
 
   ctx.fillStyle = '#333'; ctx.fillRect(30, 135, 45, 15); ctx.fillRect(45, 120, 15, 45);
   ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(150, 130, 15, 0, Math.PI*2); ctx.fill();
@@ -106,6 +107,7 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-landscape #sys-buttons { bottom: 15px; width: 100%; pointer-events: auto; }
 #gameboy.mode-landscape #gameCanvas { aspect-ratio: auto; width: 100%; height: 100%; box-shadow: none; border-radius: 4px; }
 
+
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; pointer-events: none; } 
 
@@ -176,10 +178,9 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 <div id="gameboy">
   <div id="screen-container">
     <div id="boot">
-      <div class="boot-text">10in1 RETRO SYSTEM</div>
-      <div class="boot-text">LOADING SYSTEM DATA...</div>
+      <div class="boot-text">11in1 RETRO SYSTEM</div>
+      <div class="boot-text" id="bootStatus">LOADING SYSTEM DATA...</div>
       <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
-      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Initializing...</div>
     </div>
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
@@ -239,6 +240,7 @@ window.onload = () => {
   let progress = 0;
   const bar = document.getElementById('bootProgress');
   const stat = document.getElementById('bootStatus');
+  stat.textContent = 'LOADING SYSTEM DATA...';
   
   const anim = setInterval(() => {
     progress += Math.random() * 15;
