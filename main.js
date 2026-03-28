@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Local Save & SpriteCache Crash Fix Edition) ===
+// === CORE SYSTEM (11in1 Local Save & SpriteCache Fix Edition) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -29,6 +29,9 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
+// ==========================================
+// 💾 PURE LOCAL SAVE SYSTEM (NO FIREBASE) 💾
+// ==========================================
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
@@ -63,6 +66,7 @@ const SaveSys = {
     this.save();
   }
 };
+// ==========================================
 
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
@@ -186,7 +190,7 @@ const SpriteCache = {
         this.cache[key] = c;
         return c;
     },
-    // エイリアス（念のため）
+    // エイリアス
     get(spriteName, color, scale, flip) { return this.getCanvas(spriteName, color, scale, flip); }
 };
 
@@ -237,6 +241,7 @@ const bgThemes = [
 
 const Menu = {
   cur: 0, 
+  // ★ CURSED MANOR（ホラー）をメニューに完全に追加！
   apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定', '王様の間'], 
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888', '#fa0'],
   holdTimer: 0,
@@ -265,7 +270,7 @@ const Menu = {
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
             typeof Biotope !== 'undefined' ? Biotope : null, 
-            typeof Horror !== 'undefined' ? Horror : null, 
+            typeof Horror !== 'undefined' ? Horror : null, // ★ ホラーゲームを追加！
             typeof Settings !== 'undefined' ? Settings : null, 
             typeof KingRoom !== 'undefined' ? KingRoom : null
         ]; 
@@ -276,9 +281,10 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
+    // ★ 11in1 に変更！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('10in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.2', 45, 40); 
+    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.3', 45, 40); 
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
