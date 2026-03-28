@@ -106,7 +106,6 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #gameboy.mode-landscape #sys-buttons { bottom: 15px; width: 100%; pointer-events: auto; }
 #gameboy.mode-landscape #gameCanvas { aspect-ratio: auto; width: 100%; height: 100%; box-shadow: none; border-radius: 4px; }
 
-
 .mode-tall #gameCanvas { aspect-ratio: 1 / 2; width: auto; max-width: 100%; height: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 0 30px rgba(0, 255, 0, 0.2); }
 .mode-tall #controls { height: 0px !important; opacity: 0; margin: 0; padding: 0; pointer-events: none; } 
 
@@ -165,12 +164,23 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #btn-slot-max { width: 60px; height: 60px; background: radial-gradient(circle, #0a0, #050); border: 4px solid #080; font-size: 14px; }
 #btn-slot-spin { width: 90px; height: 90px; background: radial-gradient(circle, #f00, #a00); border: 6px solid #c00; font-size: 22px; margin-top: 10px; }
 
+#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
+#boot.hidden { opacity: 0; }
+.boot-text { font-size: 10px; margin: 4px 0; }
+.boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
+.boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
 #gameCanvas { background: #000; height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; }
 </style>
 </head>
 <body>
 <div id="gameboy">
   <div id="screen-container">
+    <div id="boot">
+      <div class="boot-text">10in1 RETRO SYSTEM</div>
+      <div class="boot-text">LOADING SYSTEM DATA...</div>
+      <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
+      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Initializing...</div>
+    </div>
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
   
@@ -224,11 +234,30 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 <script src="noise.js"></script>
 
 <script>
-// ★ クラウドセーブを排除し、サクッと起動！
+// ★ ローカルで完結する超速疑似ロードアニメーション！
 window.onload = () => {
-    activeApp = Menu;
-    activeApp.init();
-    requestAnimationFrame(loop);
+  let progress = 0;
+  const bar = document.getElementById('bootProgress');
+  const stat = document.getElementById('bootStatus');
+  
+  const anim = setInterval(() => {
+    progress += Math.random() * 15;
+    if(progress >= 100) {
+      progress = 100;
+      clearInterval(anim);
+      bar.style.width = '100%';
+      stat.textContent = 'SYSTEM READY!';
+      
+      setTimeout(() => { 
+          document.getElementById('boot').classList.add('hidden'); 
+          activeApp = Menu;
+          activeApp.init();
+          requestAnimationFrame(loop);
+      }, 500);
+    } else {
+      bar.style.width = progress + '%';
+    }
+  }, 100);
 };
 </script>
 </body>
