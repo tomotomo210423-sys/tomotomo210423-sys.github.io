@@ -1,4 +1,4 @@
-// === CORE SYSTEM (Local Save & Menu Fix Edition) ===
+// === CORE SYSTEM (Local Save & SpriteCache Crash Fix Edition) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -29,9 +29,6 @@ function initAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume(); 
 }
 
-// ==========================================
-// 💾 PURE LOCAL SAVE SYSTEM (NO FIREBASE) 💾
-// ==========================================
 const SaveSys = {
   data: (() => { 
     let d = {}; try { let p = JSON.parse(localStorage.getItem('4in1_ultimate')); if (p && typeof p === 'object') d = p; } catch(e) {} 
@@ -54,10 +51,7 @@ const SaveSys = {
     }; 
   })(),
   
-  save() {
-      localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
-  },
-
+  save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
   addScore(mode, score) { 
     const rank = mode === 'normal' ? this.data.rankings.n : this.data.rankings.h; 
     rank.push({name: this.data.playerName, score: score, date: Date.now()}); 
@@ -69,7 +63,6 @@ const SaveSys = {
     this.save();
   }
 };
-// ==========================================
 
 const BGM = {
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
@@ -151,19 +144,50 @@ function addParticle(x, y, color, type = 'star') { const count = type === 'explo
 function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { let p = particles[i]; p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.life--; if (p.life <= 0) particles.splice(i, 1); } }
 function drawParticles() { particles.forEach(p => { ctx.globalAlpha = p.life / 40; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1; }); }
 
-window.sprs = {
-    player: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
-    heroNew: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
-    enemyNew: { w:8, h:8, pal:{'1':'#f00', '2':'#fff', '3':'#000'}, d: "..........1111...111111..231123..111111...1..1...11..11........." },
-    coin: { w:8, h:8, pal:{'1':'#ff0', '2':'#fa0'}, d: "..........1111...122221..121121..121121..122221...1111.........." },
-    spike: { w:8, h:8, pal:{'1':'#ddd', '2':'#888'}, d: "...................11.....1221....1221...122221..122221.12222221" }
-};
-
+// ★ 理不尽ブラザーズ（Action）をクラッシュから救う画像キャッシュ機能！
 const universalPal = {
     '1': '#000', '2': '#fff', '3': '#444', '4': '#888',
     '5': '#f00', '6': '#0f0', '7': '#00f', '8': '#ff0',
     '9': '#f0f', 'a': '#0ff', 'b': '#fa0', 'c': '#f8f',
     'd': '#840', 'e': '#8f8', 'f': '#88f'
+};
+
+const SpriteCache = {
+    cache: {},
+    getCanvas(spriteName, color, scale = 1, flip = false) {
+        const key = `${spriteName}_${color}_${scale}_${flip}`;
+        if (this.cache[key]) return this.cache[key];
+        
+        const s = window.sprs ? window.sprs[spriteName] : null;
+        if (!s) return null;
+        
+        const isStr = typeof s === 'string';
+        const sw = isStr ? 8 : (s.w || 8);
+        const sh = isStr ? 8 : (s.h || 8);
+        const sd = isStr ? s : s.d;
+        
+        const c = document.createElement('canvas');
+        c.width = sw * scale; c.height = sh * scale;
+        const cx = c.getContext('2d');
+        if (flip) { cx.translate(c.width, 0); cx.scale(-1, 1); }
+        
+        for (let r = 0; r < sh; r++) {
+            for (let col = 0; col < sw; col++) {
+                let p = sd[r * sw + col];
+                if (p !== '0' && p !== '.' && p !== ' ') {
+                    let fillCol = color || '#fff';
+                    if (!isStr && s.pal && s.pal[p]) { fillCol = s.pal[p]; }
+                    else if (universalPal[p]) { fillCol = universalPal[p]; }
+                    cx.fillStyle = fillCol;
+                    cx.fillRect(col * scale, r * scale, scale, scale);
+                }
+            }
+        }
+        this.cache[key] = c;
+        return c;
+    },
+    // エイリアス（念のため）
+    get(spriteName, color, scale, flip) { return this.getCanvas(spriteName, color, scale, flip); }
 };
 
 function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
@@ -178,16 +202,17 @@ function drawSprite(arg1, arg2, arg3, arg4, arg5, arg6) {
     }
     
     let s = typeof spriteObj === 'string' ? (window.sprs ? window.sprs[spriteObj] : null) : spriteObj;
-    if (!s || !s.d) return;
+    if (!s) return;
+    let sd = typeof s === 'string' ? s : s.d;
+    if (!sd) return;
 
     targetCtx.save();
     targetCtx.translate(x, y);
-    if (flip) { targetCtx.scale(-1, 1); targetCtx.translate(-s.w * scale, 0); }
+    if (flip) { targetCtx.scale(-1, 1); targetCtx.translate(-(s.w||8) * scale, 0); }
     
-    for (let r = 0; r < s.h; r++) {
-        for (let col = 0; col < s.w; col++) {
-            let p = s.d[r * s.w + col];
-            
+    for (let r = 0; r < (s.h||8); r++) {
+        for (let col = 0; col < (s.w||8); col++) {
+            let p = sd[r * (s.w||8) + col];
             if (p === '.' || p === ' ' || p === '0') continue;
             
             let fillCol = color || '#fff';
@@ -212,7 +237,6 @@ const bgThemes = [
 
 const Menu = {
   cur: 0, 
-  // ★ ここがズレていた！『CURSED MANOR』を完璧に追記！
   apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定', '王様の間'], 
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888', '#fa0'],
   holdTimer: 0,
