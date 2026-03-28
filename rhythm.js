@@ -1,5 +1,5 @@
-// === BEAT BROS - APOCALYPSE NIGHTMARE & VIDEO SYNC FIX EDITION ===
-// メドレー時に動画が出なくなるバグを修正し、動画の再生タイミングを完全同期！
+// === BEAT BROS - UI OVERFLOW FIX EDITION ===
+// 曲選択UIのハミ出しバグを修正！
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -64,24 +64,31 @@ const Rhythm = {
     let ui = document.getElementById('rhythm-file-ui');
     if(!ui) {
       ui = document.createElement('div'); ui.id = 'rhythm-file-ui';
+      
+      // ★ UIがハミ出さないようにCSSを超厳密に修正！
       ui.style.position = 'absolute'; ui.style.bottom = '40px'; ui.style.left = '50%'; 
       ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center'; 
-      ui.style.width = '90%'; ui.style.background = 'rgba(0, 0, 20, 0.85)';
+      ui.style.width = '85%'; 
+      ui.style.maxWidth = '170px'; // GB画面内に確実に収める
+      ui.style.boxSizing = 'border-box'; // Paddingのハミ出しを防止
+      ui.style.background = 'rgba(0, 0, 20, 0.85)';
       ui.style.border = '2px solid #0ff'; ui.style.borderRadius = '10px';
-      ui.style.padding = '15px 0'; ui.style.boxShadow = '0 0 20px #0ff, inset 0 0 10px #0ff';
+      ui.style.padding = '10px'; 
+      ui.style.boxShadow = '0 0 20px #0ff, inset 0 0 10px #0ff';
       
       let title = document.createElement('div');
       title.style.color = '#0ff'; title.style.fontFamily = 'monospace'; title.style.fontWeight = 'bold';
-      title.style.marginBottom = '15px'; title.style.textShadow = '0 0 5px #0ff';
+      title.style.marginBottom = '10px'; title.style.textShadow = '0 0 5px #0ff';
+      title.style.fontSize = '11px'; // 少し縮小
       title.innerHTML = '>> SELECT TRACK DATA <<';
       ui.appendChild(title);
 
       let label = document.createElement('label');
       label.style.display = 'inline-block'; label.style.background = 'linear-gradient(90deg, #0ff, #08f)'; 
-      label.style.color = '#000'; label.style.padding = '12px 20px'; label.style.fontFamily = 'monospace'; 
-      label.style.fontWeight = 'bold'; label.style.fontSize = '12px'; label.style.borderRadius = '5px'; 
+      label.style.color = '#000'; label.style.padding = '8px 10px'; label.style.fontFamily = 'monospace'; 
+      label.style.fontWeight = 'bold'; label.style.fontSize = '10px'; label.style.borderRadius = '5px'; 
       label.style.cursor = 'pointer'; label.style.boxShadow = '0 4px 0 #005, 0 0 15px #0ff'; 
-      label.style.marginBottom = '15px'; 
+      label.style.marginBottom = '10px'; 
       label.innerHTML = '📁 LOAD AUDIO / VIDEO';
       
       let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*, video/*'; input.multiple = true; input.style.display = 'none'; 
@@ -100,8 +107,8 @@ const Rhythm = {
       
       let btnEndless = document.createElement('div');
       btnEndless.style.display = 'inline-block'; btnEndless.style.background = 'linear-gradient(90deg, #f00, #a00)'; 
-      btnEndless.style.color = '#fff'; btnEndless.style.padding = '10px 15px'; btnEndless.style.fontFamily = 'monospace'; 
-      btnEndless.style.fontWeight = 'bold'; btnEndless.style.fontSize = '12px'; btnEndless.style.borderRadius = '5px'; 
+      btnEndless.style.color = '#fff'; btnEndless.style.padding = '8px 10px'; btnEndless.style.fontFamily = 'monospace'; 
+      btnEndless.style.fontWeight = 'bold'; btnEndless.style.fontSize = '10px'; btnEndless.style.borderRadius = '5px'; 
       btnEndless.style.cursor = 'pointer'; btnEndless.style.boxShadow = '0 4px 0 #500, 0 0 15px #f00';
       btnEndless.innerHTML = '💀 ENDLESS SURVIVAL';
       const startEndless = (e) => { 
@@ -130,7 +137,6 @@ const Rhythm = {
     this.st = 'loading'; BGM.stop(); 
     if(!file) return;
     
-    // ★ メドレーバグ修正：前の動画を確実にクリーンアップする
     if(this.video) { 
         this.video.pause(); 
         this.video.removeAttribute('src'); 
@@ -235,7 +241,6 @@ const Rhythm = {
   },
 
   handleTrackEnd() {
-    // 曲が終わったら動画も一時停止
     if(this.video) { this.video.pause(); }
     if(this.isEndless) return;
     
@@ -452,7 +457,7 @@ const Rhythm = {
         if(!this.isEndless) {
            this.startTime = audioCtx.currentTime + 1.5; 
            this.source.start(this.startTime); 
-           if(this.video) { this.video.currentTime = 0; } // ★ ここではcurrentTimeのリセットのみ
+           if(this.video) { this.video.currentTime = 0; } 
         }
       }
     }
@@ -460,7 +465,6 @@ const Rhythm = {
       let now = audioCtx.currentTime - this.startTime;
       let speed = 200;
       
-      // ★ 曲が開始した瞬間(now >= 0)に、動画を強制的に再生させて完全に同期する！！
       if (!this.isEndless && this.video && now >= 0 && this.video.paused && !this.video.ended) {
           let p = this.video.play();
           if(p !== undefined) p.catch(e => console.log("Video AutoPlay Blocked", e));
