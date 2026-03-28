@@ -161,19 +161,37 @@ const switchApp = (app) => {
 };
 
 const loop = () => {
-  keysDown = {}; for(let k in keys) { if(keys[k] && !lastKeys[k]) keysDown[k] = true; }
+  // キー入力の更新
+  keysDown = {};
+  for(let k in keys) { 
+    if(keys[k] && !lastKeys[k]) { 
+      keysDown[k] = true; 
+      console.log(`🎮 Key pressed: ${k}`);
+    }
+  }
   lastKeys = {...keys};
   pointer.clicked = false; 
-  if(activeApp) { activeApp.update(); activeApp.draw(); }
+  
+  // ゲームロジック実行
+  if(activeApp) { 
+    try {
+      activeApp.update(); 
+      activeApp.draw();
+    } catch(e) {
+      console.error('❌ App error:', e);
+    }
+  }
   requestAnimationFrame(loop);
 };
 
-// --- Menu ---
+// --- Menu (New Version) ---
 const Menu = {
   cur: 0,
   apps: [],
+  scrollY: 0,
   init() { 
     this.cur = 0;
+    this.scrollY = 0;
     const allApps = [
       { name: '操作説明', obj: Manual },
       { name: 'テトリベーダー(N)', obj: Tetri, mode: 'normal' },
@@ -192,15 +210,17 @@ const Menu = {
       { name: 'ランキング', obj: Ranking }
     ];
     this.apps = allApps.filter(a => window[a.obj === Tetri ? 'Tetri' : (a.obj === KingRoom ? 'KingRoom' : a.obj.constructor.name)] || a.obj);
+    console.log(`📋 Menu loaded with ${this.apps.length} apps`);
     if(typeof BGM !== 'undefined') BGM.play('menu');
     const gb = document.getElementById('gameboy');
     if (gb) gb.className = '';
     if (canvas) { canvas.width = 200; canvas.height = 300; }
   },
   update() {
-    if(keysDown.down){ this.cur=(this.cur+1)%this.apps.length; playSnd('sel'); }
-    if(keysDown.up){ this.cur=(this.cur+this.apps.length-1)%this.apps.length; playSnd('sel'); }
+    if(keysDown.down){ this.cur=(this.cur+1)%this.apps.length; this.scrollY = Math.max(0, Math.min(this.cur * 16 - 80, this.apps.length * 16 - 160)); playSnd('sel'); console.log(`📍 Cursor: ${this.cur}`); }
+    if(keysDown.up){ this.cur=(this.cur+this.apps.length-1)%this.apps.length; this.scrollY = Math.max(0, Math.min(this.cur * 16 - 80, this.apps.length * 16 - 160)); playSnd('sel'); console.log(`📍 Cursor: ${this.cur}`); }
     if(keysDown.a){
+      console.log(`🎮 Selected: ${this.apps[this.cur].name}`);
       playSnd('jmp');
       let target = this.apps[this.cur];
       if(target.mode) target.obj.mode = target.mode;
@@ -208,24 +228,44 @@ const Menu = {
     }
   },
   draw() {
-    ctx.fillStyle='#000'; ctx.fillRect(0,0,200,300);
-    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0';
-    ctx.fillStyle='#0f0'; ctx.font='bold 16px monospace'; ctx.textAlign='center';
-    ctx.fillText('11in1 RETRO', 100, 30);
+    // 背景
+    ctx.fillStyle='#001a00'; ctx.fillRect(0,0,200,300);
+    // グリッド背景
+    ctx.strokeStyle='#003300'; ctx.lineWidth=1;
+    for(let i=0; i<20; i++) { ctx.beginPath(); ctx.moveTo(0, i*15); ctx.lineTo(200, i*15); ctx.stroke(); }
+    
+    // タイトル
+    ctx.shadowBlur = 15; ctx.shadowColor = '#00ff00';
+    ctx.fillStyle='#00ff00'; ctx.font='bold 18px monospace'; ctx.textAlign='center';
+    ctx.fillText('11in1 RETRO', 100, 25);
     ctx.shadowBlur = 0;
-    ctx.fillStyle='#fff'; ctx.font='10px monospace';
-    ctx.fillText('ENHANCED EDITION', 100, 45);
-
-    ctx.textAlign='left';
+    ctx.fillStyle='#00aa00'; ctx.font='10px monospace';
+    ctx.fillText('NEW VERSION', 100, 40);
+    
+    // 区切り線
+    ctx.strokeStyle='#00ff00'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(10, 50); ctx.lineTo(190, 50); ctx.stroke();
+    
+    // メニューアイテム
+    ctx.textAlign='left'; ctx.font='11px monospace';
     for(let i=0; i<this.apps.length; i++){
-      let y = 75 + i * 16;
-      if (y > 280) continue;
-      ctx.fillStyle = i===this.cur?'#0f0':'#aaa'; 
-      ctx.font='11px monospace';
-      ctx.fillText((i===this.cur?'> ':'  ')+this.apps[i].name, 15, y);
+      let y = 65 + i * 16 - this.scrollY;
+      if (y < 55 || y > 280) continue;
+      
+      if (i === this.cur) {
+        // 選択中のアイテム
+        ctx.fillStyle='#000000';
+        ctx.fillRect(8, y-12, 184, 14);
+        ctx.fillStyle='#00ff00';
+        ctx.fillText('▶ '+this.apps[i].name, 15, y);
+      } else {
+        ctx.fillStyle='#00aa00';
+        ctx.fillText('  '+this.apps[i].name, 15, y);
+      }
     }
-    ctx.fillStyle='#888'; ctx.font='9px monospace'; ctx.textAlign='center';
-    ctx.fillText('PLAYER: '+SaveSys.data.playerName, 100, 295);
+    
+    // フッター
+    ctx.fillStyle='#006600'; ctx.font='8px monospace'; ctx.textAlign='center';
+    ctx.fillText('↑↓: 選択  Z: 決定  X: キャンセル', 100, 295);
   }
 };
 
@@ -262,11 +302,16 @@ const initSystem = async () => {
   canvas.width = 200; canvas.height = 300;
   
   const handleKey = (e, v) => {
-    const k = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right', z:'a', x:'b', Enter:'start', Shift:'select'}[e.key];
-    if(k) { keys[k] = v; e.preventDefault(); if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    const k = {ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right', z:'a', Z:'a', x:'b', X:'b', ' ':'a', Enter:'start', Shift:'select'}[e.key];
+    if(k) { 
+      keys[k] = v; 
+      console.log(`⌨️ ${v ? 'DOWN' : 'UP'}: ${k} (key: ${e.key})`);
+      e.preventDefault(); 
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+    }
   };
-  window.addEventListener('keydown', e => handleKey(e, true));
-  window.addEventListener('keyup', e => handleKey(e, false));
+  window.addEventListener('keydown', e => handleKey(e, true), true);
+  window.addEventListener('keyup', e => handleKey(e, false), true);
 
   const getPos = (e) => {
       const rect = canvas.getBoundingClientRect();
