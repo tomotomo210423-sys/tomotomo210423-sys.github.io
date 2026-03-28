@@ -172,24 +172,38 @@ const Menu = {
     cur: 0, tmr: 0,
     apps: [],
     init() {
-        this.apps = [
-            { name: '理不尽ブラザーズ', obj: Action },
-            { name: '無限無双', obj: Musou },
-            { name: 'テトリベーダー', obj: Tetri },
-            { name: 'ビートブラザーズ', obj: Rhythm },
-            { name: 'ロイヤルジョーカー', obj: Online },
-            { name: 'アビスジェネラル', obj: Abyss },
-            { name: '爆音スニーキング', obj: Noise },
-            { name: 'ピクセルビオトープ', obj: Biotope },
-            { name: 'カースドマナー', obj: Horror },
-            { name: 'ハッカーズ15', obj: PCApp },
-            { name: 'レトロスロット', obj: Slot },
-            { name: 'ガイド', obj: Guide },
-            { name: '王様の間', obj: KingApp }
+        console.log("🎮 Menu Initializing...");
+        this.apps = [];
+        const appList = [
+            { name: '理不尽ブラザーズ', key: 'Action' },
+            { name: '無限無双', key: 'Musou' },
+            { name: 'テトリベーダー', key: 'Tetri' },
+            { name: 'ビートブラザーズ', key: 'Rhythm' },
+            { name: 'ロイヤルジョーカー', key: 'Online' },
+            { name: 'アビスジェネラル', key: 'Abyss' },
+            { name: '爆音スニーキング', key: 'Noise' },
+            { name: 'ピクセルビオトープ', key: 'Biotope' },
+            { name: 'カースドマナー', key: 'Horror' },
+            { name: 'ハッカーズ15', key: 'PCApp' },
+            { name: 'レトロスロット', key: 'Slot' },
+            { name: 'ガイド', key: 'Guide' },
+            { name: '王様の間', key: 'KingRoom' }
         ];
-        BGM.play('menu');
-        document.getElementById('gameboy').className = '';
-        canvas.width = 200; canvas.height = 300;
+        
+        appList.forEach(a => {
+            const obj = window[a.key];
+            if (obj) {
+                this.apps.push({ name: a.name, obj: obj });
+            } else {
+                console.warn(`⚠️ App ${a.key} is not defined.`);
+            }
+        });
+
+        if (typeof BGM !== 'undefined') BGM.play('menu');
+        const gb = document.getElementById('gameboy');
+        if (gb) gb.className = '';
+        if (canvas) { canvas.width = 200; canvas.height = 300; }
+        console.log(`🎮 Menu Ready with ${this.apps.length} apps.`);
     },
     update() {
         this.tmr++;
