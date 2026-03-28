@@ -1,4 +1,4 @@
-// === UNREASONABLE BROS - TRUE COMPLETE EDITION (Standalone Texture Edition) ===
+// === UNREASONABLE BROS - TRUE COMPLETE EDITION (Standalone Texture & Camera Fix) ===
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   fallingSpikes: [], fireballs: [], sun: null, blackHole: null,
@@ -7,7 +7,7 @@ const Action = {
   mIdx: 1, deathReason: '', checkpointX: 20, bgTimer: 0,
   titleCur: 0, stageSelect: 1,
   
-  // ★ アクションゲーム専用のテクスチャデータ
+  // ★ 1. アクションゲーム専用のテクスチャデータ（完全に内部化）
   tex: {
     hero: { w:8, h:8, pal:{'1':'#fcc', '2':'#000', '3':'#f00', '4':'#00f'}, d: "..........1111...121121..111111...4444...4.44.4..3.33.3....33..." },
     enemy: { w:8, h:8, pal:{'1':'#f00', '2':'#fff', '3':'#000'}, d: "..........1111...111111..231123..111111...1..1...11..11........." },
@@ -15,30 +15,45 @@ const Action = {
     spike: { w:8, h:8, pal:{'1':'#ddd', '2':'#888'}, d: "...................11.....1221....1221...122221..122221.12222221" }
   },
 
-  // ★ テクスチャをシステム(SpriteCache)に登録する処理を追加！
-  registerSprites() {
-    if (!window.sprs) window.sprs = {};
-    window.sprs.act_hero = this.tex.hero;
-    window.sprs.act_enemy = this.tex.enemy;
-    window.sprs.act_coin = this.tex.coin;
-    window.sprs.spike = this.tex.spike;
+  // ★ 2. Action専用の爆速画像キャッシュエンジン
+  texCache: {},
+  getTexCanvas(texKey, color1, scale, flip) {
+      const key = `${texKey}_${color1}_${scale}_${flip}`;
+      if (this.texCache[key]) return this.texCache[key];
+      
+      const s = this.tex[texKey];
+      if (!s) return null;
+      
+      const c = document.createElement('canvas');
+      c.width = s.w * scale; c.height = s.h * scale;
+      const cx = c.getContext('2d');
+      
+      if (flip) { cx.translate(c.width, 0); cx.scale(-1, 1); }
+      
+      for (let r = 0; r < s.h; r++) {
+          for (let col = 0; col < s.w; col++) {
+              let p = s.d[r * s.w + col];
+              if (p !== '.' && p !== ' ' && p !== '0') {
+                  let fillCol = (s.pal && s.pal[p]) ? s.pal[p] : (color1 || '#fff');
+                  cx.fillStyle = fillCol;
+                  cx.fillRect(col * scale, r * scale, scale, scale);
+              }
+          }
+      }
+      this.texCache[key] = c;
+      return c;
   },
 
-  // ★ アクションゲーム専用・絶対バグらない描画エンジン
+  // ★ 3. カメラの倍速ズレを直した描画関数（x, y をそのまま使う）
   drawTex(x, y, texKey, scale, flip, color1) {
-      if (typeof SpriteCache === 'undefined') return;
-      const cached = SpriteCache.get(texKey, color1 || null, scale, flip);
-      if (cached) {
-          const screenX = Math.round(x - this.camX);
-          const screenY = Math.round(y);
-          if (screenX > -64 && screenX < 264 && screenY > -64 && screenY < 364) {
-              ctx.drawImage(cached, screenX, screenY);
-          }
+      const c = this.getTexCanvas(texKey, color1, scale, flip);
+      if (c) {
+          // ctx.translate がすでに効いているので、ここではそのままの x, y に描画する！
+          ctx.drawImage(c, Math.round(x), Math.round(y));
       }
   },
 
   init() { 
-    this.registerSprites(); // ★ 起動時にテクスチャを登録！
     this.st = 'title'; BGM.play('action'); 
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
     if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
@@ -59,7 +74,6 @@ const Action = {
     const themes = ['grass', 'desert', 'lava', 'ice', 'void', 'final', 'neon', 'dark', 'glitch', 'blood', 'space', 'ultimate'];
     this.stageTheme = themes[Math.min(stage - 1, themes.length - 1)];
     
-    // 背景の装飾オブジェクトを初期化
     this.bgProps = [];
     for(let i=0; i<15; i++) {
         this.bgProps.push({
@@ -357,6 +371,7 @@ const Action = {
     updateParticles();
   },
   
+  // ★ 4. drawBlockもカメラのズレを完璧に修正
   drawBlock(x, y, w, h, type, fake) {
     const theme = this.stageTheme;
     let base = '#642', top = '#0f0';
@@ -374,24 +389,22 @@ const Action = {
 
     if (fake) base = '#432';
     
-    // 画面内チェック
-    const screenX = x - this.camX;
-    const screenY = y;
-    if (screenX + w > -50 && screenX < 250) {
+    // ctx.translateが効いているので、x, yをそのまま使う！
+    // ただし描画をサボるための「画面内判定」には camX との比較を使う
+    if (x - this.camX + w > -50 && x - this.camX < 250) {
         ctx.fillStyle = base; 
-        ctx.fillRect(screenX, screenY, w, h);
+        ctx.fillRect(x, y, w, h);
         ctx.fillStyle = top; 
-        ctx.fillRect(screenX, screenY, w, 4);
+        ctx.fillRect(x, y, w, 4);
         
-        // テクスチャ詳細
         ctx.globalAlpha = 0.1;
         for(let i=0; i<w; i+=8) {
             for(let j=0; j<h; j+=8) {
-                if((i+j)%16 === 0) { ctx.fillStyle = '#000'; ctx.fillRect(screenX+i, screenY+j, 4, 4); }
+                if((i+j)%16 === 0) { ctx.fillStyle = '#000'; ctx.fillRect(x+i, y+j, 4, 4); }
             }
         }
         ctx.globalAlpha = 1.0;
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeRect(screenX, screenY, w, h);
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.strokeRect(x, y, w, h);
     }
   },
 
@@ -403,7 +416,7 @@ const Action = {
       ctx.shadowBlur = 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText('UNREASONABLE', 30, 80); ctx.fillText('BROTHERS', 45, 105); ctx.shadowBlur = 0;
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('～理不尽なアクション～', 30, 130);
       
-      for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; this.drawTex(x, y, 'act_hero', 2.5, false, '#00f'); }
+      for (let i = 0; i < 5; i++) { const x = 30 + i * 30; const y = 160 + Math.sin(this.bgTimer / 10 + i) * 5; this.drawTex(x, y, 'hero', 2.5, false, '#00f'); }
       
       if (this.st === 'title') {
         ctx.fillStyle = this.titleCur === 0 ? '#ff0' : '#fff'; ctx.font = 'bold 12px monospace'; 
@@ -459,12 +472,13 @@ const Action = {
         else if (this.stageTheme === 'void') { ctx.fillStyle='#fff'; ctx.fillRect((cx*3)%200, (i*60)%300, 1, 1); } 
     }
     
-    if (this.stageTheme === 'desert') { ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(30, 50, 20, 0, Math.PI * 2); ctx.fill(); } 
-    else if (this.stageTheme === 'lava') { ctx.fillStyle = `rgba(255,50,0,${0.3+Math.sin(this.bgTimer/10)*0.2})`; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(50 + i * 60, 280, 40, 0, Math.PI * 2); ctx.fill(); } }
-    else if (this.stageTheme === 'void' || this.stageTheme === 'final') { ctx.strokeStyle = 'rgba(255,0,255,0.2)'; for(let i=0; i<200; i+=20){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,300); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i*1.5); ctx.lineTo(200, i*1.5); ctx.stroke(); } }
-
+    // ★ ここから下が「メインのカメラずらし」
     ctx.save(); ctx.translate(-this.camX, 0);
     
+    if (this.stageTheme === 'desert') { ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(30 + this.camX, 50, 20, 0, Math.PI * 2); ctx.fill(); } 
+    else if (this.stageTheme === 'lava') { ctx.fillStyle = `rgba(255,50,0,${0.3+Math.sin(this.bgTimer/10)*0.2})`; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(50 + i * 60 + this.camX, 280, 40, 0, Math.PI * 2); ctx.fill(); } }
+    else if (this.stageTheme === 'void' || this.stageTheme === 'final') { ctx.strokeStyle = 'rgba(255,0,255,0.2)'; for(let i=0; i<200; i+=20){ ctx.beginPath(); ctx.moveTo(i + this.camX, 0); ctx.lineTo(i + this.camX, 300); ctx.stroke(); ctx.beginPath(); ctx.moveTo(this.camX, i*1.5); ctx.lineTo(200 + this.camX, i*1.5); ctx.stroke(); } }
+
     if ((this.stageTheme === 'desert' || this.stageTheme === 'final') && this.sun) {
        ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(this.sun.x, this.sun.y, 14, 0, Math.PI * 2); ctx.fill();
        ctx.fillStyle = '#f00'; ctx.font = 'bold 12px monospace'; ctx.fillText('▼', this.sun.x - 6, this.sun.y + 4);
@@ -482,56 +496,58 @@ const Action = {
     }
 
     for (let m of this.map) {
-      if (m.x - this.camX > -50 && m.x - this.camX < 250) {
-        if (m.type === 'ground' || m.type === 'fakeGround') { 
-           this.drawBlock(m.x, m.y, m.w, m.h, 'ground', m.type === 'fakeGround');
-        } else if (m.type === 'checkpoint') {
-          ctx.fillStyle = this.checkpointX === m.x ? '#0f0' : '#888'; ctx.fillRect(m.x + 8, m.y, 4, m.h); 
-          ctx.fillStyle = this.checkpointX === m.x ? '#ff0' : '#ccc'; ctx.fillRect(m.x + 12, m.y + 5, 15, 15); 
-        } else if (m.type === 'goal') { 
-          ctx.fillStyle = this.stageTheme === 'final' ? '#f0f' : '#ffd700'; ctx.fillRect(m.x, m.y, m.w, m.h); 
-          ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText('★', m.x + 7, m.y + 30); 
-        }
+      if (m.type === 'ground' || m.type === 'fakeGround') { 
+         this.drawBlock(m.x, m.y, m.w, m.h, 'ground', m.type === 'fakeGround');
+      } else if (m.type === 'checkpoint') {
+        ctx.fillStyle = this.checkpointX === m.x ? '#0f0' : '#888'; ctx.fillRect(m.x + 8, m.y, 4, m.h); 
+        ctx.fillStyle = this.checkpointX === m.x ? '#ff0' : '#ccc'; ctx.fillRect(m.x + 12, m.y + 5, 15, 15); 
+      } else if (m.type === 'goal') { 
+        ctx.fillStyle = this.stageTheme === 'final' ? '#f0f' : '#ffd700'; ctx.fillRect(m.x, m.y, m.w, m.h); 
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 16px monospace'; ctx.fillText('★', m.x + 7, m.y + 30); 
       }
     }
-    for (let plat of this.platforms) { if (plat.x - this.camX > -50 && plat.x - this.camX < 250) this.drawBlock(plat.x, plat.y, plat.w, plat.h, 'plat', false); }
-    for (let ib of this.invisibleBlocks) { if (ib.x - this.camX > -50 && ib.x - this.camX < 250 && ib.visible) this.drawBlock(ib.x, ib.y, ib.w, ib.h, 'inv', false); }
+    
+    for (let plat of this.platforms) { this.drawBlock(plat.x, plat.y, plat.w, plat.h, 'plat', false); }
+    for (let ib of this.invisibleBlocks) { if (ib.visible) this.drawBlock(ib.x, ib.y, ib.w, ib.h, 'inv', false); }
+    
     for (let fc of this.fakeCoins) {
-      if (!fc.touched && fc.x - this.camX > -50 && fc.x - this.camX < 250) {
-        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(fc.x - 4, fc.y + offset - 4, 'act_coin', 2.0, false, '#f00'); 
+      if (!fc.touched) {
+        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(fc.x - 4, fc.y + offset - 4, 'coin', 2.0, false, '#f00'); 
       }
     }
     for (let coin of this.coins) {
-      if (!coin.collected && coin.x - this.camX > -50 && coin.x - this.camX < 250) {
-        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(coin.x - 4, coin.y + offset - 4, 'act_coin', 2.0, false, '#ff0'); 
+      if (!coin.collected) {
+        const offset = Math.sin(this.bgTimer / 10) * 3; this.drawTex(coin.x - 4, coin.y + offset - 4, 'coin', 2.0, false, '#ff0'); 
       }
     }
+    
     for (let s of this.fallingSpikes) { 
-        if (s.x - this.camX > -50 && s.x - this.camX < 250) { ctx.fillStyle = s.isIce ? '#8ff' : '#888'; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x+20, s.y); ctx.lineTo(s.x+10, s.y+20); ctx.fill(); } 
+        ctx.fillStyle = s.isIce ? '#8ff' : '#888'; ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x+20, s.y); ctx.lineTo(s.x+10, s.y+20); ctx.fill();
     }
+    
     for (let spike of this.spikes) { 
-      if (spike.x - this.camX > -50 && spike.x - this.camX < 250) {
-        if (spike.blink && (Math.floor(this.bgTimer / 30) % 2 === 0)) ctx.globalAlpha = 0.2;
-        this.drawTex(spike.x, spike.y, 'spike', 2.5, false, spike.blink ? '#0ff' : '#aaa'); 
-        ctx.globalAlpha = 1.0;
-      }
+      if (spike.blink && (Math.floor(this.bgTimer / 30) % 2 === 0)) ctx.globalAlpha = 0.2;
+      this.drawTex(spike.x, spike.y, 'spike', 2.5, false, spike.blink ? '#0ff' : '#aaa'); 
+      ctx.globalAlpha = 1.0;
     }
+    
     for (let e of this.enemies) {
-      if (e.y < 300 && e.x - this.camX > -50 && e.x - this.camX < 250) {
+      if (e.y < 300) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;
         const color = e.troll ? '#f0f' : '#a00'; 
-        this.drawTex(e.x - 4, e.y + offsetY - 4, 'act_enemy', 2.5, false, color);
+        this.drawTex(e.x - 4, e.y + offsetY - 4, 'enemy', 2.5, false, color);
       }
     }
     
     if (this.st !== 'dead' && this.st !== 'gameover') {
       for(let i=0; i<this.p.trail.length; i++) {
           let tr = this.p.trail[i]; ctx.globalAlpha = 0.5 - (i*0.1);
-          this.drawTex(tr.x, tr.y, 'act_hero', 2.5, tr.dir < 0, '#0ff');
+          this.drawTex(tr.x, tr.y, 'hero', 2.5, tr.dir < 0, '#0ff');
       }
       ctx.globalAlpha = 1;
-      this.drawTex(this.p.x, this.p.y, 'act_hero', 2.5, this.p.dir < 0, '#00f'); 
+      this.drawTex(this.p.x, this.p.y, 'hero', 2.5, this.p.dir < 0, '#00f'); 
     }
+    
     ctx.restore();
 
     drawParticles();
