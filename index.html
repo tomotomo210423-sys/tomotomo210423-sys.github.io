@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>11in1 RETRO SYSTEM</title>
+<title>10in1 RETRO SYSTEM</title>
 
 <link id="favicon" rel="icon" type="image/png" href="">
 <link id="apple-icon" rel="apple-touch-icon" href="">
@@ -33,8 +33,7 @@
   ctx.font = 'bold 36px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // ★ ここが 11in1 に進化！
-  ctx.fillText('11in1', 90, 60);
+  ctx.fillText('10in1', 90, 60);
 
   ctx.fillStyle = '#333'; ctx.fillRect(30, 135, 45, 15); ctx.fillRect(45, 120, 15, 45);
   ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(150, 130, 15, 0, Math.PI*2); ctx.fill();
@@ -166,70 +165,12 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 #btn-slot-max { width: 60px; height: 60px; background: radial-gradient(circle, #0a0, #050); border: 4px solid #080; font-size: 14px; }
 #btn-slot-spin { width: 90px; height: 90px; background: radial-gradient(circle, #f00, #a00); border: 6px solid #c00; font-size: 22px; margin-top: 10px; }
 
-#boot { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #0f0; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.5s; border-radius: 6px 6px 35px 6px; pointer-events: none; }
-#boot.hidden { opacity: 0; }
-.boot-text { font-size: 10px; margin: 4px 0; }
-.boot-bar { width: 80%; height: 15px; border: 2px solid #0f0; margin-top: 15px; }
-.boot-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.1s; }
-  #gameCanvas { background: #000; height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; }
-  
-  #screen-container::before {
-    content: " ";
-    display: block;
-    position: absolute;
-    top: 0; left: 0; bottom: 0; right: 0;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-    z-index: 10;
-    background-size: 100% 4px, 3px 100%;
-    pointer-events: none;
-  }
-  
-  #screen-container::after {
-    content: " ";
-    display: block;
-    position: absolute;
-    top: 0; left: 0; bottom: 0; right: 0;
-    background: rgba(18, 16, 16, 0.1);
-    opacity: 0;
-    z-index: 10;
-    pointer-events: none;
-    animation: flicker 0.15s infinite;
-  }
-  
-  @keyframes flicker {
-    0% { opacity: 0.27861; }
-    5% { opacity: 0.34769; }
-    10% { opacity: 0.23604; }
-    15% { opacity: 0.90626; }
-    20% { opacity: 0.18128; }
-    25% { opacity: 0.83891; }
-    30% { opacity: 0.65583; }
-    35% { opacity: 0.57807; }
-    40% { opacity: 0.26559; }
-    45% { opacity: 0.84693; }
-    50% { opacity: 0.96019; }
-    55% { opacity: 0.08594; }
-    60% { opacity: 0.20313; }
-    65% { opacity: 0.71988; }
-    70% { opacity: 0.53455; }
-    75% { opacity: 0.37288; }
-    80% { opacity: 0.71428; }
-    85% { opacity: 0.70419; }
-    90% { opacity: 0.7003; }
-    95% { opacity: 0.36108; }
-    100% { opacity: 0.24387; }
-  }
-  </style>
+#gameCanvas { background: #000; height: 100%; width: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1.5; image-rendering: pixelated; box-shadow: 0 0 15px rgba(0,0,0,0.9); z-index: 1; border-radius: 2px; touch-action: none; transition: all 0.5s; }
+</style>
 </head>
 <body>
 <div id="gameboy">
   <div id="screen-container">
-    <div id="boot">
-      <div class="boot-text">11in1 RETRO SYSTEM</div>
-      <div class="boot-text">SYNCING CLOUD DATA...</div>
-      <div class="boot-bar"><div class="boot-fill" id="bootProgress"></div></div>
-      <div class="boot-text" id="bootStatus" style="margin-top: 10px;">Connecting...</div>
-    </div>
     <canvas id="gameCanvas" width="200" height="300"></canvas>
   </div>
   
@@ -283,39 +224,11 @@ body { background: #000; display: flex; justify-content: center; align-items: ce
 <script src="noise.js"></script>
 
 <script>
-window.onload = async () => {
-  let progress = 0;
-  const bar = document.getElementById('bootProgress');
-  const stat = document.getElementById('bootStatus');
-  
-  const anim = setInterval(() => {
-    progress += Math.random() * 20;
-    if(progress > 100) progress = 100; 
-    bar.style.width = progress + '%';
-    if(progress >= 100) {
-        clearInterval(anim);
-        stat.textContent = 'SYSTEM READY!';
-        setTimeout(() => { 
-            document.getElementById('boot').classList.add('hidden'); 
-            // Menuが定義されているか確認し、定義されていなければ再定義を試みる
-            if (typeof Menu === 'undefined' && typeof window.Menu !== 'undefined') {
-                window.Menu.init();
-                activeApp = window.Menu;
-            } else if (typeof Menu !== 'undefined') {
-                Menu.init();
-                activeApp = Menu;
-            } else {
-                console.error("Menu is not defined!");
-            }
-        }, 300);
-    }
-  }, 50);
-
-  // システムの基本初期化（キャンバス、キー入力など）
-  if (typeof initSystem !== 'undefined') await initSystem();
-  
-  // クラウド同期をスキップし、ローカルの初期化のみを実行
-  if (typeof SaveSys !== 'undefined' && SaveSys.init) await SaveSys.init();
+// ★ クラウドセーブを排除し、サクッと起動！
+window.onload = () => {
+    activeApp = Menu;
+    activeApp.init();
+    requestAnimationFrame(loop);
 };
 </script>
 </body>
