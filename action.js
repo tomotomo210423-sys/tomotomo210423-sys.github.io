@@ -15,8 +15,18 @@ const Action = {
     spike: { w:8, h:8, pal:{'1':'#ddd', '2':'#888'}, d: "...................11.....1221....1221...122221..122221.12222221" }
   },
 
+  // ★ テクスチャをシステム(SpriteCache)に登録する処理を追加！
+  registerSprites() {
+    if (!window.sprs) window.sprs = {};
+    window.sprs.act_hero = this.tex.hero;
+    window.sprs.act_enemy = this.tex.enemy;
+    window.sprs.act_coin = this.tex.coin;
+    window.sprs.spike = this.tex.spike;
+  },
+
   // ★ アクションゲーム専用・絶対バグらない描画エンジン
   drawTex(x, y, texKey, scale, flip, color1) {
+      if (typeof SpriteCache === 'undefined') return;
       const cached = SpriteCache.get(texKey, color1 || null, scale, flip);
       if (cached) {
           const screenX = Math.round(x - this.camX);
@@ -28,6 +38,7 @@ const Action = {
   },
 
   init() { 
+    this.registerSprites(); // ★ 起動時にテクスチャを登録！
     this.st = 'title'; BGM.play('action'); 
     if (isNaN(SaveSys.data.actStage)) SaveSys.data.actStage = 1;
     if (isNaN(SaveSys.data.actSeed)) SaveSys.data.actSeed = Math.floor(Math.random() * 1000);
@@ -79,12 +90,11 @@ const Action = {
       }
 
       let trapChance = stage >= 6 ? 0.4 + (stage - 6) * 0.05 : 0.3 + (stage * 0.04);
-      // ステージごとの個性的なギミック確率
       let specialGimmickChance = stage >= 7 ? 0.2 : 0;
 
       if (trapCooldown <= 0 && rand() < trapChance) {
         let type = Math.floor(rand() * 8); 
-        if (stage >= 7 && rand() < specialGimmickChance) type = 7; // STAGE 7+ 特殊ギミック
+        if (stage >= 7 && rand() < specialGimmickChance) type = 7; 
 
         switch(type) {
           case 0:
@@ -92,17 +102,17 @@ const Action = {
             this.invisibleBlocks.push({x: currentX + 80, y: 190, w: 20, h: 20, visible: false, type: 'kaizo'});
             this.map.push({x: currentX + 130, y: 270, w: 90, h: 30, type: 'ground'});
             currentX += 220; break;
-          case 7: // 特殊ギミック（ステージごとに変化）
+          case 7: 
             if (this.stageTheme === 'neon') {
                this.map.push({x: currentX, y: 270, w: 60, h: 30, type: 'ground'});
-               this.spikes.push({x: currentX + 60, y: 250, w: 40, h: 20, blink: true}); // 点滅するトゲ
+               this.spikes.push({x: currentX + 60, y: 250, w: 40, h: 20, blink: true});
                this.map.push({x: currentX + 100, y: 270, w: 60, h: 30, type: 'ground'});
                currentX += 160;
             } else if (this.stageTheme === 'glitch') {
-               this.map.push({x: currentX, y: 270, w: 100, h: 30, type: 'ground', glitch: true}); // 崩れる地面
+               this.map.push({x: currentX, y: 270, w: 100, h: 30, type: 'ground', glitch: true}); 
                currentX += 150;
             } else if (this.stageTheme === 'space') {
-               this.platforms.push({x: currentX, y: 200, w: 50, h: 10, moving: true, vy: 1, range: 60, startY: 200}); // 縦移動
+               this.platforms.push({x: currentX, y: 200, w: 50, h: 10, moving: true, vy: 1, range: 60, startY: 200}); 
                currentX += 120;
             } else {
                this.map.push({x: currentX, y: 270, w: 100, h: 30, type: 'ground'});
@@ -514,7 +524,6 @@ const Action = {
       }
     }
     
-    // ★ プレイヤー描画
     if (this.st !== 'dead' && this.st !== 'gameover') {
       for(let i=0; i<this.p.trail.length; i++) {
           let tr = this.p.trail[i]; ctx.globalAlpha = 0.5 - (i*0.1);
