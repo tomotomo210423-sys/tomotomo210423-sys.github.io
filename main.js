@@ -17,14 +17,11 @@ const SaveSys = {
               console.error("💾 読み込みエラー", e);
           }
       }
-      
-      // クラウドセーブ機能を無効化し、ローカルストレージのみを使用
       console.log("💾 ローカル保存モード - クラウド同期無効");
       this.isCloudReady = false; 
   },
 
   save() {
-      // ローカルストレージへの保存のみを実行
       try {
           localStorage.setItem('4in1_ultimate', JSON.stringify(this.data));
       } catch (e) {
@@ -47,6 +44,7 @@ const SaveSys = {
 let audioCtx = null, bgmInterval = null, keys = {}, keysDown = {}, lastKeys = {};
 let activeApp = null, canvas = null, ctx = null, screenShakeT = 0;
 let particleList = [];
+let pointer = { x: 0, y: 0, down: false, clicked: false };
 
 const playSnd = (type) => {
   if (!audioCtx || SaveSys.data.seVol <= 0) return;
@@ -107,10 +105,8 @@ const SpriteCache = {
   get(texKey, color1, scale = 1, flip = false) {
     const key = `${texKey}_${color1}_${scale}_${flip}`;
     if (this.cache[key]) return this.cache[key];
-
     let t = window.sprs ? window.sprs[texKey] : null;
     if (!t) return null;
-
     if (typeof t === 'string' || Array.isArray(t)) {
         const d = Array.isArray(t) ? t[0] : t;
         const len = d.length;
@@ -119,20 +115,17 @@ const SpriteCache = {
         else if (len === 576) { w = 24; h = 24; }
         else if (len === 64) { w = 8; h = 8; }
         else { const s = Math.sqrt(len); if (s % 1 === 0) { w = s; h = s; } else { w = 16; h = Math.floor(len / 16); } }
-        const pal = (typeof t === 'object' && !Array.isArray(t)) ? t.pal : null;
-        t = { w: w, h: h, d: d, pal: pal };
+        t = { w: w, h: h, d: d };
     }
-
     const cv = document.createElement('canvas');
     const tw = t.w || 8; const th = t.h || 8;
     cv.width = tw * scale; cv.height = th * scale;
     const cx = cv.getContext('2d');
     if (flip) { cx.translate(cv.width, 0); cx.scale(-1, 1); }
-
     for (let i = 0; i < t.d.length; i++) {
       const c = t.d[i]; if (c === '0') continue;
-      let fill = (c === '1' && color1) ? color1 : (t.pal ? t.pal[c] : universalPal[c]);
-      if (!fill) fill = universalPal[c] || '#fff';
+      let fill = (c === '1' && color1) ? color1 : universalPal[c];
+      if (!fill) fill = '#fff';
       cx.fillStyle = fill;
       cx.fillRect((i % tw) * scale, Math.floor(i / tw) * scale, scale, scale);
     }
@@ -151,7 +144,7 @@ const drawParticles = () => {
     let p = particleList[i]; p.x += p.vx; p.y += p.vy; p.life--;
     if(p.life <= 0) { particleList.splice(i, 1); continue; }
     ctx.fillStyle = p.color; ctx.globalAlpha = p.life / 30;
-    ctx.fillRect(p.x - activeApp.camX, p.y, 2, 2);
+    ctx.fillRect(p.x - (activeApp.camX || 0), p.y, 2, 2);
   }
   ctx.globalAlpha = 1;
 };
@@ -160,16 +153,71 @@ const screenShake = (t) => { screenShakeT = t; };
 const applyShake = () => { if(screenShakeT > 0) { ctx.save(); ctx.translate((Math.random()-0.5)*screenShakeT, (Math.random()-0.5)*screenShakeT); screenShakeT--; } };
 const resetShake = () => { if(screenShakeT >= 0) ctx.restore(); };
 
-const switchApp = (app) => { if(activeApp && activeApp.stop) activeApp.stop(); activeApp = app; activeApp.init(); };
+const switchApp = (app) => { 
+    if(!app) return;
+    if(activeApp && activeApp.stop) activeApp.stop(); 
+    activeApp = app; 
+    activeApp.init(); 
+};
 
 const loop = () => {
   keysDown = {}; for(let k in keys) { if(keys[k] && !lastKeys[k]) keysDown[k] = true; }
   lastKeys = {...keys};
+  pointer.clicked = false; // 1フレームのみ有効
   if(activeApp) { activeApp.update(); activeApp.draw(); }
   requestAnimationFrame(loop);
 };
 
-// システム初期化関数
+const Menu = {
+    cur: 0, tmr: 0,
+    apps: [],
+    init() {
+        this.apps = [
+            { name: '理不尽ブラザーズ', obj: Action },
+            { name: '無限無双', obj: Musou },
+            { name: 'テトリベーダー', obj: Tetri },
+            { name: 'ビートブラザーズ', obj: Rhythm },
+            { name: 'ロイヤルジョーカー', obj: Online },
+            { name: 'アビスジェネラル', obj: Abyss },
+            { name: '爆音スニーキング', obj: Noise },
+            { name: 'ピクセルビオトープ', obj: Biotope },
+            { name: 'カースドマナー', obj: Horror },
+            { name: 'ハッカーズ15', obj: PCApp },
+            { name: 'レトロスロット', obj: Slot },
+            { name: 'ガイド', obj: Guide },
+            { name: '王様の間', obj: KingApp }
+        ];
+        BGM.play('menu');
+        document.getElementById('gameboy').className = '';
+        canvas.width = 200; canvas.height = 300;
+    },
+    update() {
+        this.tmr++;
+        if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
+        if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
+        if (keysDown.a) { switchApp(this.apps[this.cur].obj); playSnd('jmp'); }
+    },
+    draw() {
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
+        ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('11in1 SYSTEM', 100, 40);
+        ctx.strokeStyle = '#0f0'; ctx.beginPath(); ctx.moveTo(20, 50); ctx.lineTo(180, 50); ctx.stroke();
+        
+        ctx.textAlign = 'left'; ctx.font = '12px monospace';
+        for(let i=0; i<this.apps.length; i++) {
+            let y = 80 + i * 16;
+            if (y < 60 || y > 280) continue;
+            if (i === this.cur) {
+                ctx.fillStyle = '#0f0'; ctx.fillRect(15, y-10, 170, 14);
+                ctx.fillStyle = '#000';
+            } else {
+                ctx.fillStyle = '#0f0';
+            }
+            ctx.fillText(this.apps[i].name, 25, y);
+        }
+    }
+};
+
 const initSystem = async () => {
   canvas = document.getElementById('gameCanvas'); ctx = canvas.getContext('2d');
   canvas.width = 200; canvas.height = 300;
@@ -180,13 +228,23 @@ const initSystem = async () => {
   };
   window.addEventListener('keydown', e => handleKey(e, true));
   window.addEventListener('keyup', e => handleKey(e, false));
-  
+
+  const getPos = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+  };
+  const down = (e) => { const p = getPos(e); pointer.x = p.x; pointer.y = p.y; pointer.down = true; pointer.clicked = true; if(!audioCtx) audioCtx = new AudioContext(); };
+  const move = (e) => { const p = getPos(e); pointer.x = p.x; pointer.y = p.y; };
+  const up = () => { pointer.down = false; };
+  canvas.addEventListener('mousedown', down); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  canvas.addEventListener('touchstart', e => { down(e); e.preventDefault(); }, {passive:false});
+  canvas.addEventListener('touchmove', e => { move(e); e.preventDefault(); }, {passive:false});
+  window.addEventListener('touchend', up);
+
   requestAnimationFrame(loop);
 };
 
-const AISys = {
-  chat: async (msg) => {
-    console.log("🤖 AI SYSTEM (Mock):", msg);
-    return "王は沈黙している...";
-  }
-};
+const AISys = { chat: async (msg) => { return "王は沈黙している..."; } };
+window.Menu = Menu; // グローバルに公開

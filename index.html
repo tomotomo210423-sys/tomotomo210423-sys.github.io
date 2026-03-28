@@ -297,9 +297,15 @@ window.onload = async () => {
         stat.textContent = 'SYSTEM READY!';
         setTimeout(() => { 
             document.getElementById('boot').classList.add('hidden'); 
-            if (typeof Menu !== 'undefined') {
+            // Menuが定義されているか確認し、定義されていなければ再定義を試みる
+            if (typeof Menu === 'undefined' && typeof window.Menu !== 'undefined') {
+                window.Menu.init();
+                activeApp = window.Menu;
+            } else if (typeof Menu !== 'undefined') {
+                Menu.init();
                 activeApp = Menu;
-                activeApp.init();
+            } else {
+                console.error("Menu is not defined!");
             }
         }, 300);
     }
