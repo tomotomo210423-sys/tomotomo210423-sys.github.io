@@ -242,8 +242,8 @@ const bgThemes = [
 const Menu = {
   cur: 0, 
   // ★ CURSED MANOR（ホラー）をメニューに完全に追加！
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定', '王様の間'], 
-  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888', '#fa0'],
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定'],
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888'],
   holdTimer: 0,
   
   init() { 
@@ -270,9 +270,8 @@ const Menu = {
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
             typeof Biotope !== 'undefined' ? Biotope : null, 
-            typeof Horror !== 'undefined' ? Horror : null, // ★ ホラーゲームを追加！
-            typeof Settings !== 'undefined' ? Settings : null, 
-            typeof KingRoom !== 'undefined' ? KingRoom : null
+            typeof Horror !== 'undefined' ? Horror : null,
+            typeof Settings !== 'undefined' ? Settings : null
         ]; 
         if (appObjs[this.cur]) { switchApp(appObjs[this.cur]); } else { playSnd('hit'); }
     }

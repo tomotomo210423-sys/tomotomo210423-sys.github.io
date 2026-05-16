@@ -482,7 +482,7 @@ const Musou = {
             s.laser.timer--;
             if (s.laser.timer <= 0) {
                 s.laser.timer = s.laser.cd;
-                let target = this.getRandomEnemy();
+                let target = this.getNearestEnemy();
                 if (target) {
                     let angle = Math.atan2(target.y - this.p.y, target.x - this.p.x);
                     this.addVFX('beam', this.p.x, this.p.y, '#f0f', { angle: angle, size: 400, life: 10 });
@@ -678,7 +678,6 @@ const Musou = {
             return;
         }
 
-        if (typeof applyShake !== 'undefined') applyShake();
         ctx.save();
         ctx.translate(-this.cam.x, -this.cam.y);
 
@@ -767,7 +766,6 @@ const Musou = {
         ctx.globalAlpha = 1;
 
         ctx.restore();
-        if (typeof resetShake !== 'undefined') resetShake();
 
         // プレイ中UI
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, 200, 25);

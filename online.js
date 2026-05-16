@@ -447,8 +447,8 @@ const Online = {
 
       let mySkills = this.state.skills[this.role];
       ctx.fillStyle = '#0ff'; ctx.font = '10px monospace';
-      if (mySkills.length > 0) ctx.fillText(`[B] SKILLS: ${mySkills.length}`, 10, 280);
-      else ctx.fillStyle = '#555'; ctx.fillText('NO SKILLS', 10, 280);
+      if (mySkills.length > 0) { ctx.fillText(`[B] SKILLS: ${mySkills.length}`, 10, 280); }
+      else { ctx.fillStyle = '#555'; ctx.fillText('NO SKILLS', 10, 280); }
 
       if (this.isSkillMenu) {
         ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(15, 160, 170, 60); ctx.strokeStyle = '#0ff'; ctx.strokeRect(15, 160, 170, 60);

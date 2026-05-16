@@ -409,8 +409,6 @@ const Action = {
   },
 
   draw() {
-    applyShake();
-    
     if (this.st === 'title' || this.st === 'confirmDelete') {
       const gradient = ctx.createLinearGradient(0, 0, 0, 300); gradient.addColorStop(0, '#f40'); gradient.addColorStop(1, '#820'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 200, 300);
       ctx.shadowBlur = 20; ctx.shadowColor = '#f00'; ctx.fillStyle = '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText('UNREASONABLE', 30, 80); ctx.fillText('BROTHERS', 45, 105); ctx.shadowBlur = 0;
@@ -435,7 +433,7 @@ const Action = {
         ctx.fillStyle = this.mIdx === 0 ? '#f00' : '#aaa'; ctx.fillText((this.mIdx === 0 ? "> " : "  ") + "はい", 60, 165);
         ctx.fillStyle = this.mIdx === 1 ? '#0f0' : '#aaa'; ctx.fillText((this.mIdx === 1 ? "> " : "  ") + "いいえ", 60, 185);
       }
-      resetShake(); return;
+      return;
     }
     
     const grad = ctx.createLinearGradient(0, 0, 0, 300);
@@ -571,6 +569,5 @@ const Action = {
       ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText(`残機: ${SaveSys.data.actLives}`, 70, 140);
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(SaveSys.data.actStage === 1 && this.st === 'clear' ? '(A) Title' : '(A) Next Stage', 60, 165); 
     }
-    resetShake();
   }
 };

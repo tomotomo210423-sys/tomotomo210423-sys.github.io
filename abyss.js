@@ -561,8 +561,6 @@ const Abyss = {
     },
     
     draw() {
-        if (typeof applyShake !== 'undefined') applyShake();
-
         const bgGrad = ctx.createLinearGradient(0, 0, 400, 0);
         bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
@@ -774,6 +772,5 @@ const Abyss = {
             }
         }
 
-        if (typeof resetShake !== 'undefined') resetShake();
     }
 };
