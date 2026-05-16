@@ -50,7 +50,10 @@ const SaveSys = {
         rhythm: d.rhythm||{easy:0,normal:0,hard:0,nightmare:0}, 
         logs: d.logs||[],
         osFiles: d.osFiles||null,
-        trashFiles: d.trashFiles||{}
+        trashFiles: d.trashFiles||{},
+        tetriHi: d.tetriHi||0,
+        chainBest: d.chainBest||0,
+        dashBest: d.dashBest||0
     }; 
   })(),
   
@@ -242,8 +245,8 @@ const bgThemes = [
 const Menu = {
   cur: 0, 
   // ★ CURSED MANOR（ホラー）をメニューに完全に追加！
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'システム設定'],
-  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#888'],
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'ONLINE対戦', 'BEAT BROS', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'PIXEL BIOTOPE', 'CURSED MANOR', 'CHAIN BLAST', 'TURBO DASH', 'システム設定'],
+  appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#f44', '#ff4', '#888'],
   holdTimer: 0,
   
   init() { 
@@ -269,8 +272,10 @@ const Menu = {
             typeof Abyss !== 'undefined' ? Abyss : null, 
             typeof Noise !== 'undefined' ? Noise : null, 
             typeof PCApp !== 'undefined' ? PCApp : null, 
-            typeof Biotope !== 'undefined' ? Biotope : null, 
+            typeof Biotope !== 'undefined' ? Biotope : null,
             typeof Horror !== 'undefined' ? Horror : null,
+            typeof ChainBlast !== 'undefined' ? ChainBlast : null,
+            typeof TurboDash !== 'undefined' ? TurboDash : null,
             typeof Settings !== 'undefined' ? Settings : null
         ]; 
         if (appObjs[this.cur]) { switchApp(appObjs[this.cur]); } else { playSnd('hit'); }

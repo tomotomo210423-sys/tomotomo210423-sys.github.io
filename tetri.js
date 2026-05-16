@@ -79,6 +79,7 @@ const Tetri = {
         document.getElementById('gameboy').classList.remove('mode-abyss');
         canvas.width = 200; canvas.height = 300;
         this.st = 'title'; this.tmr = 0; this.shipIdx = 0; this.diff = 0;
+        this.hiScore = SaveSys.data.tetriHi || 0;
         this.stars = [];
         for(let i=0; i<50; i++) { this.stars.push({x: Math.random()*200, y: Math.random()*300, s: Math.random()*2+1}); }
         if(typeof BGM !== 'undefined') BGM.play('menu');
@@ -162,8 +163,15 @@ const Tetri = {
         }
 
         if (this.st === 'gameover') {
+            if (this.tmr === 1) {
+                if (this.score > this.hiScore) {
+                    this.hiScore = this.score;
+                    SaveSys.data.tetriHi = this.hiScore;
+                    SaveSys.save();
+                }
+                SaveSys.addLog('テトリベーダー', `スコア: ${this.score}`);
+            }
             if (this.tmr > 60 && (keysDown.a || keysDown.b)) {
-                if (this.score > this.hiScore) this.hiScore = this.score;
                 this.st = 'title';
             }
             return;
@@ -572,7 +580,10 @@ const Tetri = {
             ctx.fillText('GAME OVER', 100, 120);
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff'; ctx.font = 'bold 13px monospace';
-            ctx.fillText(`FINAL SCORE: ${this.score}`, 100, 165);
+            ctx.fillText(`SCORE: ${this.score}`, 100, 160);
+            ctx.fillStyle = this.score >= this.hiScore ? '#ff0' : '#888';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`HI: ${this.hiScore}`, 100, 180);
             if (this.tmr > 60) {
                 ctx.fillStyle = '#ff0'; ctx.font = 'bold 11px monospace';
                 ctx.fillText('PRESS [A] TO RETURN', 100, 230);

@@ -1,44 +1,6 @@
 // === CURSED MANOR V9 (Full Reset Bug Fix Edition) ===
 // ゲームオーバー時にマップや謎解きの状態が完全にリセットされるように修正！
 
-// ★ 専用の不気味な重低音ドローンBGMジェネレーター
-let horrorBgmOsc = null, horrorBgmGain = null, horrorLfo = null;
-function startHorrorBGM() {
-    if (!audioCtx || SaveSys.data.bgmVol <= 0) return;
-    
-    if(typeof BGM !== 'undefined') BGM.stop(); 
-    stopHorrorBGM();
-    
-    let n = audioCtx.currentTime;
-    
-    horrorBgmOsc = audioCtx.createOscillator();
-    horrorBgmOsc.type = 'sine';
-    horrorBgmOsc.frequency.setValueAtTime(45, n); 
-    
-    horrorBgmGain = audioCtx.createGain();
-    horrorBgmGain.gain.setValueAtTime(0.4 * SaveSys.data.bgmVol, n);
-    
-    horrorLfo = audioCtx.createOscillator();
-    horrorLfo.type = 'sine';
-    horrorLfo.frequency.setValueAtTime(0.15, n); 
-    let lfoGain = audioCtx.createGain();
-    lfoGain.gain.setValueAtTime(0.2 * SaveSys.data.bgmVol, n);
-    horrorLfo.connect(lfoGain);
-    lfoGain.connect(horrorBgmGain.gain);
-    
-    horrorBgmOsc.connect(horrorBgmGain);
-    horrorBgmGain.connect(audioCtx.destination);
-    
-    horrorBgmOsc.start(n);
-    horrorLfo.start(n);
-}
-
-function stopHorrorBGM() {
-    if(horrorBgmOsc) { try{horrorBgmOsc.stop();}catch(e){} horrorBgmOsc.disconnect(); horrorBgmOsc = null; }
-    if(horrorLfo) { try{horrorLfo.stop();}catch(e){} horrorLfo.disconnect(); horrorLfo = null; }
-    if(horrorBgmGain) { horrorBgmGain.disconnect(); horrorBgmGain = null; }
-}
-
 function playHSnd(t, param) {
     if (!audioCtx || SaveSys.data.seVol <= 0) return;
     let n = audioCtx.currentTime;
@@ -111,6 +73,37 @@ const Horror = {
     e: { x: 350, y: 350, r: 8, spd: 1.0, state: 'patrol', alert: 0, path: [] },
     keys: 0, maxKeys: 3, diaries: 0,
     msg: '', msgTimer: 0,
+
+    bgmOsc: null, bgmGain: null, bgmLfo: null,
+
+    startBGM() {
+        if (!audioCtx || SaveSys.data.bgmVol <= 0) return;
+        if(typeof BGM !== 'undefined') BGM.stop();
+        this.stopBGM();
+        let n = audioCtx.currentTime;
+        this.bgmOsc = audioCtx.createOscillator();
+        this.bgmOsc.type = 'sine';
+        this.bgmOsc.frequency.setValueAtTime(45, n);
+        this.bgmGain = audioCtx.createGain();
+        this.bgmGain.gain.setValueAtTime(0.4 * SaveSys.data.bgmVol, n);
+        this.bgmLfo = audioCtx.createOscillator();
+        this.bgmLfo.type = 'sine';
+        this.bgmLfo.frequency.setValueAtTime(0.15, n);
+        let lfoGain = audioCtx.createGain();
+        lfoGain.gain.setValueAtTime(0.2 * SaveSys.data.bgmVol, n);
+        this.bgmLfo.connect(lfoGain);
+        lfoGain.connect(this.bgmGain.gain);
+        this.bgmOsc.connect(this.bgmGain);
+        this.bgmGain.connect(audioCtx.destination);
+        this.bgmOsc.start(n);
+        this.bgmLfo.start(n);
+    },
+
+    stopBGM() {
+        if(this.bgmOsc) { try{this.bgmOsc.stop();}catch(e){} this.bgmOsc.disconnect(); this.bgmOsc = null; }
+        if(this.bgmLfo) { try{this.bgmLfo.stop();}catch(e){} this.bgmLfo.disconnect(); this.bgmLfo = null; }
+        if(this.bgmGain) { this.bgmGain.disconnect(); this.bgmGain = null; }
+    },
     
     pzSafe: [0, 0, 0], pzSafeCur: 0,
     pzPiano: [], pzPianoAns: [0, 2, 3, 4],
@@ -162,7 +155,7 @@ const Horror = {
         this.map = [...this.baseMap];
         
         if(typeof BGM !== 'undefined') BGM.stop();
-        startHorrorBGM(); 
+        this.startBGM(); 
     },
 
     setMsg(text) { this.msg = text; this.msgTimer = 150; },
@@ -234,7 +227,7 @@ const Horror = {
         let k = typeof keys !== 'undefined' ? keys : {};
 
         if (this.st === 'menu') {
-            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; }
+            if (kD.select) { this.stopBGM(); switchApp(Menu); return; }
             if (kD.a) { 
                 this.st = 'play'; playSnd('jmp'); 
                 this.setMsg('3つの謎を解き、鍵を探せ...'); 
@@ -320,7 +313,7 @@ const Horror = {
             this.updateEnemyInPuzzle(); 
         }
         else if (this.st === 'play') {
-            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; } 
+            if (kD.select) { this.stopBGM(); switchApp(Menu); return; } 
 
             if (!this.p.isHide) {
                 let dx = 0, dy = 0;
@@ -365,7 +358,7 @@ const Horror = {
                     playSnd('sel');
                 } else if (ty <= 1 && tile === 0 && this.p.y < 30) {
                     if (this.keys >= this.maxKeys) {
-                        this.st = 'clear'; playHSnd('open'); stopHorrorBGM();
+                        this.st = 'clear'; playHSnd('open'); this.stopBGM();
                     } else {
                         this.setMsg('鍵がかかっている...あと' + (this.maxKeys - this.keys) + '個必要だ。'); playHSnd('error');
                     }
@@ -382,11 +375,11 @@ const Horror = {
             if(this.camY > this.mapH*this.ts - 300) this.camY = this.mapH*this.ts - 300;
         }
         else if (this.st === 'jumpscare') {
-            if (this.timer === 1) { stopHorrorBGM(); playHSnd('roar'); }
+            if (this.timer === 1) { this.stopBGM(); playHSnd('roar'); }
             if (this.timer > 80) { this.init(); } 
         }
         else if (this.st === 'clear') {
-            if (kD.select) { stopHorrorBGM(); switchApp(Menu); return; } 
+            if (kD.select) { this.stopBGM(); switchApp(Menu); return; } 
             if (kD.a || kD.start) this.init();
         }
     },
