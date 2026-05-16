@@ -27,7 +27,7 @@ const TurboDash = {
         this.p = { x: 40, y: this.FLOOR_Y, vy: 0, onGround: true, jumps: 0, duck: false, dead: false, col: '#0ff' };
         this.obstacles = [];
         this.coins = [];
-        if (typeof BGM !== 'undefined') BGM.play('action');
+        if (typeof BGM !== 'undefined') BGM.play('dash');
     },
 
     spawnObstacle() {
@@ -49,8 +49,9 @@ const TurboDash = {
     },
 
     spawnCoin() {
-        let fy = this.FLOOR_Y - 10 - Math.floor(Math.random() * 3) * 25;
-        this.coins.push({ x: 210, y: fy, r: 6, collected: false });
+        // 地面スレスレ or 低ジャンプで取れる高さのみ
+        let fy = this.FLOOR_Y - 8 - Math.floor(Math.random() * 2) * 18;
+        this.coins.push({ x: 210, y: fy, r: 8, collected: false });
     },
 
     collides(p, obs) {
@@ -140,7 +141,7 @@ const TurboDash = {
         for (let i = this.coins.length - 1; i >= 0; i--) {
             let coin = this.coins[i];
             coin.x -= this.speed;
-            if (!coin.collected && Math.abs(p.x - coin.x) < 10 && Math.abs(p.y - coin.y) < 10) {
+            if (!coin.collected && Math.abs(p.x - coin.x) < 16 && Math.abs(p.y - coin.y) < 16) {
                 coin.collected = true;
                 this.score += 10;
                 playSnd('sel');

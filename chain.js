@@ -26,7 +26,7 @@ const ChainBlast = {
         this.cx = 3; this.cy = 3;
         this.animFrames = [];
         this.fillGrid();
-        if (typeof BGM !== 'undefined') BGM.play('spell');
+        if (typeof BGM !== 'undefined') BGM.play('puzzle');
     },
 
     fillGrid() {
@@ -87,6 +87,26 @@ const ChainBlast = {
         return this.grid.every(v => v < 0);
     },
 
+    hasValidMoves() {
+        for (let r = 0; r < this.ROWS; r++)
+            for (let c = 0; c < this.COLS; c++)
+                if (this.getCell(r, c) >= 0 && this.findGroup(r, c).length >= 2) return true;
+        return false;
+    },
+
+    reshuffleBoard() {
+        let cells = this.grid.filter(v => v >= 0);
+        cells.sort(() => Math.random() - 0.5);
+        let idx = 0;
+        for (let i = 0; i < this.grid.length; i++)
+            if (this.grid[i] >= 0) this.grid[i] = cells[idx++];
+        this.moves += 3;
+        this.shuffleMsg = 90;
+        playSnd('combo');
+    },
+
+    shuffleMsg: 0,
+
     endGame() {
         this.st = 'result'; this.tmr = 0;
         if (this.score > this.hiScore) {
@@ -144,6 +164,8 @@ const ChainBlast = {
                     playSnd('hit');
                     screenShake(4);
                     this.applyGravity();
+
+                    if (!this.isEmpty() && !this.hasValidMoves()) this.reshuffleBoard();
 
                     if (this.isEmpty()) {
                         this.score += 500;
@@ -289,5 +311,16 @@ const ChainBlast = {
         ctx.textAlign = 'right';
         ctx.fillText('SELECT:MENU', 195, 286);
         ctx.textAlign = 'left';
+
+        // シャッフルメッセージ
+        if (this.shuffleMsg > 0) {
+            this.shuffleMsg--;
+            let alpha = Math.min(1, this.shuffleMsg / 20);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#ff4'; ctx.font = 'bold 18px "Arial Black", sans-serif';
+            ctx.textAlign = 'center'; ctx.shadowBlur = 10; ctx.shadowColor = '#ff4';
+            ctx.fillText('SHUFFLE! +3手', 100, 155);
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.textAlign = 'left';
+        }
     }
 };

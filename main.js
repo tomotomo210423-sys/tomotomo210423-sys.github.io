@@ -1,4 +1,4 @@
-// === CORE SYSTEM (11in1 Local Save & SpriteCache Fix Edition) ===
+// === CORE SYSTEM (13in1 RETRO SYSTEM - v17.0) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -79,7 +79,11 @@ const BGM = {
       menu:   { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
       tetri:  { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
       action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
-      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
+      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 },
+      musou:  { t1:[392,466,523,466,392,349,392,523], t2:[196,233,262,233,196,174,196,262], t3:[98,98,0,131,98,0,131,98], n:[1,0,1,1,0,1,1,0], spd: 155 },
+      puzzle: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,0,131,0,0,98,0], n:[0,0,0,0,0,0,0,0], spd: 420 },
+      dash:   { t1:[440,494,554,659,554,494,523,440], t2:[220,247,277,330,277,247,262,220], t3:[110,0,138,0,110,0,138,0], n:[1,0,0,1,1,0,0,1], spd: 175 },
+      boss:   { t1:[294,311,294,262,294,349,311,294], t2:[147,155,147,131,147,174,155,147], t3:[73,0,87,73,0,87,73,0], n:[1,1,0,1,1,0,1,0], spd: 250 }
     };
     const tr = mels[type] || mels.menu; let i = 0;
     bgmInterval = setInterval(() => {
@@ -285,10 +289,9 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx); 
     
-    // ★ 11in1 に変更！
-    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.3', 45, 40); 
+    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
+    ctx.fillText('13in1 RETRO', 50, 25); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v17.0', 45, 40);
     
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);

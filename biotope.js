@@ -40,7 +40,7 @@ const Biotope = {
         
         this.addLog("WORLD GENERATED.");
         this.addLog("SELECTボタンでメニューに戻れます。");
-        BGM.play('menu');
+        BGM.play('puzzle');
     },
 
     injectInstincts() {

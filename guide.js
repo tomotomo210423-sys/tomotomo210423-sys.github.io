@@ -1,4 +1,4 @@
-// === GUIDE APP (Remake: Cyber Archive Edition - 11in1) ===
+// === GUIDE APP (Remake: Cyber Archive Edition - 13in1) ===
 
 const Guide = {
     st: 'list', // 'list', 'detail'

@@ -133,7 +133,7 @@ const PCApp = {
         
         this.st = 'play'; this.hp = 100; this.timer = 0; this.scanTimer = 0;
         this.cursor = 0; this.swap1 = -1;
-        BGM.play('action'); 
+        BGM.play('puzzle');
     },
 
     checkClear() {
