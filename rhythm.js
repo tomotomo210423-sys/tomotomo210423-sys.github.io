@@ -5,9 +5,10 @@ const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
   audioBuffer: null, source: null, analyser: null, dataArray: null,
   startTime: 0, notes: [],
-  score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0, 
-  pendingFile: null, playlist: [], trackIndex: 0, 
+  score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0,
+  pendingFile: null, playlist: [], trackIndex: 0,
   isEndless: false, endlessBpm: 120, endlessBeat: 0, logicalBeatTime: 0, life: 5, finalTime: 0,
+  rollingMax: 0, rollingWindow: [],
   touchBound: false, laneTouch: [false,false,false,false], laneGlow: [0,0,0,0], 
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340, 
   video: null, isVideo: false, bgTimer: 0,
@@ -165,9 +166,23 @@ const Rhythm = {
     const raw = buffer.getChannelData(0); this.notes = [];
     let sum = 0, count = 0; for(let i=0; i<raw.length; i+=1000){ sum+=Math.abs(raw[i]); count++; }
     let avgVol = sum / count;
-    
-    let threshold = avgVol * (this.mode === 'nightmare' ? 0.15 : this.mode === 'hard' ? 0.75 : this.mode === 'normal' ? 1.2 : 1.6);
-    if(threshold < 0.01) threshold = 0.01;
+
+    // Compute rolling maximum over 60-frame windows for adaptive normalization
+    const frameSize = Math.floor(buffer.sampleRate / 60);
+    let rollingMaxArr = [];
+    for(let i=0; i<raw.length; i+=frameSize) {
+      let mx = 0;
+      for(let j=i; j<Math.min(i+frameSize, raw.length); j++) { let v=Math.abs(raw[j]); if(v>mx) mx=v; }
+      rollingMaxArr.push(mx);
+    }
+    // Use 60-frame rolling max smoothed as normalization reference
+    this.rollingWindow = rollingMaxArr;
+    let rollingMed = rollingMaxArr.slice().sort((a,b)=>a-b)[Math.floor(rollingMaxArr.length/2)] || avgVol;
+    let adaptiveAvg = (avgVol + rollingMed) / 2;
+    if(adaptiveAvg < 0.005) adaptiveAvg = avgVol; // quiet song fallback
+
+    let threshold = adaptiveAvg * (this.mode === 'nightmare' ? 0.15 : this.mode === 'hard' ? 0.75 : this.mode === 'normal' ? 1.2 : 1.6);
+    if(threshold < 0.005) threshold = 0.005;
     
     let minGap = this.mode === 'nightmare' ? 0.02 : this.mode === 'hard' ? 0.15 : this.mode === 'normal' ? 0.25 : 0.35;
     

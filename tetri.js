@@ -10,9 +10,15 @@ const Tetri = {
     // 弾幕モード用変数
     starFall: false, starX: 0, starY: 0,
     danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0,
-    
+
     // ★ EXPERT限定シールド
-    shields: 0,
+    shields: 0, shieldUses: 0,
+
+    // ★ NEW RECORD表示
+    newRecord: false, newRecordTmr: 0,
+
+    // ★ タイトルブロックアニメ
+    titleBlocks: [],
 
     playSE(id) { if(typeof playSnd === 'function') playSnd(id); },
     shakeCam(val) { if(typeof screenShake === 'function') screenShake(val); },
@@ -82,6 +88,19 @@ const Tetri = {
         this.hiScore = SaveSys.data.tetriHi || 0;
         this.stars = [];
         for(let i=0; i<50; i++) { this.stars.push({x: Math.random()*200, y: Math.random()*300, s: Math.random()*2+1}); }
+        // ★ タイトル用テトリミノ背景ブロック初期化
+        this.titleBlocks = [];
+        const TB_MINOS = [
+            {s:[[1,1,1,1]],c:'rgba(0,255,255,0.18)'},
+            {s:[[1,1],[1,1]],c:'rgba(255,255,0,0.18)'},
+            {s:[[0,1,0],[1,1,1]],c:'rgba(160,0,255,0.18)'},
+            {s:[[1,0,0],[1,1,1]],c:'rgba(255,128,0,0.18)'},
+            {s:[[0,1,1],[1,1,0]],c:'rgba(0,255,0,0.18)'}
+        ];
+        for(let i=0;i<4;i++){
+            let mino = TB_MINOS[Math.floor(Math.random()*TB_MINOS.length)];
+            this.titleBlocks.push({shape:mino.s, c:mino.c, x:Math.random()*160+20, y:-60+Math.random()*100, spd:0.3+Math.random()*0.4});
+        }
         if(typeof BGM !== 'undefined') BGM.play('menu');
     },
 
@@ -89,9 +108,11 @@ const Tetri = {
         this.st = 'play'; this.tmr = 0; this.score = 0;
         this.px = 100; this.bullets = []; this.blocks = []; this.parts = [];
         this.danmakuMode = false; this.starFall = false;
-        
-        // ★ EXPERT限定：初期シールド付与
+        this.newRecord = false; this.newRecordTmr = 0;
+
+        // ★ EXPERT限定：初期シールド付与 (最大5回使用)
         this.shields = (this.diff === 2) ? 1 : 0;
+        this.shieldUses = (this.diff === 2) ? 5 : 0;
         
         if(typeof BGM !== 'undefined') BGM.play('action');
     },
@@ -168,9 +189,11 @@ const Tetri = {
                     this.hiScore = this.score;
                     SaveSys.data.tetriHi = this.hiScore;
                     SaveSys.save();
+                    this.newRecord = true; this.newRecordTmr = 0;
                 }
                 SaveSys.addLog('テトリベーダー', `スコア: ${this.score}`);
             }
+            if (this.newRecord) this.newRecordTmr++;
             if (this.tmr > 60 && (keysDown.a || keysDown.b)) {
                 this.st = 'title';
             }
@@ -287,7 +310,7 @@ const Tetri = {
                 this.starFall = false;
                 this.scoreBeforeDanmaku = this.score;
                 this.danmakuMode = true;
-                this.danmakuTimer = 600; 
+                this.danmakuTimer = [600, 480, 360][this.diff];
                 this.danmakuBullets = [];
                 this.playerHit = false;
                 this.playSE('combo');
@@ -343,9 +366,10 @@ const Tetri = {
 
             // ★ 防衛ライン越え判定（シールド処理を追加）
             if (blk.y + blk.h > 280) {
-                if (this.shields > 0) {
+                if (this.shields > 0 && this.shieldUses > 0) {
                     // シールド発動！(ボム効果)
                     this.shields--;
+                    this.shieldUses--;
                     this.playSE('combo');
                     this.shakeCam(20);
                     

@@ -1,25 +1,27 @@
-// === ABYSS GENERAL (Phase 10: Despair Rush & Holy Seals) ===
+// === ABYSS GENERAL v2 — DEEP ABYSS EVOLUTION ===
 const Abyss = {
     st: 'title',
     tmr: 0,
     core: { x: 40, y: 120 },
     target: { x: 150, y: 120 },
-    tentacles: [], 
-    
+    tentacles: [],
+
     prevPointerActive: false,
-    winding: false, 
-    musicBox: 100,  
-    
-    vfx: [], shieldTmr: 0, swarms: [], eyes: [], 
-    projectiles: [], // 邪眼の弾
-    enemies: [], 
-    enemyProjectiles: [], // 遠距離兵の矢
-    holySeals: [], // 聖なる封印（タップ破壊タスク）
-    
+    winding: false,
+    musicBox: 100,
+
+    vfx: [], shieldTmr: 0, swarms: [], eyes: [],
+    projectiles: [],
+    enemies: [],
+    enemyProjectiles: [],
+    holySeals: [],
+    bubbles: [], // deep-sea bubble particles
+    wave: 0,
+
     coreHp: 100, coreMaxHp: 100, score: 0, soul: 0,
     lv: { tentacle: 1, meteor: 1, swarm: 1 },
-    
-    bgmInt: null, // 絶望BGM用
+
+    bgmInt: null,
 
     init() {
         document.getElementById('gameboy').classList.add('mode-abyss');
@@ -71,13 +73,17 @@ const Abyss = {
 
     startGame() {
         this.st = 'play';
-        this.tmr = 0; 
+        this.tmr = 0;
         this.vfx = []; this.shieldTmr = 0; this.swarms = [];
-        this.eyes = []; this.projectiles = []; this.enemies = []; 
+        this.eyes = []; this.projectiles = []; this.enemies = [];
         this.enemyProjectiles = []; this.holySeals = [];
         this.coreHp = 100; this.coreMaxHp = 100; this.score = 0; this.soul = 0;
         this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
-        this.musicBox = 100; this.winding = false;
+        this.musicBox = 100; this.winding = false; this.wave = 0;
+        this.bubbles = [];
+        for (let i = 0; i < 20; i++) {
+            this.bubbles.push({ x: Math.random()*400, y: Math.random()*240+240, r: 1+Math.random()*3, spd: 0.3+Math.random()*0.5 });
+        }
         
         this.tentacles = [];
         this.addTentacle();
@@ -345,7 +351,15 @@ const Abyss = {
             let eType = 'normal';
             let eHp = 15, eAtk = 2, eSpeed = 0.5 + Math.random();
             
-            if (r < 0.1) { eType = 'boss'; eHp = 200; eAtk = 15; eSpeed = 0.3; this.vfx.push({ type: 'text', text: 'BOSS WARNING!', x: 250, y: 120, life: 90, color: '#f00' }); }
+            if (r < 0.1) {
+                eType = 'boss'; eHp = 1000; eAtk = 15; eSpeed = 0.3;
+                this.vfx.push({ type: 'text', text: '!! BOSS INCOMING !!', x: 160, y: 100, life: 120, color: '#f00' });
+                // 8-direction bullet burst on spawn
+                for (let d = 0; d < 8; d++) {
+                    let ang = d * Math.PI / 4;
+                    this.enemyProjectiles.push({ x: 400, y: 120, vx: Math.cos(ang)*3.5, vy: Math.sin(ang)*3.5, life: 100 });
+                }
+            }
             else if (r < 0.25) { eType = 'archer'; eHp = 10; eSpeed = 0.6; }
             else if (r < 0.35) { eType = 'jammer'; eHp = 20; eSpeed = 0.8; }
 
@@ -528,6 +542,15 @@ const Abyss = {
         }
 
         this.updateVFX(ts);
+
+        // Wave counter
+        if (this.tmr % 600 === 0 && this.st === 'play') this.wave++;
+
+        // Bubble animation
+        for (let b of this.bubbles) {
+            b.y -= b.spd * ts; b.x += Math.sin(b.y * 0.05) * 0.4;
+            if (b.y < -10) { b.y = 250; b.x = Math.random() * 400; }
+        }
     },
     
     updateVFX(ts) {
@@ -561,9 +584,15 @@ const Abyss = {
     },
     
     draw() {
-        const bgGrad = ctx.createLinearGradient(0, 0, 400, 0);
-        bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
+        // Deep abyss background
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, 240);
+        bgGrad.addColorStop(0, '#0a0015'); bgGrad.addColorStop(0.5, '#100020'); bgGrad.addColorStop(1, '#050008');
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
+
+        // Bubble particles
+        ctx.strokeStyle = 'rgba(100,80,180,0.35)'; ctx.lineWidth = 0.8;
+        for (let b of this.bubbles) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.stroke(); }
+        ctx.lineWidth = 1;
 
         // 聖なる封印（魔法陣）
         for (let s of this.holySeals) {
@@ -651,9 +680,19 @@ const Abyss = {
         }
 
         if (this.coreHp > 0) {
-            ctx.fillStyle = '#f00'; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
-            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 30 + Math.sin(this.tmr * 0.1) * 3, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 10, 0, Math.PI * 2); ctx.fill();
+            let cr = 30 + Math.sin(this.tmr * 0.1) * 4;
+            let pulse = (Math.sin(this.tmr * 0.08) + 1) / 2;
+            ctx.shadowBlur = 20 + pulse * 15; ctx.shadowColor = '#f00';
+            let cg = ctx.createRadialGradient(this.core.x, this.core.y, 4, this.core.x, this.core.y, cr);
+            cg.addColorStop(0, '#ff8'); cg.addColorStop(0.3, '#f44'); cg.addColorStop(1, '#800');
+            ctx.fillStyle = cg;
+            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, cr, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 10, 0, Math.PI*2); ctx.fill();
+            // Inner glow ring
+            ctx.strokeStyle = `rgba(255,100,0,${0.4+pulse*0.4})`; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, cr*0.6, 0, Math.PI*2); ctx.stroke();
+            ctx.lineWidth = 1;
         }
 
         ctx.globalCompositeOperation = 'lighter';
@@ -678,7 +717,9 @@ const Abyss = {
         }
 
         if (!this.winding && this.st === 'play' && typeof pointer !== 'undefined' && pointer.active && pointer.path.length > 0) {
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+            // Orange semi-transparent gesture trail
+            ctx.strokeStyle = 'rgba(255,140,20,0.75)'; ctx.lineWidth = 3.5;
+            ctx.shadowBlur = 12; ctx.shadowColor = '#fa6';
             ctx.lineJoin = 'round'; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(pointer.path[0].x, pointer.path[0].y);
             for (let i = 1; i < pointer.path.length; i++) ctx.lineTo(pointer.path[i].x, pointer.path[i].y);
@@ -686,18 +727,23 @@ const Abyss = {
         }
 
         if (this.st === 'title') {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, 400, 240);
-            ctx.fillStyle = '#f00'; ctx.font = 'bold 30px monospace';
-            ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
-            ctx.fillText('ABYSS GENERAL', 80, 100);
+            // Semi-transparent overlay (tentacles visible behind)
+            ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0,0,400,240);
+            ctx.shadowBlur = 28; ctx.shadowColor = '#f00';
+            ctx.fillStyle = '#f44'; ctx.font = 'bold 30px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('ABYSS GENERAL', 200, 95);
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace';
-            ctx.fillText('- 深 淵 の 魔 将 -', 135, 130);
-            
+            ctx.fillStyle = '#c8a'; ctx.font = 'bold 13px monospace';
+            ctx.fillText('- 深 淵 の 魔 将 v2 -', 200, 118);
+            ctx.fillStyle = '#555'; ctx.font = '10px monospace';
+            ctx.fillText('DRAW GESTURES TO COMMAND', 200, 150);
             if (this.tmr % 60 < 30) {
-                ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-                ctx.fillText('TAP TO START', 140, 200);
+                ctx.shadowBlur = 10; ctx.shadowColor = '#0f0';
+                ctx.fillStyle = '#0f0'; ctx.font = 'bold 15px monospace';
+                ctx.fillText('TAP TO START', 200, 200);
+                ctx.shadowBlur = 0;
             }
+            ctx.textAlign = 'left';
         } 
         else if (this.st === 'gameover') {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; ctx.fillRect(0, 0, 400, 240);
@@ -711,10 +757,11 @@ const Abyss = {
             }
         }
         else {
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
-            ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 70, 20);
-            ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
-            ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace';
+            ctx.fillText('HP:'+Math.floor(this.coreHp)+'/'+this.coreMaxHp, 70, 20);
+            ctx.fillStyle = '#ff0'; ctx.fillText('SOUL:'+this.soul, 170, 20);
+            ctx.fillStyle = '#fff'; ctx.fillText('SCORE:'+this.score, 250, 20);
+            ctx.fillStyle = '#f8a'; ctx.fillText('W'+this.wave, 360, 20);
 
             // ジャマー影響時はオルゴールUIを紫に点滅
             let hasJammer = this.enemies.some(e => e.type === 'jammer');

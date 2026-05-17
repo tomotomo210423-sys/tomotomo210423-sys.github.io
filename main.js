@@ -53,8 +53,9 @@ const SaveSys = {
         trashFiles: d.trashFiles||{},
         tetriHi: d.tetriHi||0,
         chainBest: d.chainBest||0,
-        dashBest: d.dashBest||0
-    }; 
+        dashBest: d.dashBest||0,
+        pcBest: d.pcBest||{easy:0,normal:0,hard:0}
+    };
   })(),
   
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },

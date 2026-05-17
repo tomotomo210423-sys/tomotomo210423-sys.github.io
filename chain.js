@@ -1,4 +1,4 @@
-// === CHAIN BLAST ===
+// === CHAIN BLAST v2 ===
 
 const ChainBlast = {
     st: 'title', tmr: 0, score: 0, hiScore: 0,
@@ -7,6 +7,8 @@ const ChainBlast = {
     moves: 25,
     level: 1,
     animFrames: [],
+    texts: [], // score popups
+    titleBlocks: [], // title screen floating blocks
 
     COLS: 8, ROWS: 8, CELL: 20,
     OX: 20, OY: 50,
@@ -17,6 +19,15 @@ const ChainBlast = {
         canvas.width = 200; canvas.height = 300;
         this.st = 'title'; this.tmr = 0;
         this.hiScore = SaveSys.data.chainBest || 0;
+        this.texts = []; this.titleBlocks = [];
+        for (let i = 0; i < 12; i++) {
+            this.titleBlocks.push({
+                x: Math.random()*200, y: Math.random()*300,
+                col: Math.floor(Math.random()*5),
+                spd: 0.2+Math.random()*0.5,
+                sz: 8+Math.floor(Math.random()*3)*4
+            });
+        }
         if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
@@ -102,6 +113,15 @@ const ChainBlast = {
         if (keysDown.select) { switchApp(Menu); return; }
         this.tmr++;
 
+        // Update popups
+        this.texts = this.texts.filter(t => t.life-- > 0);
+        for (let t of this.texts) t.y -= 0.5;
+
+        // Title block animation
+        if (this.st === 'title') {
+            for (let b of this.titleBlocks) { b.y -= b.spd; if (b.y < -20) b.y = 310; }
+        }
+
         if (this.animFrames.length > 0) {
             this.animFrames = this.animFrames.filter(f => f.life-- > 0);
             return;
@@ -142,7 +162,12 @@ const ChainBlast = {
                     this.score += pts;
                     this.moves--;
                     playSnd('hit');
-                    screenShake(4);
+                    screenShake(group.length >= 6 ? 8 : 4);
+                    // Score popup
+                    let midX = group.reduce((s,g)=>s+g.c,0)/group.length*this.CELL+this.OX;
+                    let midY = group.reduce((s,g)=>s+g.r,0)/group.length*this.CELL+this.OY;
+                    let popTxt = group.length >= 4 ? '+BIG CHAIN! +'+pts : '+'+pts;
+                    this.texts.push({x:midX, y:midY, text:popTxt, life:50, col:group.length>=4?'#ff4':'#0ff'});
                     this.applyGravity();
 
                     if (this.isEmpty()) {
@@ -174,19 +199,32 @@ const ChainBlast = {
     },
 
     draw() {
-        ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
+        // Level-based background
+        let lvDark = Math.min(0.6, (this.level - 1) * 0.08);
+        ctx.fillStyle = `rgb(0,0,${Math.floor(18 - lvDark*18)})`; ctx.fillRect(0, 0, 200, 300);
 
         if (this.st === 'title') {
+            ctx.fillStyle = '#000510'; ctx.fillRect(0,0,200,300);
+            // Floating blocks
+            for (let b of this.titleBlocks) {
+                ctx.globalAlpha = 0.35;
+                ctx.fillStyle = this.COLORS[b.col];
+                ctx.fillRect(b.x, b.y, b.sz, b.sz);
+                ctx.globalAlpha = 1;
+            }
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#f44'; ctx.font = 'bold 28px "Arial Black", sans-serif';
-            ctx.shadowBlur = 12; ctx.shadowColor = '#f44';
-            ctx.fillText('CHAIN', 100, 85);
-            ctx.fillStyle = '#ff4'; ctx.shadowColor = '#ff4';
-            ctx.fillText('BLAST', 100, 118);
+            let p1 = (Math.sin(this.tmr*0.08)+1)/2;
+            let p2 = (Math.sin(this.tmr*0.08+Math.PI)+1)/2;
+            ctx.shadowBlur = 8+p1*12; ctx.shadowColor = '#f44';
+            ctx.fillStyle = '#f44'; ctx.font = 'bold 30px "Arial Black", sans-serif';
+            ctx.fillText('CHAIN', 100, 90);
+            ctx.shadowBlur = 8+p2*12; ctx.shadowColor = '#ff4';
+            ctx.fillStyle = '#ff4';
+            ctx.fillText('BLAST', 100, 126);
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('同じ色を2つ以上選んで消せ！', 100, 150);
-            ctx.fillStyle = '#888'; ctx.fillText(`BEST: ${this.hiScore}`, 100, 175);
+            ctx.fillStyle = '#aaa'; ctx.font = '9px monospace';
+            ctx.fillText('同じ色を2つ以上選んで消せ！', 100, 158);
+            ctx.fillStyle = '#666'; ctx.fillText('BEST: '+this.hiScore, 100, 180);
             if (this.tmr % 50 < 25) {
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
                 ctx.fillText('PRESS [A] TO START', 100, 230);
@@ -216,42 +254,55 @@ const ChainBlast = {
             return;
         }
 
-        // グリッド背景
-        ctx.fillStyle = '#112';
-        ctx.fillRect(this.OX - 1, this.OY - 1, this.COLS * this.CELL + 2, this.ROWS * this.CELL + 2);
+        // Grid border glow
+        let glowPulse = 3 + Math.sin(this.tmr*0.06)*3;
+        ctx.shadowBlur = glowPulse; ctx.shadowColor = '#24f';
+        ctx.strokeStyle = '#246'; ctx.lineWidth = 2;
+        ctx.strokeRect(this.OX-2, this.OY-2, this.COLS*this.CELL+4, this.ROWS*this.CELL+4);
+        ctx.shadowBlur = 0; ctx.lineWidth = 1;
+        ctx.fillStyle = '#050814';
+        ctx.fillRect(this.OX-1, this.OY-1, this.COLS*this.CELL+2, this.ROWS*this.CELL+2);
 
         let highlight = this.animFrames.length === 0 ? this.getGroupCached() : [];
         let hlValid = highlight.length >= 2;
+        let hlPulse = 3 + Math.sin(this.tmr*0.18)*3;
 
         for (let r = 0; r < this.ROWS; r++) {
             for (let c = 0; c < this.COLS; c++) {
                 let val = this.getCell(r, c);
                 let x = this.OX + c * this.CELL;
                 let y = this.OY + r * this.CELL;
-                ctx.fillStyle = '#0a0a18';
-                ctx.fillRect(x + 1, y + 1, this.CELL - 2, this.CELL - 2);
+                ctx.fillStyle = '#080818';
+                ctx.fillRect(x+1, y+1, this.CELL-2, this.CELL-2);
                 if (val >= 0) {
-                    ctx.fillStyle = this.COLORS[val];
-                    ctx.fillRect(x + 2, y + 2, this.CELL - 4, this.CELL - 4);
-                    if (hlValid && highlight.some(g => g.r === r && g.c === c)) {
-                        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-                        ctx.fillRect(x + 2, y + 2, this.CELL - 4, this.CELL - 4);
+                    let inHL = hlValid && highlight.some(g => g.r===r && g.c===c);
+                    if (inHL) {
+                        ctx.shadowBlur = hlPulse*1.8; ctx.shadowColor = this.COLORS[val];
                     }
-                    // ハイライト端
-                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                    ctx.fillRect(x + 2, y + 2, this.CELL - 4, 3);
-                    ctx.fillRect(x + 2, y + 2, 3, this.CELL - 4);
+                    ctx.fillStyle = this.COLORS[val];
+                    ctx.fillRect(x+2, y+2, this.CELL-4, this.CELL-4);
+                    ctx.shadowBlur = 0;
+                    if (inHL) {
+                        ctx.fillStyle = `rgba(255,255,255,${0.15+Math.sin(this.tmr*0.18)*0.15})`;
+                        ctx.fillRect(x+2, y+2, this.CELL-4, this.CELL-4);
+                    }
+                    // Cell gloss (top-left triangle)
+                    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                    ctx.fillRect(x+2, y+2, this.CELL-4, 3);
+                    ctx.fillRect(x+2, y+2, 3, this.CELL-4);
                 }
             }
         }
 
-        // カーソル
+        // Pulsing cursor
         if (this.animFrames.length === 0) {
-            let cx = this.OX + this.cx * this.CELL;
-            let cy = this.OY + this.cy * this.CELL;
-            ctx.strokeStyle = this.tmr % 20 < 10 ? '#fff' : '#aaa';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(cx + 1, cy + 1, this.CELL - 2, this.CELL - 2);
+            let cx2 = this.OX + this.cx * this.CELL;
+            let cy2 = this.OY + this.cy * this.CELL;
+            let cPulse = 2 + Math.sin(this.tmr*0.2)*2;
+            ctx.strokeStyle = hlValid ? '#0ff' : '#fff';
+            ctx.lineWidth = 2; ctx.shadowBlur = cPulse*2; ctx.shadowColor = hlValid ? '#0ff' : '#888';
+            ctx.strokeRect(cx2+1, cy2+1, this.CELL-2, this.CELL-2);
+            ctx.shadowBlur = 0; ctx.lineWidth = 1;
         }
 
         // 消去パーティクル
@@ -264,6 +315,17 @@ const ChainBlast = {
             ctx.arc(f.x, f.y, radius, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
+        }
+
+        // Score popups
+        for (let t of this.texts) {
+            let alpha = t.life / 50;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = t.col; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+            ctx.shadowBlur = 8; ctx.shadowColor = t.col;
+            ctx.fillText(t.text, t.x, t.y);
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1; ctx.textAlign = 'left';
         }
 
         // UI ヘッダー

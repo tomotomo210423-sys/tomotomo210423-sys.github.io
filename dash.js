@@ -1,4 +1,4 @@
-// === TURBO DASH ===
+// === TURBO DASH v2 ===
 
 const TurboDash = {
     st: 'title', tmr: 0, dist: 0, best: 0,
@@ -8,6 +8,9 @@ const TurboDash = {
     speed: 2.5,
     score: 0,
     bgX: 0,
+    bgBuilding: 0, // building scroll (0.2x)
+    buildings: [],
+    titleBgX: 0, titleAnim: 0,
 
     FLOOR_Y: 230,
     GRAVITY: 0.55,
@@ -16,18 +19,31 @@ const TurboDash = {
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss');
         canvas.width = 200; canvas.height = 300;
-        this.st = 'title'; this.tmr = 0;
+        this.st = 'title'; this.tmr = 0; this.titleAnim = 0; this.titleBgX = 0;
         this.best = SaveSys.data.dashBest || 0;
+        this.genBuildings();
         if (typeof BGM !== 'undefined') BGM.play('menu');
+    },
+
+    genBuildings() {
+        this.buildings = [];
+        for (let i = 0; i < 16; i++) {
+            this.buildings.push({
+                x: i * 28 + (Math.random()*10|0),
+                h: 30 + (Math.random()*60|0),
+                w: 14 + (Math.random()*12|0)
+            });
+        }
     },
 
     startGame() {
         this.st = 'play'; this.tmr = 0; this.dist = 0; this.score = 0;
-        this.speed = 2.5; this.bgX = 0;
+        this.speed = 2.5; this.bgX = 0; this.bgBuilding = 0;
         this.p = { x: 40, y: this.FLOOR_Y, vy: 0, onGround: true, jumps: 0, duck: false, dead: false, col: '#0ff' };
         this.obstacles = [];
         this.coins = [];
-        if (typeof BGM !== 'undefined') BGM.play('action');
+        this.genBuildings();
+        if (typeof BGM !== 'undefined') BGM.play('dash');
     },
 
     spawnObstacle() {
@@ -80,6 +96,7 @@ const TurboDash = {
         this.tmr++;
 
         if (this.st === 'title') {
+            this.titleAnim++; this.titleBgX -= 0.5;
             if (keysDown.a) { this.startGame(); playSnd('jmp'); }
             return;
         }
@@ -95,6 +112,7 @@ const TurboDash = {
         // ===== PLAY =====
         this.dist++;
         this.bgX -= this.speed * 0.5;
+        this.bgBuilding -= this.speed * 0.1; // parallax 0.2x
         this.speed = Math.min(6.0, 2.5 + this.dist * 0.001);
 
         // プレイヤー物理
@@ -144,6 +162,8 @@ const TurboDash = {
                 coin.collected = true;
                 this.score += 10;
                 playSnd('sel');
+                // Coin particles
+                for (let pi = 0; pi < 5; pi++) addParticle(coin.x, coin.y, `hsl(${40+pi*15},100%,65%)`, 'spark');
             }
             if (coin.x < -10) this.coins.splice(i, 1);
         }
@@ -152,9 +172,17 @@ const TurboDash = {
     drawPlayer(p) {
         let ph = p.duck ? 12 : 20;
         let py = p.y - ph;
-        // ボディ
+        // Speed glow
+        let spdNorm = Math.max(0, (this.speed - 2.5) / 3.5);
+        if (spdNorm > 0) {
+            let gHue = 200 - spdNorm * 200; // blue→red
+            ctx.shadowBlur = spdNorm * 18;
+            ctx.shadowColor = `hsl(${gHue},100%,60%)`;
+        }
+        // Body
         ctx.fillStyle = p.col;
         ctx.fillRect(p.x - 8, py, 16, ph);
+        ctx.shadowBlur = 0;
         // 頭
         if (!p.duck) {
             ctx.fillStyle = '#fff';
@@ -178,43 +206,79 @@ const TurboDash = {
         }
     },
 
+    drawBuildings(offsetX, floorY) {
+        let bOff = ((offsetX % (16*28)) + 16*28) % (16*28);
+        for (let i = 0; i < 18; i++) {
+            let b = this.buildings[i % this.buildings.length];
+            let bx = ((b.x - bOff) % (16*28) + 16*28) % (16*28) - 28;
+            ctx.fillStyle = '#0a0820';
+            ctx.fillRect(bx, floorY - b.h, b.w, b.h);
+            // Windows
+            for (let wy = floorY - b.h + 4; wy < floorY - 4; wy += 7) {
+                for (let wx = bx + 2; wx < bx + b.w - 2; wx += 5) {
+                    if ((i + Math.floor(wx/5) + Math.floor(wy/7)) % 3 !== 0) {
+                        ctx.fillStyle = 'rgba(255,240,80,0.35)';
+                        ctx.fillRect(wx, wy, 2, 2);
+                    }
+                }
+            }
+        }
+    },
+
     draw() {
-        // 背景
         ctx.fillStyle = '#050518'; ctx.fillRect(0, 0, 200, 300);
 
-        // スクロール背景グリッド
-        ctx.strokeStyle = 'rgba(0,100,255,0.15)'; ctx.lineWidth = 1;
+        // Scrolling background grid
+        ctx.strokeStyle = 'rgba(0,80,200,0.1)'; ctx.lineWidth = 1;
         let bx = ((this.bgX % 30) + 30) % 30;
-        for (let x = -30 + bx; x < 210; x += 30) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 300); ctx.stroke();
-        }
-        for (let y = 0; y < 300; y += 30) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(200, y); ctx.stroke();
-        }
+        for (let x = -30 + bx; x < 210; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 300); ctx.stroke(); }
+        for (let y = 0; y < 300; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(200, y); ctx.stroke(); }
 
         if (this.st === 'title') {
+            // Building silhouettes scrolling
+            this.drawBuildings(this.titleBgX, 250);
+
             ctx.textAlign = 'center';
+            // Slide-in animation
+            let ta = Math.min(this.titleAnim, 30);
+            let offTurbo = ta < 15 ? -200 + (ta/15)*200 : 0;
+            let offDash  = ta < 15 ? 200 - (ta/15)*200 : 0;
+            ctx.shadowBlur = 14; ctx.shadowColor = '#0ff';
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 26px "Arial Black", sans-serif';
-            ctx.shadowBlur = 12; ctx.shadowColor = '#0ff';
-            ctx.fillText('TURBO', 100, 90);
-            ctx.fillStyle = '#ff4'; ctx.shadowColor = '#ff4';
-            ctx.fillText('DASH', 100, 122);
+            ctx.fillText('TURBO', 100 + offTurbo, 100);
+            ctx.shadowBlur = 14; ctx.shadowColor = '#ff4';
+            ctx.fillStyle = '#ff4';
+            ctx.fillText('DASH', 100 + offDash, 135);
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('A: ジャンプ（2段可）', 100, 155);
-            ctx.fillText('↓: しゃがみ', 100, 172);
-            ctx.fillStyle = '#888';
-            ctx.fillText(`BEST: ${this.best}`, 100, 198);
+            ctx.fillStyle = '#888'; ctx.font = '9px monospace';
+            ctx.fillText('A: ジャンプ（2段可）  ↓: しゃがみ', 100, 168);
+            ctx.fillStyle = '#555'; ctx.fillText('BEST: '+this.best, 100, 186);
             if (this.tmr % 50 < 25) {
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
-                ctx.fillText('PRESS [A] TO START', 100, 240);
+                ctx.fillText('PRESS [A] TO START', 100, 234);
             }
             ctx.textAlign = 'left';
             return;
         }
 
-        // 地面
-        ctx.fillStyle = '#1a3a6a';
+        // Building silhouettes (parallax)
+        this.drawBuildings(this.bgBuilding, this.FLOOR_Y);
+
+        // Speed lines
+        if (this.speed > 4.0) {
+            let intensity = (this.speed - 4.0) * 0.18;
+            ctx.strokeStyle = `rgba(255,255,255,${intensity})`;
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 12; i++) {
+                let ly = 80 + Math.floor(Math.random()*180);
+                let llen = 20 + Math.floor(Math.random()*40);
+                ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(llen, ly); ctx.stroke();
+            }
+            ctx.lineWidth = 1;
+        }
+
+        // Ground
+        ctx.fillStyle = '#162850';
         ctx.fillRect(0, this.FLOOR_Y, 200, 300 - this.FLOOR_Y);
         ctx.fillStyle = '#4af'; ctx.fillRect(0, this.FLOOR_Y, 200, 2);
 
