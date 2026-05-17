@@ -271,10 +271,10 @@ const Tetri = {
             
             // ★ EXPERT限定：ツインブラスター (2発同時発射)
             if (this.diff === 2) {
-                this.bullets.push({ x: this.px - 6, y: this.py - 10, vy: -9, col: bCol });
-                this.bullets.push({ x: this.px + 6, y: this.py - 10, vy: -9, col: bCol });
+                this.bullets.push({ x: this.px - 6, y: this.py - 10, vy: -9, col: bCol, trail: [] });
+                this.bullets.push({ x: this.px + 6, y: this.py - 10, vy: -9, col: bCol, trail: [] });
             } else {
-                this.bullets.push({ x: this.px, y: this.py - 10, vy: -9, col: bCol });
+                this.bullets.push({ x: this.px, y: this.py - 10, vy: -9, col: bCol, trail: [] });
             }
             
             this.playSE('sel');
@@ -283,6 +283,9 @@ const Tetri = {
 
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             let b = this.bullets[i];
+            if (!b.trail) b.trail = [];
+            b.trail.unshift({x: b.x, y: b.y});
+            if (b.trail.length > 3) b.trail.pop();
             b.y += b.vy;
             this.parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 12, maxLife: 12, col: b.col, type: 'trail' });
             if (b.y < -15) this.bullets.splice(i, 1);
@@ -440,16 +443,41 @@ const Tetri = {
         }
 
         if (this.st === 'title') {
+            // ★ タイトルブロックアニメ (背景に落下するテトリミノ)
+            const B_SZ = 16;
+            for (let tb of this.titleBlocks) {
+                tb.y += tb.spd;
+                if (tb.y > 320) {
+                    const TB_MINOS2 = [
+                        {s:[[1,1,1,1]],c:'rgba(0,255,255,0.18)'},
+                        {s:[[1,1],[1,1]],c:'rgba(255,255,0,0.18)'},
+                        {s:[[0,1,0],[1,1,1]],c:'rgba(160,0,255,0.18)'},
+                        {s:[[1,0,0],[1,1,1]],c:'rgba(255,128,0,0.18)'},
+                        {s:[[0,1,1],[1,1,0]],c:'rgba(0,255,0,0.18)'}
+                    ];
+                    let nm = TB_MINOS2[Math.floor(Math.random()*TB_MINOS2.length)];
+                    tb.shape = nm.s; tb.c = nm.c; tb.x = Math.random()*160+20; tb.y = -30; tb.spd = 0.3+Math.random()*0.4;
+                }
+                for (let r = 0; r < tb.shape.length; r++) {
+                    for (let c = 0; c < tb.shape[r].length; c++) {
+                        if (tb.shape[r][c] === 1) {
+                            ctx.fillStyle = tb.c;
+                            ctx.fillRect(tb.x + c*B_SZ, tb.y + r*B_SZ, B_SZ-1, B_SZ-1);
+                        }
+                    }
+                }
+            }
+
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 24px "Arial Black", sans-serif';
             ctx.textAlign = 'center'; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
             ctx.fillText('TETRIVADER', 100, 100);
             ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px "Arial Black", sans-serif'; ctx.shadowColor = '#ff0';
             ctx.fillText('V2', 165, 120);
             ctx.shadowBlur = 0;
-            
+
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
             ctx.fillText('- REMAKE V2.3 -', 100, 145);
-            
+
             if (this.tmr % 50 < 25) { ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace'; ctx.fillText('PRESS [A] TO START', 100, 220); }
             ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`HI-SCORE: ${this.hiScore}`, 100, 280);
             ctx.textAlign = 'left';
@@ -546,6 +574,16 @@ const Tetri = {
         if (this.starFall) this.drawStar(this.starX, this.starY);
 
         for (let b of this.bullets) {
+            // ★ 弾トレイル (過去3フレームの位置を淡い円で描画)
+            if (b.trail) {
+                for (let ti = 0; ti < b.trail.length; ti++) {
+                    let alpha = (1 - (ti + 1) / (b.trail.length + 1)) * 0.5;
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = b.col;
+                    ctx.beginPath(); ctx.arc(b.trail[ti].x, b.trail[ti].y, 3 - ti * 0.5, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+            }
             ctx.fillStyle = b.col; ctx.fillRect(b.x - 2.5, b.y - 7, 5, 14);
             ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 1, b.y - 5, 2, 10);
         }
@@ -608,6 +646,13 @@ const Tetri = {
             ctx.fillStyle = this.score >= this.hiScore ? '#ff0' : '#888';
             ctx.font = 'bold 11px monospace';
             ctx.fillText(`HI: ${this.hiScore}`, 100, 180);
+            // ★ NEW RECORD!! 黄色点滅テキスト
+            if (this.newRecord && this.newRecordTmr % 30 < 20) {
+                ctx.shadowBlur = 12; ctx.shadowColor = '#ff0';
+                ctx.fillStyle = '#ff0'; ctx.font = 'bold 14px "Arial Black", sans-serif';
+                ctx.fillText('NEW RECORD!!', 100, 205);
+                ctx.shadowBlur = 0;
+            }
             if (this.tmr > 60) {
                 ctx.fillStyle = '#ff0'; ctx.font = 'bold 11px monospace';
                 ctx.fillText('PRESS [A] TO RETURN', 100, 230);

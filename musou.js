@@ -12,6 +12,9 @@ const Musou = {
     
     p: { x: 0, y: 0, hp: 100, maxHp: 100, vx: 0, vy: 0, spd: 3, magnet: 40, atkMult: 1.0 },
     cam: { x: 0, y: 0 },
+    dmgFlash: 0,
+    bossWarning: 0,
+    bossFlash: 0,
     
     enemies: [],
     bullets: [],
@@ -97,7 +100,10 @@ const Musou = {
             atkMult: 1.0 + (u.atk * this.shopData.atk.val)
         };
         this.cam = { x: -100, y: -150 };
-        
+        this.dmgFlash = 0;
+        this.bossWarning = 0;
+        this.bossFlash = 0;
+
         this.enemies = [];
         this.bullets = [];
         this.vfx = [];
@@ -373,8 +379,18 @@ const Musou = {
 
         // === ここからプレイ中のメインループ ===
         this.timer++;
-        
-        if (this.timer % 1800 === 0) this.phase++;
+
+        if (this.bossFlash > 0) this.bossFlash--;
+        if (this.bossWarning > 0) this.bossWarning--;
+
+        if (this.timer % 1800 === 0) {
+            this.phase++;
+            if (this.phase % 5 === 0) {
+                this.bossWarning = 120;
+                this.bossFlash = 1; // 1-frame red screen flash
+                if (typeof screenShake !== 'undefined') screenShake(10);
+            }
+        }
 
         let spawnRate = Math.max(3, 20 - this.phase);
         if (this.timer % spawnRate === 0) this.spawnEnemy();
@@ -486,6 +502,7 @@ const Musou = {
                 if (target) {
                     let angle = Math.atan2(target.y - this.p.y, target.x - this.p.x);
                     this.addVFX('beam', this.p.x, this.p.y, '#f0f', { angle: angle, size: 400, life: 10 });
+                    this.addVFX('laserFlash', 0, 0, 'rgba(255,255,255,0.3)', { life: 1 });
                     if (typeof playSnd !== 'undefined') playSnd('hit');
                     if (typeof screenShake !== 'undefined') screenShake(4);
                     for (let e of this.enemies) {
@@ -531,6 +548,8 @@ const Musou = {
                 this.addVFX('ring', this.p.x, this.p.y, '#f0f', { size: s.hole.range, life: 60 });
             }
             if (s.hole.timer > s.hole.cd - 60) {
+                // Rotating vortex lines for black hole visual
+                this.addVFX('vortex', this.p.x, this.p.y, '#f0f', { size: s.hole.range, angle: this.timer * 0.08, life: 2 });
                 for (let e of this.enemies) {
                     let d = Math.hypot(e.x - this.p.x, e.y - this.p.y);
                     if (d < s.hole.range) {
@@ -545,6 +564,10 @@ const Musou = {
         // --- 弾の更新 ---
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             let b = this.bullets[i];
+            // Store last 4 positions as trail
+            if (!b.trail) b.trail = [];
+            b.trail.push({ x: b.x, y: b.y });
+            if (b.trail.length > 4) b.trail.shift();
             b.x += b.vx; b.y += b.vy; b.life--;
             this.addVFX('particle', b.x, b.y, '#0ff', { size: 4, life: 5 });
 
@@ -600,11 +623,15 @@ const Musou = {
 
             // プレイヤー被弾判定
             if (dist < e.size + 8) {
-                this.p.hp -= (e.maxHp * 0.05); 
+                this.p.hp -= (e.maxHp * 0.05);
+                this.dmgFlash = 8;
                 if (typeof screenShake !== 'undefined') screenShake(2);
                 this.addVFX('hit', this.p.x, this.p.y, '#f00', { size: 10 });
             }
         }
+
+        // Damage flash timer decrement
+        if (this.dmgFlash > 0) this.dmgFlash--;
 
         // --- VFXとテキストの更新 ---
         for (let i = this.vfx.length - 1; i >= 0; i--) {
@@ -717,18 +744,35 @@ const Musou = {
             ctx.fill();
         }
 
+        // Bullet trails: draw fading circles for last 4 positions
+        for (let b of this.bullets) {
+            if (!b.trail) continue;
+            for (let ti = 0; ti < b.trail.length; ti++) {
+                let tp = b.trail[ti];
+                let a = (ti + 1) / (b.trail.length + 1) * 0.5;
+                ctx.globalAlpha = a;
+                ctx.fillStyle = '#0ff';
+                ctx.beginPath(); ctx.arc(tp.x, tp.y, 3, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+
         // VFX描画
         ctx.globalCompositeOperation = 'lighter';
         for (let v of this.vfx) {
             let ratio = Math.max(0, v.life / v.maxLife); 
             ctx.globalAlpha = ratio;
             if (v.type === 'slash') {
-                ctx.strokeStyle = v.color; ctx.lineWidth = 3 * ratio;
+                ctx.strokeStyle = v.color; ctx.lineWidth = 8 * ratio;
                 ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size), v.angle - 1, v.angle + 1); ctx.stroke();
             } else if (v.type === 'explosion') {
                 ctx.fillStyle = v.color;
-                // ★ クラッシュ原因だったマイナス値をMath.maxで完全ブロック！
+                // Draw explosion twice: large outer circle then smaller inner circle
                 ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size * (1 - ratio)), 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.globalAlpha = ratio * 0.6;
+                ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size * (1 - ratio) * 0.5), 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = Math.max(0, v.life / v.maxLife);
             } else if (v.type === 'particle' || v.type === 'hit') {
                 ctx.fillStyle = v.color;
                 ctx.beginPath(); ctx.arc(v.x, v.y, Math.max(0.1, v.size * ratio), 0, Math.PI * 2); ctx.fill();
@@ -743,16 +787,34 @@ const Musou = {
             } else if (v.type === 'levelUp') {
                 ctx.fillStyle = v.color;
                 ctx.fillRect(v.x - 10 * ratio, v.y - 150, 20 * ratio, 300);
+            } else if (v.type === 'vortex') {
+                ctx.strokeStyle = v.color; ctx.lineWidth = 1.5;
+                for (let k = 0; k < 4; k++) {
+                    let a = v.angle + (k * Math.PI / 2);
+                    ctx.beginPath();
+                    ctx.moveTo(v.x, v.y);
+                    ctx.lineTo(v.x + Math.cos(a) * v.size * ratio, v.y + Math.sin(a) * v.size * ratio);
+                    ctx.stroke();
+                }
             }
         }
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
 
-        // プレイヤー描画
-        ctx.fillStyle = '#0ff';
-        ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+        // Laser screen flash (drawn in world space coords but covers screen)
+        for (let v of this.vfx) {
+            if (v.type === 'laserFlash') {
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(this.cam.x, this.cam.y, 200, 300);
+            }
+        }
+
+        // プレイヤー描画 (damage flash in red)
+        let playerCol = this.dmgFlash > 0 ? '#f44' : '#0ff';
+        ctx.fillStyle = playerCol;
+        ctx.shadowBlur = 10; ctx.shadowColor = playerCol;
         ctx.beginPath(); ctx.arc(this.p.x, this.p.y, 8, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = this.dmgFlash > 0 ? '#faa' : '#fff';
         ctx.beginPath(); ctx.arc(this.p.x, this.p.y, 4, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -766,6 +828,22 @@ const Musou = {
         ctx.globalAlpha = 1;
 
         ctx.restore();
+
+        // Boss incoming: 1-frame red screen flash
+        if (this.bossFlash > 0) {
+            ctx.fillStyle = 'rgba(255,0,0,0.5)';
+            ctx.fillRect(0, 0, 200, 300);
+        }
+
+        // Boss warning overlay
+        if (this.bossWarning > 0) {
+            ctx.globalAlpha = Math.abs(Math.sin(this.bossWarning * 0.1)) * 0.85 + 0.1;
+            ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 130, 200, 40);
+            ctx.fillStyle = '#f44'; ctx.font = 'bold 14px monospace';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#f00';
+            ctx.fillText('!! BOSS INCOMING !!', 30, 157);
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        }
 
         // プレイ中UI
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; ctx.fillRect(0, 0, 200, 25);

@@ -7,6 +7,10 @@ const Online = {
   roomName: '', roomList: [], roomCursor: 0,
   isSkillMenu: false, skillCursor: 0,
   confirmLeave: false, isResult: false, resultCursor: 0, myChoice: '', opChoice: '',
+  skillFlash: 0, skillFlashColor: '#fff',
+  cardPositions: [], cardTargetX: [], cardTargetY: [],
+  opCardPositions: [], opCardTargetX: [], opCardTargetY: [],
+  resultOverlay: 0, resultWin: false,
   state: {
     hostHand: [], guestHand: [],
     skills: { host: [], guest: [] },
@@ -21,6 +25,10 @@ const Online = {
     this.guestJoined = false; this.isBot = false; this.roomList = []; this.roomCursor = 0;
     this.isSkillMenu = false; this.skillCursor = 0;
     this.confirmLeave = false; this.isResult = false; this.myChoice = ''; this.opChoice = '';
+    this.skillFlash = 0; this.skillFlashColor = '#fff';
+    this.cardPositions = []; this.cardTargetX = []; this.cardTargetY = [];
+    this.opCardPositions = []; this.opCardTargetX = []; this.opCardTargetY = [];
+    this.resultOverlay = 0; this.resultWin = false;
     
     const loadScript = (src) => new Promise(r => {
       if (document.querySelector(`script[src="${src}"]`)) return r();
@@ -182,6 +190,9 @@ const Online = {
       let skillId = actionData.skillId;
       this.state.skills[playerRole].splice(this.state.skills[playerRole].indexOf(skillId), 1);
       this.state.msg = `SKILL: ${S_NAMES[skillId]}!`; this.state.wait = 90; playSnd('jmp');
+      // Skill flash: color based on skill type
+      const skillColors = { 1:'#0ff', 2:'#f0f', 3:'#0f0', 4:'#888', 5:'#ff0', 6:'#0ff', 7:'#84f', 8:'#0f0', 9:'#ff0', 10:'#f0f' };
+      this.skillFlash = 2; this.skillFlashColor = skillColors[skillId] || '#fff';
 
       if (skillId === 1) { this.state.activeSkill = 1; }
       else if (skillId === 2) { let t = this.state.hostHand; this.state.hostHand = this.state.guestHand; this.state.guestHand = t; }

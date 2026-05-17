@@ -2,10 +2,14 @@
 const Action = {
   st: 'title', map: [], platforms: [], coins: [], spikes: [], enemies: [], invisibleBlocks: [], fakeCoins: [],
   fallingSpikes: [], fireballs: [], sun: null, blackHole: null,
-  p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1, trail: []}, 
+  p: {x: 20, y: 200, vx: 0, vy: 0, anim: 0, jumpCount: 0, dir: 1, trail: []},
   score: 0, camX: 0, coyoteTime: 0, stageTheme: 'grass',
   mIdx: 1, deathReason: '', checkpointX: 20, bgTimer: 0,
   titleCur: 0, stageSelect: 1,
+  // ★ ステージ12ボス
+  stage12Boss: null, stage12BossBullets: [],
+  // ★ ステージ開始フラッシュ
+  stageFlashTmr: 0,
   
   // ★ 1. アクションゲーム専用のテクスチャデータ（完全に内部化）
   tex: {
@@ -67,6 +71,7 @@ const Action = {
     this.map = []; this.platforms = []; this.coins = []; this.spikes = []; this.enemies = []; 
     this.invisibleBlocks = []; this.fakeCoins = []; this.fallingSpikes = []; this.fireballs = []; 
     this.sun = null; this.blackHole = null; this.camX = 0; this.coyoteTime = 0; this.deathReason = '';
+    this.stage12Boss = null; this.stage12BossBullets = []; this.stageFlashTmr = 60;
     
     SaveSys.data.actStage = this.stageSelect; SaveSys.save();
 
@@ -185,6 +190,11 @@ const Action = {
     
     this.map.push({x: 3800, y: 270, w: 300, h: 30, type: 'ground'});
     this.map.push({x: 3950, y: 220, w: 30, h: 50, type: 'goal'});
+
+    // ★ ステージ12: ボスを追加
+    if (stage === 12) {
+        this.stage12Boss = { x: 3900, y: 240, vx: 1.5, hp: 200, maxHp: 200, shotTimer: 0, dead: false };
+    }
   },
   
   die(reason) {
@@ -358,16 +368,48 @@ const Action = {
        let dx = this.p.x - this.blackHole.x; let dy = this.p.y - this.blackHole.y; let dist = Math.sqrt(dx*dx + dy*dy);
        if (dist > 0) { this.blackHole.x += (dx/dist) * this.blackHole.speed; this.blackHole.y += (dy/dist) * this.blackHole.speed; }
        if (dist < 100) { nx -= (dx/dist)*0.5; ny -= (dy/dist)*0.5; }
+       // ★ 壁への押し込み防止 (ブラックホールの引力で壁に押し込まれないようにする)
+       nx = Math.max(10, Math.min(canvas.width - 10, nx));
+       ny = Math.max(10, Math.min(280, ny));
        if (dist < this.blackHole.radius - 5) { this.die("虚無に飲まれた"); return; }
     }
     
     if (!grounded && this.coyoteTime > 0) this.coyoteTime--;
     if ((grounded || this.coyoteTime > 0) && keysDown.a) { this.p.vy = jumpForce; this.p.jumpCount++; this.coyoteTime = 0; playSnd('jmp'); addParticle(this.p.x + 10, this.p.y + 20, '#fff', 'star'); }
     this.p.x = Math.max(0, nx); this.p.y = ny;
-    
+
     if (this.p.y > 320) { this.die("奈落へ落ちた"); return; }
-    
+
+    // ★ ステージ12ボス更新
+    if (this.stage12Boss && !this.stage12Boss.dead) {
+        let b12 = this.stage12Boss;
+        b12.x += b12.vx;
+        if (b12.x < 3810 || b12.x > 4080) b12.vx *= -1;
+        b12.shotTimer++;
+        if (b12.shotTimer >= 90) {
+            b12.shotTimer = 0;
+            this.stage12BossBullets.push({ x: b12.x + 10, y: b12.y + 10, vy: 2.5 });
+        }
+        // ボス弾の更新
+        for (let i = this.stage12BossBullets.length - 1; i >= 0; i--) {
+            let bl = this.stage12BossBullets[i];
+            bl.y += bl.vy;
+            if (bl.y > 340) { this.stage12BossBullets.splice(i, 1); continue; }
+            if (Math.abs(this.p.x + 10 - bl.x) < 12 && Math.abs(this.p.y + 10 - bl.y) < 12) { this.die("ボスの弾に当たった"); return; }
+        }
+        // ボスへの弾当たり判定
+        for (let i = this.p.trail.length; i >= 0; i--) { /* placeholder */ }
+        if (Math.abs(this.p.x + 10 - b12.x - 10) < 22 && Math.abs(this.p.y + 10 - b12.y - 10) < 22) {
+            if (this.p.vy > 0 && this.p.y + 20 <= b12.y + 10) {
+                b12.hp -= 50; this.p.vy = -6; playSnd('hit'); screenShake(5);
+                addParticle(b12.x + 10, b12.y, '#f0f', 'explosion');
+                if (b12.hp <= 0) { b12.dead = true; playSnd('combo'); screenShake(15); this.score += 500; addParticle(b12.x+10, b12.y+10, '#ff0', 'explosion'); }
+            } else { this.die("ボスに触れた"); return; }
+        }
+    }
+
     this.camX = Math.max(0, Math.min(this.p.x - 100, 3800));
+    if (this.stageFlashTmr > 0) this.stageFlashTmr--;
     updateParticles();
   },
   
@@ -543,19 +585,44 @@ const Action = {
           this.drawTex(tr.x, tr.y, 'hero', 2.5, tr.dir < 0, '#0ff');
       }
       ctx.globalAlpha = 1;
-      this.drawTex(this.p.x, this.p.y, 'hero', 2.5, this.p.dir < 0, '#00f'); 
+      this.drawTex(this.p.x, this.p.y, 'hero', 2.5, this.p.dir < 0, '#00f');
     }
-    
+
+    // ★ ステージ12ボス描画
+    if (this.stage12Boss && !this.stage12Boss.dead) {
+        let b12 = this.stage12Boss;
+        ctx.fillStyle = '#f0f'; ctx.fillRect(b12.x, b12.y, 20, 20);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(b12.x, b12.y, 20, 20);
+        ctx.fillStyle = '#ff0'; ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center'; ctx.fillText('BOSS', b12.x + 10, b12.y - 2); ctx.textAlign = 'left';
+        // HP バー
+        ctx.fillStyle = '#500'; ctx.fillRect(b12.x, b12.y - 8, 20, 4);
+        ctx.fillStyle = '#f00'; ctx.fillRect(b12.x, b12.y - 8, 20 * (b12.hp / b12.maxHp), 4);
+    }
+    for (let bl of this.stage12BossBullets) {
+        ctx.fillStyle = '#f0f'; ctx.beginPath(); ctx.arc(bl.x, bl.y, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
     ctx.restore();
 
     drawParticles();
     
-    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 25); 
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 25);
     ctx.fillStyle = this.stageTheme === 'final' ? '#f0f' : '#0f0'; ctx.font = 'bold 10px monospace';
     let stName = this.stageTheme.toUpperCase();
     ctx.fillText(`ST${SaveSys.data.actStage}[${stName}]`, 5, 17);
-    ctx.fillStyle = '#ff0'; ctx.fillText(`SC:${this.score}`, 85, 17); 
+    ctx.fillStyle = '#ff0'; ctx.fillText(`SC:${this.score}`, 85, 17);
     ctx.fillStyle = '#f00'; ctx.fillText(`♥:${SaveSys.data.actLives}`, 150, 17);
+
+    // ★ STAGE X フラッシュ表示 (ステージ開始から60フレーム)
+    if (this.stageFlashTmr > 0) {
+        let alpha = this.stageFlashTmr > 45 ? (60 - this.stageFlashTmr) / 15 : (this.stageFlashTmr / 45);
+        ctx.globalAlpha = Math.min(1, alpha);
+        ctx.textAlign = 'center'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 20px "Arial Black", sans-serif';
+        ctx.fillText(`STAGE ${SaveSys.data.actStage}`, 100, 155);
+        ctx.shadowBlur = 0; ctx.textAlign = 'left'; ctx.globalAlpha = 1.0;
+    }
     
     if (this.st === 'dead' || this.st === 'gameover') { 
       ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 100, 200, 80); ctx.strokeStyle = '#f00'; ctx.strokeRect(0, 100, 200, 80);

@@ -592,18 +592,19 @@ const Rhythm = {
 
     ctx.save();
     
-    if(this.mode === 'nightmare' && this.st === 'play') { 
+    if(this.mode === 'nightmare' && this.st === 'play') {
         let nNow = Date.now();
-        ctx.translate(100, 200); 
-        ctx.rotate(Math.sin(nNow/100) * 0.3 + (Math.random()-0.5)*0.1); 
+        ctx.translate(100, 200);
+        // Rotation capped at ±12° (0.209 radians)
+        ctx.rotate(Math.max(-0.209, Math.min(0.209, Math.sin(nNow/100) * 0.209 + (Math.random()-0.5)*0.05)));
         ctx.scale(1.0 + Math.sin(nNow/80)*0.2, 1.0 + Math.cos(nNow/110)*0.2);
         ctx.translate(-100, -200);
-        
+
         if(Math.random() < 0.25) {
             ctx.fillStyle = ['rgba(255,0,0,0.6)', 'rgba(0,255,0,0.6)', 'rgba(0,0,255,0.6)'][Math.floor(Math.random()*3)];
             ctx.fillRect(Math.random()*200, Math.random()*400, Math.random()*200, Math.random()*150);
         }
-        if(Math.random() < 0.1) { ctx.globalCompositeOperation = 'difference'; }
+        // color invert removed
     }
     
     if(typeof shakeTimer !== 'undefined' && shakeTimer > 0){ ctx.translate((Math.random()-0.5)*shakeTimer*2, (Math.random()-0.5)*shakeTimer*2); shakeTimer--; }
@@ -719,16 +720,30 @@ const Rhythm = {
          ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
       }
       
+      // Ghost notes: semi-transparent preview 80px before the hit zone
+      this.notes.forEach(n => {
+        let ghostY = this.lineY - 80;
+        if(!n.missed && !n.hit && n.y > ghostY - 20 && n.y < ghostY + 20) {
+          let gcx = 25 + n.lane * 50 + laneOffset;
+          if(n.curve) gcx += Math.sin((ghostY / 400) * Math.PI * 2) * 40;
+          if(this.mode === 'nightmare') gcx += Math.sin(ghostY * 0.05 + now * 10) * 25;
+          ctx.globalAlpha = 0.35;
+          ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(gcx, ghostY, 16, 0, Math.PI * 2); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      });
+
       this.notes.forEach(n => {
         if(!n.missed && !n.hit && n.y > -30 && n.y < 420) {
            let cx = 25 + n.lane * 50 + laneOffset;
-           if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40; 
-           
+           if(n.curve) cx += Math.sin((n.y / 400) * Math.PI * 2) * 40;
+
            if (this.mode === 'nightmare') {
-               cx += Math.sin(n.y * 0.05 + now * 10) * 25; 
+               cx += Math.sin(n.y * 0.05 + now * 10) * 25;
            }
-           
-           if (this.noteSkin === 0) { 
+
+           if (this.noteSkin === 0) {
                ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill();
                ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke();
                ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5);
@@ -762,18 +777,23 @@ const Rhythm = {
          if (this.autoPlay) { ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('AUTO PLAY', 140, 20); }
       }
       
-      if(this.combo > 5){ 
-          let size = 16 + Math.min(this.combo/10, 10);
-          ctx.fillStyle = '#0ff'; ctx.font = `bold ${size}px monospace`; 
+      if(this.combo > 5){
+          let size = Math.min(24, 10 + this.combo / 5);
+          ctx.fillStyle = '#0ff'; ctx.font = `bold ${size}px monospace`;
           ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
-          ctx.fillText(`${this.combo} COMBO!`, 100 - (size*3), 150); 
+          ctx.fillText(`${this.combo} COMBO!`, 100 - (size*3), 150);
           ctx.shadowBlur = 0;
       }
       
       for(let j of this.judgements) {
-         ctx.fillStyle = j.color; ctx.font = 'bold 12px monospace'; ctx.globalAlpha = j.life / 30;
-         let jx = (25 + j.lane * 50) - (j.msg.length * 3.5) + laneOffset; 
-         ctx.fillText(j.msg, jx, this.lineY - 30 - (30 - j.life)); ctx.globalAlpha = 1;
+         ctx.globalAlpha = j.life / 30;
+         ctx.fillStyle = j.color; ctx.font = 'bold 12px monospace';
+         if(j.msg === 'PERFECT' || j.msg === 'GREAT' || j.msg === 'GOOD') {
+           ctx.shadowBlur = 8; ctx.shadowColor = j.color;
+         }
+         let jx = (25 + j.lane * 50) - (j.msg.length * 3.5) + laneOffset;
+         ctx.fillText(j.msg, jx, this.lineY - 30 - (30 - j.life));
+         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
       }
       
       ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(5, 5, 40, 20); ctx.strokeStyle = '#f00'; ctx.strokeRect(5, 5, 40, 20);
