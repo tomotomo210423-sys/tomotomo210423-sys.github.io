@@ -232,7 +232,13 @@ const Online = {
       this.state.wait = 9999; 
       
       this.isResult = true; this.resultCursor = 0; this.myChoice = '';
-      this.opChoice = this.isBot ? 'rematch' : ''; 
+      this.opChoice = this.isBot ? 'rematch' : '';
+      // Determine win/lose for result screen effects
+      let winMsg = this.state.msg;
+      if (this.role === 'host') this.resultWin = winMsg.includes('HOST WINS') && !winMsg.includes('GUEST WINS');
+      else this.resultWin = winMsg.includes('GUEST WINS') && !winMsg.includes('HOST WINS');
+      if (winMsg.includes('SURRENDER')) this.resultWin = true;
+      this.resultOverlay = 0;
       playSnd('combo'); return true;
     }
     if (!this.state.shuffleTriggered && (hLen === 3 || gLen === 3)) {
@@ -317,6 +323,10 @@ const Online = {
   },
 
   update() {
+    // Decrement flash/overlay timers
+    if (this.skillFlash > 0) this.skillFlash--;
+    if (this.isResult && this.resultOverlay < 60) this.resultOverlay++;
+
     if (keysDown.select && !this.confirmLeave) {
       keysDown.select = false;
       if (this.st === 'play' && !this.isResult) {
@@ -418,20 +428,60 @@ const Online = {
 
   draw() {
     ctx.fillStyle = '#012'; ctx.fillRect(0, 0, 200, 300);
-    
+
     if (this.st === 'play') {
       let myHand = this.role === 'host' ? this.state.hostHand : this.state.guestHand;
       let opHand = this.role === 'host' ? this.state.guestHand : this.state.hostHand;
 
+      // Turn indicator: current player area gets green glow, opponent gets red glow
+      let myTurn = this.state.turn === this.role;
+      ctx.shadowBlur = 12;
+      // My area border
+      ctx.strokeStyle = myTurn ? '#0f0' : '#f00';
+      ctx.shadowColor = myTurn ? '#0f0' : '#f00';
+      ctx.lineWidth = 2; ctx.strokeRect(2, 180, 196, 60); ctx.lineWidth = 1;
+      // Opponent area border
+      ctx.strokeStyle = myTurn ? '#f00' : '#0f0';
+      ctx.shadowColor = myTurn ? '#f00' : '#0f0';
+      ctx.lineWidth = 2; ctx.strokeRect(2, 10, 196, 55); ctx.lineWidth = 1;
+      ctx.shadowBlur = 0;
+
       if (this.state.effects.global.revolution) { ctx.fillStyle = '#f0f'; ctx.font = 'bold 10px monospace'; ctx.fillText('REVOLUTION ACTIVE!', 40, 100); }
 
-      let startX = 100 - (opHand.length * 15) / 2;
+      // Opponent cards with rounded corners and suit decoration
+      let opTargetStartX = 100 - (opHand.length * 15) / 2;
       for (let i = 0; i < opHand.length; i++) {
-        let x = startX + i * 15; let y = 20;
-        ctx.fillStyle = '#a00'; ctx.fillRect(x, y, 25, 35); ctx.strokeStyle = '#fff'; ctx.strokeRect(x, y, 25, 35);
+        // Lerp card positions for slide animation
+        let tX = opTargetStartX + i * 15, tY = 20;
+        if (!this.opCardPositions[i]) this.opCardPositions[i] = { x: tX, y: tY };
+        this.opCardPositions[i].x += (tX - this.opCardPositions[i].x) * 0.2;
+        this.opCardPositions[i].y += (tY - this.opCardPositions[i].y) * 0.2;
+        let x = this.opCardPositions[i].x, y = this.opCardPositions[i].y;
+
+        let isSelected = this.state.turn === this.role && this.cursor === i && !this.isSkillMenu && this.state.pendingSkill !== 3 && this.state.wait === 0 && !this.isResult;
+        if (isSelected) y -= 5; // selected card shifts up
+
+        // Draw rounded card
+        let r = 3;
+        ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+25-r,y);
+        ctx.arcTo(x+25,y,x+25,y+r,r); ctx.lineTo(x+25,y+35-r);
+        ctx.arcTo(x+25,y+35,x+25-r,y+35,r); ctx.lineTo(x+r,y+35);
+        ctx.arcTo(x,y+35,x,y+35-r,r); ctx.lineTo(x,y+r);
+        ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
+        ctx.fillStyle = '#a00'; ctx.fill();
+        if (isSelected) {
+          ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
+          ctx.shadowBlur = 8; ctx.shadowColor = '#0ff';
+        } else { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.shadowBlur = 0; }
+        ctx.stroke(); ctx.shadowBlur = 0; ctx.lineWidth = 1;
+
+        // Suit symbol decoration (small suits on card back)
+        let suits = ['♠','♥','♦','♣']; let suit = suits[i % 4];
+        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '8px monospace';
+        ctx.fillText(suit, x+8, y+14);
+
         if (this.state.activeSkill === 1 && opHand[i].v === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x+2, y+2, 21, 31); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('J', x+8, y+20); }
-        if (this.state.turn === this.role && this.cursor === i && !this.isSkillMenu && this.state.pendingSkill !== 3 && this.state.wait === 0 && !this.isResult) {
-          ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(x-2, y-6, 29, 39); ctx.lineWidth = 1;
+        if (isSelected) {
           if (this.state.effects[this.role].oracle) {
              let isMatch = myHand.some(c => c.v === opHand[i].v && opHand[i].v !== 0);
              ctx.fillStyle = isMatch ? '#0f0' : '#f00'; ctx.font = 'bold 16px monospace'; ctx.fillText(isMatch ? 'O' : 'X', x + 8, y - 10);
@@ -445,15 +495,37 @@ const Online = {
       ctx.fillStyle = this.state.turn === this.role ? '#0f0' : '#f00'; ctx.font = '12px monospace';
       ctx.fillText(this.state.msg, 100 - (this.state.msg.length*3.5), 140);
 
-      startX = 100 - (myHand.length * 15) / 2;
+      let myTargetStartX = 100 - (myHand.length * 15) / 2;
       for (let i = 0; i < myHand.length; i++) {
-        let x = startX + i * 15; let y = 200;
-        ctx.fillStyle = '#ddd'; ctx.fillRect(x, y, 25, 35); ctx.strokeStyle = '#000'; ctx.strokeRect(x, y, 25, 35);
-        ctx.fillStyle = myHand[i].v === 0 ? '#f00' : '#000'; ctx.font = 'bold 14px monospace'; ctx.fillText(myHand[i].v === 0 ? 'J' : myHand[i].v, x + 6, y + 22);
-        
-        if (this.state.turn === this.role && this.cursor === i && this.state.pendingSkill === 3 && this.state.wait === 0 && !this.isResult) {
-           ctx.strokeStyle = '#f0f'; ctx.lineWidth = 2; ctx.strokeRect(x-2, y-2, 29, 39); ctx.lineWidth = 1;
-        }
+        let tX = myTargetStartX + i * 15, tY = 200;
+        if (!this.cardPositions[i]) this.cardPositions[i] = { x: tX, y: tY };
+        this.cardPositions[i].x += (tX - this.cardPositions[i].x) * 0.2;
+        this.cardPositions[i].y += (tY - this.cardPositions[i].y) * 0.2;
+        let x = this.cardPositions[i].x, y = this.cardPositions[i].y;
+
+        let isGiveSelected = this.state.turn === this.role && this.cursor === i && this.state.pendingSkill === 3 && this.state.wait === 0 && !this.isResult;
+        if (isGiveSelected) y -= 5;
+
+        // Draw rounded card (my hand)
+        let r = 3;
+        ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+25-r,y);
+        ctx.arcTo(x+25,y,x+25,y+r,r); ctx.lineTo(x+25,y+35-r);
+        ctx.arcTo(x+25,y+35,x+25-r,y+35,r); ctx.lineTo(x+r,y+35);
+        ctx.arcTo(x,y+35,x,y+35-r,r); ctx.lineTo(x,y+r);
+        ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
+        ctx.fillStyle = '#ddd'; ctx.fill();
+        if (isGiveSelected) {
+          ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
+          ctx.shadowBlur = 8; ctx.shadowColor = '#0ff';
+        } else { ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.shadowBlur = 0; }
+        ctx.stroke(); ctx.shadowBlur = 0; ctx.lineWidth = 1;
+
+        // Suit symbol
+        let suits = ['♠','♥','♦','♣']; let cardSuit = suits[i % 4];
+        ctx.fillStyle = myHand[i].v === 0 ? 'rgba(200,0,0,0.4)' : 'rgba(0,0,0,0.2)'; ctx.font = '8px monospace';
+        ctx.fillText(cardSuit, x+2, y+12);
+        ctx.fillStyle = myHand[i].v === 0 ? '#f00' : '#000'; ctx.font = 'bold 14px monospace';
+        ctx.fillText(myHand[i].v === 0 ? 'J' : myHand[i].v, x + 6, y + 22);
       }
 
       let mySkills = this.state.skills[this.role];
@@ -476,21 +548,41 @@ const Online = {
         ctx.fillStyle = '#0f0'; ctx.fillText('A: YES(LOSE)  B: NO', 25, 150);
       }
       else if (this.isResult) {
+        // Result screen: winning shows gold particle burst, losing shows red overlay fade
+        if (this.resultWin) {
+          // Gold particle burst using addParticle if available
+          if (typeof addParticle === 'function' && Math.random() < 0.3) {
+            addParticle(Math.random() * 200, Math.random() * 300, '#ff0', 'star');
+          }
+        } else {
+          // Red overlay fade
+          let alpha = Math.min(0.4, this.resultOverlay / 60 * 0.4);
+          ctx.fillStyle = `rgba(200,0,0,${alpha})`; ctx.fillRect(0, 0, 200, 300);
+        }
+
         ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(15, 80, 170, 110);
         ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(15, 80, 170, 110); ctx.lineWidth = 1;
         ctx.fillStyle = '#ff0'; ctx.font = '12px monospace'; ctx.fillText('=== MATCH END ===', 35, 100);
-        
+
         if (this.myChoice === '') {
           // ★ BOT戦の場合は選択肢を2つにして描画する
           const opts = this.isBot ? ['もう一度遊ぶ', 'タイトルに戻る'] : ['もう一度遊ぶ', 'ロビーに戻る', 'タイトルに戻る'];
           opts.forEach((opt, idx) => {
             ctx.fillStyle = this.resultCursor === idx ? '#0f0' : '#fff';
-            // 2択の時は少し間隔を広げるなど、お好みで調整できます（ここではそのままの余白で並べます）
             ctx.fillText((this.resultCursor===idx?'>':' ') + opt, 25, 130 + idx * 25);
           });
         } else {
           ctx.fillStyle = '#fff'; ctx.fillText('WAITING RIVAL...', 35, 140);
         }
+      }
+
+      // Skill flash: 2-frame color overlay when skill activates
+      if (this.skillFlash > 0) {
+        let c = this.skillFlashColor;
+        ctx.fillStyle = c.startsWith('rgba') ? c : c + '44';
+        ctx.globalAlpha = this.skillFlash / 2 * 0.5;
+        ctx.fillRect(0, 0, 200, 300);
+        ctx.globalAlpha = 1;
       }
     }
     else {
