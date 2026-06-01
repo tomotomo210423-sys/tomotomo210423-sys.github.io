@@ -256,58 +256,77 @@ const Menu = {
       document.getElementById('gameboy').className = '';
   },
   
+  // ONLINE対戦 はインターネット接続が必要 (apps 配列上の index)
+  onlineRequiredIndices: [3],
+
+  isOfflineApp(i) {
+    return this.onlineRequiredIndices.includes(i) && !window.isOnline;
+  },
+
   update() {
     if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
     if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
-    
-    if (keysDown.a) { 
+
+    if (keysDown.a) {
+        // オフライン中はオンライン必須アプリを起動不可
+        if (this.isOfflineApp(this.cur)) { playSnd('hit'); return; }
         const appObjs = [
-            typeof Guide !== 'undefined' ? Guide : null, 
-            typeof Tetri !== 'undefined' ? Tetri : null, 
-            typeof Action !== 'undefined' ? Action : null, 
-            typeof Online !== 'undefined' ? Online : null, 
-            typeof Rhythm !== 'undefined' ? Rhythm : null, 
-            typeof Slot !== 'undefined' ? Slot : null, 
-            typeof Musou !== 'undefined' ? Musou : null, 
-            typeof Abyss !== 'undefined' ? Abyss : null, 
-            typeof Noise !== 'undefined' ? Noise : null, 
-            typeof PCApp !== 'undefined' ? PCApp : null, 
+            typeof Guide !== 'undefined' ? Guide : null,
+            typeof Tetri !== 'undefined' ? Tetri : null,
+            typeof Action !== 'undefined' ? Action : null,
+            typeof Online !== 'undefined' ? Online : null,
+            typeof Rhythm !== 'undefined' ? Rhythm : null,
+            typeof Slot !== 'undefined' ? Slot : null,
+            typeof Musou !== 'undefined' ? Musou : null,
+            typeof Abyss !== 'undefined' ? Abyss : null,
+            typeof Noise !== 'undefined' ? Noise : null,
+            typeof PCApp !== 'undefined' ? PCApp : null,
             typeof Biotope !== 'undefined' ? Biotope : null,
             typeof Horror !== 'undefined' ? Horror : null,
             typeof ChainBlast !== 'undefined' ? ChainBlast : null,
             typeof TurboDash !== 'undefined' ? TurboDash : null,
             typeof Settings !== 'undefined' ? Settings : null
-        ]; 
+        ];
         if (appObjs[this.cur]) { switchApp(appObjs[this.cur]); } else { playSnd('hit'); }
     }
   },
-  
+
   draw() {
-    bgThemes[SaveSys.data.bgTheme].draw(ctx); 
-    
+    bgThemes[SaveSys.data.bgTheme].draw(ctx);
+
     // ★ 11in1 に変更！
-    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace'; 
-    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0; 
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.3', 45, 40); 
-    
+    ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
+    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.3', 45, 40);
+
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
-    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
+    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) {
         let col = this.appColors[i];
-        ctx.font = 'bold 11px monospace'; 
-        
+        let offline = this.isOfflineApp(i);
+        ctx.font = 'bold 11px monospace';
+
+        // オフライン無効アプリはグレーアウト
+        if (offline) col = '#444';
+
         if (i === this.cur) {
-            ctx.fillStyle = col;
+            ctx.fillStyle = offline ? '#2a2a2a' : col;
             ctx.fillRect(8, startY + (i - drawStart) * 19 - 11, 184, 15);
-            ctx.fillStyle = '#000';
-            ctx.fillText('▶ ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+            ctx.fillStyle = offline ? '#666' : '#000';
+            ctx.fillText('▶ ' + this.apps[i] + (offline ? ' [圏外]' : ''), 12, startY + (i - drawStart) * 19);
         } else {
             ctx.fillStyle = col;
-            ctx.fillText('  ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+            ctx.fillText('  ' + this.apps[i] + (offline ? ' [圏外]' : ''), 12, startY + (i - drawStart) * 19);
         }
     }
-    
+
+    // 圏外インジケーター
+    if (!window.isOnline) {
+        ctx.fillStyle = '#555'; ctx.font = '8px monospace';
+        ctx.fillText('● 圏外', 130, 288);
+    }
+
     ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };
