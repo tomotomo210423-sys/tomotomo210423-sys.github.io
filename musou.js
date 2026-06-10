@@ -738,23 +738,37 @@ const Musou = {
 
         // 敵描画
         for (let e of this.enemies) {
-            ctx.fillStyle = e.color;
-            ctx.beginPath();
-            ctx.arc(e.x, e.y, Math.max(0.1, e.size), 0, Math.PI * 2);
-            ctx.fill();
+            ctx.save();
+            let hitFlash = (e.hitTimer > 0);
+            this.drawEnemy(e, hitFlash);
+            ctx.restore();
         }
 
-        // Bullet trails: draw fading circles for last 4 positions
+        // 弾丸描画: 細長い光線 + グロー
         for (let b of this.bullets) {
-            if (!b.trail) continue;
-            for (let ti = 0; ti < b.trail.length; ti++) {
-                let tp = b.trail[ti];
-                let a = (ti + 1) / (b.trail.length + 1) * 0.5;
-                ctx.globalAlpha = a;
-                ctx.fillStyle = '#0ff';
-                ctx.beginPath(); ctx.arc(tp.x, tp.y, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.save();
+            // trail glow
+            if (b.trail && b.trail.length > 1) {
+                for (let ti = 0; ti < b.trail.length; ti++) {
+                    let tp = b.trail[ti];
+                    let a = (ti + 1) / (b.trail.length + 1) * 0.45;
+                    ctx.globalAlpha = a;
+                    ctx.fillStyle = '#0ff';
+                    ctx.beginPath(); ctx.arc(tp.x, tp.y, 2, 0, Math.PI * 2); ctx.fill();
+                }
             }
             ctx.globalAlpha = 1;
+            // 光線本体: 飛行方向に回転した細長い rect
+            let angle = Math.atan2(b.vy, b.vx);
+            ctx.translate(b.x, b.y);
+            ctx.rotate(angle);
+            ctx.shadowBlur = 6; ctx.shadowColor = '#0ff';
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-5, -1, 10, 2);
+            ctx.fillStyle = '#0ff';
+            ctx.fillRect(-5, -1.5, 10, 3);
+            ctx.shadowBlur = 0;
+            ctx.restore();
         }
 
         // VFX描画
@@ -809,14 +823,10 @@ const Musou = {
             }
         }
 
-        // プレイヤー描画 (damage flash in red)
-        let playerCol = this.dmgFlash > 0 ? '#f44' : '#0ff';
-        ctx.fillStyle = playerCol;
-        ctx.shadowBlur = 10; ctx.shadowColor = playerCol;
-        ctx.beginPath(); ctx.arc(this.p.x, this.p.y, 8, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = this.dmgFlash > 0 ? '#faa' : '#fff';
-        ctx.beginPath(); ctx.arc(this.p.x, this.p.y, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
+        // プレイヤー描画 (高品質サムライドット絵)
+        ctx.save();
+        this.drawPlayer(this.p.x, this.p.y, this.p.vx, this.p.vy, this.dmgFlash > 0);
+        ctx.restore();
 
         // ダメージテキスト
         for (let t of this.texts) {

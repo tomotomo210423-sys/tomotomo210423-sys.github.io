@@ -169,41 +169,149 @@ const TurboDash = {
         }
     },
 
+    drawRunner(p, ox, oy, phase, duck) {
+        // ox, oy = top-left corner of the 16x20 sprite grid (or 16x12 when ducking)
+        const S = 2; // pixel scale: each "dot" = 2x2 px
+        function px(col, row, w, h) {
+            ctx.fillRect(ox + col * S, oy + row * S, (w||1)*S, (h||1)*S);
+        }
+        if (duck) {
+            // === DUCK POSE (16×6 dots = 12px tall) ===
+            // Helmet
+            ctx.fillStyle = '#0ff';
+            px(2,0,4,1); px(1,1,6,1); px(1,2,6,1);
+            // Visor
+            ctx.fillStyle = '#fff';
+            px(3,1,1,1); px(4,1,2,1);
+            ctx.fillStyle = '#08f';
+            px(5,1,1,1);
+            // Outline
+            ctx.fillStyle = '#000';
+            px(1,0,1,1); px(6,0,1,1); px(0,1,1,1); px(7,1,1,1);
+            px(0,2,1,1); px(7,2,1,1);
+            // Body (crouched flat)
+            ctx.fillStyle = '#0ff';
+            px(1,3,6,1); px(1,4,6,1);
+            // White stripe
+            ctx.fillStyle = '#fff';
+            px(3,3,2,1);
+            // Body outline
+            ctx.fillStyle = '#000';
+            px(0,3,1,2); px(7,3,1,2); px(1,5,6,1);
+            // Legs (flat/crouching)
+            ctx.fillStyle = '#08f';
+            px(1,5,3,1); px(4,5,3,1);
+            ctx.fillStyle = '#000';
+            px(0,5,1,1); px(7,5,1,1);
+        } else {
+            // === STANDING / RUN SPRITE (16×10 dots = 20px tall) ===
+            // --- Helmet (rows 0-3) ---
+            ctx.fillStyle = '#0ff';
+            px(2,0,4,1); px(1,1,6,1); px(1,2,6,1); px(2,3,4,1);
+            // Visor band (white highlight left, cyan mid, blue right)
+            ctx.fillStyle = '#fff';
+            px(2,1,2,2);
+            ctx.fillStyle = '#5ef';
+            px(4,1,2,2);
+            ctx.fillStyle = '#08f';
+            px(6,1,1,2);
+            // Helmet outline
+            ctx.fillStyle = '#000';
+            px(1,0,1,1); px(6,0,1,1);
+            px(0,1,1,2); px(7,1,1,2);
+            px(1,3,1,1); px(6,3,1,1);
+            // --- Neck connector ---
+            ctx.fillStyle = '#0ff';
+            px(3,4,2,1);
+            ctx.fillStyle = '#000';
+            px(2,4,1,1); px(5,4,1,1);
+            // --- Torso (rows 5-6) ---
+            ctx.fillStyle = '#0ff';
+            px(1,5,6,1); px(1,6,6,1);
+            // White chest stripe
+            ctx.fillStyle = '#fff';
+            px(3,5,2,1);
+            // Dark shoulder accents
+            ctx.fillStyle = '#08f';
+            px(1,5,1,2); px(6,5,1,2);
+            // Torso outline
+            ctx.fillStyle = '#000';
+            px(0,5,1,2); px(7,5,1,2); px(1,7,6,1);
+            // --- Arm (left side only, row 5-6) ---
+            ctx.fillStyle = '#0ff';
+            px(0,5,1,2);
+            // Already covered by outline above; arm hint:
+            ctx.fillStyle = '#08f';
+            px(8,5,1,2);
+            ctx.fillStyle = '#000';
+            px(9,5,1,2);
+            // --- Hip ---
+            ctx.fillStyle = '#08f';
+            px(2,7,4,1);
+            ctx.fillStyle = '#000';
+            px(1,7,1,1); px(6,7,1,1);
+
+            // --- Legs/feet: 4-frame run animation ---
+            // phase 0,1 = right leg forward; phase 2,3 = left leg forward
+            ctx.fillStyle = '#0ff';
+            ctx.fillStyle = '#08f';
+            if (phase === 0) {
+                // Left leg back-swing, right leg forward-plant
+                ctx.fillStyle = '#08f';
+                px(1,8,2,1); px(1,9,2,1); // left leg (back, flat)
+                px(4,8,2,1); px(5,9,2,1); // right leg (forward, step down)
+                ctx.fillStyle = '#0ff';
+                px(5,9,1,1); // right foot highlight
+                ctx.fillStyle = '#000';
+                px(0,8,1,2); px(3,8,1,1); px(3,9,1,1); // outlines
+                px(6,9,1,1);
+            } else if (phase === 1) {
+                // Both legs mid-stride
+                ctx.fillStyle = '#08f';
+                px(2,8,2,1); px(2,9,2,1);
+                px(4,8,2,1); px(4,9,2,1);
+                ctx.fillStyle = '#000';
+                px(1,8,1,2); px(4,8,1,1); px(6,9,1,1);
+            } else if (phase === 2) {
+                // Left leg forward-plant, right leg back-swing
+                ctx.fillStyle = '#08f';
+                px(2,8,2,1); px(1,9,2,1); // left leg forward
+                px(5,8,2,1); px(5,9,2,1); // right leg back
+                ctx.fillStyle = '#0ff';
+                px(1,9,1,1); // left foot highlight
+                ctx.fillStyle = '#000';
+                px(0,9,1,1); px(3,9,1,1);
+                px(7,8,1,2);
+            } else {
+                // Mirror of phase 1
+                ctx.fillStyle = '#08f';
+                px(2,8,2,1); px(2,9,2,1);
+                px(4,8,2,1); px(4,9,2,1);
+                ctx.fillStyle = '#000';
+                px(1,8,1,2); px(4,8,1,1); px(6,9,1,1);
+            }
+        }
+    },
+
     drawPlayer(p) {
         let ph = p.duck ? 12 : 20;
         let py = p.y - ph;
-        // Speed glow
+
+        // Speed glow (maintained from original)
         let spdNorm = Math.max(0, (this.speed - 2.5) / 3.5);
         if (spdNorm > 0) {
             let gHue = 200 - spdNorm * 200; // blue→red
             ctx.shadowBlur = spdNorm * 18;
             ctx.shadowColor = `hsl(${gHue},100%,60%)`;
         }
-        // Body
-        ctx.fillStyle = p.col;
-        ctx.fillRect(p.x - 8, py, 16, ph);
+
+        // Run phase (4-frame cycle, only when on ground)
+        let phase = p.onGround ? (Math.floor(this.tmr / 5) % 4) : 0;
+
+        // Draw the detailed pixel-art sprite
+        this.drawRunner(p, p.x - 8, py, phase, p.duck);
+
         ctx.shadowBlur = 0;
-        // 頭
-        if (!p.duck) {
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(p.x - 5, py - 8, 10, 8);
-            // 目
-            ctx.fillStyle = '#000';
-            ctx.fillRect(p.x - 3, py - 6, 3, 3);
-            ctx.fillRect(p.x + 1, py - 6, 3, 3);
-        }
-        // 足（走りアニメ）
-        if (p.onGround) {
-            let phase = Math.floor(this.tmr / 4) % 4;
-            ctx.fillStyle = '#08f';
-            if (phase < 2) {
-                ctx.fillRect(p.x - 6, p.y, 5, 5);
-                ctx.fillRect(p.x + 2, p.y - 3, 5, 3);
-            } else {
-                ctx.fillRect(p.x - 6, p.y - 3, 5, 3);
-                ctx.fillRect(p.x + 2, p.y, 5, 5);
-            }
-        }
     },
 
     drawBuildings(offsetX, floorY) {
