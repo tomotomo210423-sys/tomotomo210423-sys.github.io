@@ -393,15 +393,19 @@ const PCApp = {
             ctx.strokeRect(bx + 1, by + 1, cs - 2, cs - 2);
         }
 
-        // Cursor (pulsing glow)
+        // Cursor (pulsing cyan glow for selection)
         let cc = this.cursor % n, cr = Math.floor(this.cursor / n);
         let cxp = bx0 + cc * cs, cyp = by0 + cr * cs;
         let isCheat = this.st === 'cheat' || this.st === 'cheat_swap1' || this.st === 'cheat_swap2';
         let pulse = 3 + Math.sin(this.timer * 0.18) * 3;
-        ctx.strokeStyle = isCheat ? '#f44' : '#0ff';
+        let cursorColor = isCheat ? '#f44' : '#0ff';
+        ctx.strokeStyle = cursorColor;
         ctx.lineWidth = 2.5;
-        ctx.shadowBlur = pulse * 2.5; ctx.shadowColor = isCheat ? '#f44' : '#0ff';
+        ctx.shadowBlur = pulse * 2.5; ctx.shadowColor = cursorColor;
         ctx.strokeRect(cxp + 1, cyp + 1, cs - 2, cs - 2);
+        // Pulsing fill overlay for cursor
+        ctx.fillStyle = isCheat ? `rgba(255,60,60,${0.08 + Math.sin(this.timer*0.18)*0.06})` : `rgba(0,255,255,${0.08 + Math.sin(this.timer*0.18)*0.06})`;
+        ctx.fillRect(cxp + 1, cyp + 1, cs - 2, cs - 2);
         ctx.shadowBlur = 0; ctx.lineWidth = 1;
 
         // Swap1 highlight

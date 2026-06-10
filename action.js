@@ -574,8 +574,57 @@ const Action = {
     for (let e of this.enemies) {
       if (e.y < 300) {
         const offsetY = Math.sin((e.anim || 0) * Math.PI / 180) * 2;
-        const color = e.troll ? '#f0f' : '#a00'; 
-        this.drawTex(e.x - 4, e.y + offsetY - 4, 'enemy', 2.5, false, color);
+        // Enemy type: troll = mid-tier skeleton warrior, normal = goblin
+        ctx.save();
+        let ex = e.x - 4, ey = e.y + offsetY - 4;
+        if (e.troll) {
+            // Mid-tier enemy: skeleton warrior (8x8 fillRect pixel art)
+            ctx.shadowBlur = 5; ctx.shadowColor = '#f0f';
+            // Skull
+            ctx.fillStyle = '#ddd'; ctx.fillRect(ex+2, ey, 12, 8);    // skull top
+            ctx.fillStyle = '#000'; ctx.fillRect(ex+3, ey+2, 3, 2);   // left eye socket
+            ctx.fillRect(ex+8, ey+2, 3, 2);                           // right eye socket
+            ctx.fillStyle = '#ddd'; ctx.fillRect(ex+3, ey+6, 10, 2);  // jaw
+            ctx.fillStyle = '#000'; ctx.fillRect(ex+5, ey+6, 2, 2);   // tooth gap
+            ctx.fillRect(ex+9, ey+6, 2, 2);
+            // Ribcage body
+            ctx.fillStyle = '#bbb'; ctx.fillRect(ex+2, ey+9, 12, 6);
+            ctx.fillStyle = '#000'; ctx.fillRect(ex+4, ey+10, 2, 2);
+            ctx.fillRect(ex+8, ey+10, 2, 2);
+            ctx.fillRect(ex+4, ey+13, 2, 2);
+            ctx.fillRect(ex+8, ey+13, 2, 2);
+            // Arms (bone-colored)
+            ctx.fillStyle = '#ccc'; ctx.fillRect(ex, ey+9, 2, 8);     // left arm
+            ctx.fillRect(ex+14, ey+9, 2, 8);                          // right arm
+            // Legs
+            ctx.fillRect(ex+4, ey+16, 3, 4);
+            ctx.fillRect(ex+9, ey+16, 3, 4);
+            ctx.shadowBlur = 0;
+        } else {
+            // Normal enemy: small goblin
+            ctx.shadowBlur = 3; ctx.shadowColor = '#600';
+            // Goblin head (green-toned)
+            ctx.fillStyle = '#4a3'; ctx.fillRect(ex+3, ey, 10, 8);
+            ctx.fillStyle = '#000'; ctx.fillRect(ex+4, ey+2, 2, 2);   // left eye
+            ctx.fillRect(ex+9, ey+2, 2, 2);                           // right eye
+            ctx.fillStyle = '#f00'; ctx.fillRect(ex+5, ey+5, 5, 2);   // mouth/frown
+            // Ears
+            ctx.fillStyle = '#3a2'; ctx.fillRect(ex+1, ey+2, 2, 3);
+            ctx.fillRect(ex+13, ey+2, 2, 3);
+            // Body
+            ctx.fillStyle = '#532'; ctx.fillRect(ex+3, ey+8, 10, 7);
+            // Arms
+            ctx.fillStyle = '#4a3'; ctx.fillRect(ex, ey+9, 3, 4);
+            ctx.fillRect(ex+13, ey+9, 3, 4);
+            // Legs
+            ctx.fillStyle = '#532'; ctx.fillRect(ex+4, ey+15, 3, 4);
+            ctx.fillRect(ex+9, ey+15, 3, 4);
+            // Boots
+            ctx.fillStyle = '#321'; ctx.fillRect(ex+3, ey+18, 4, 2);
+            ctx.fillRect(ex+8, ey+18, 4, 2);
+            ctx.shadowBlur = 0;
+        }
+        ctx.restore();
       }
     }
     
@@ -588,16 +637,65 @@ const Action = {
       this.drawTex(this.p.x, this.p.y, 'hero', 2.5, this.p.dir < 0, '#00f');
     }
 
-    // ★ ステージ12ボス描画
+    // ★ ステージ12ボス描画 (large intimidating pixel art, 8x8 fillRect)
     if (this.stage12Boss && !this.stage12Boss.dead) {
         let b12 = this.stage12Boss;
-        ctx.fillStyle = '#f0f'; ctx.fillRect(b12.x, b12.y, 20, 20);
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(b12.x, b12.y, 20, 20);
+        let bx = b12.x, by = b12.y;
+        let bFlash = Math.floor(this.bgTimer / 8) % 2 === 0;
+        ctx.save();
+        ctx.shadowBlur = 12 + Math.sin(this.bgTimer * 0.15) * 6;
+        ctx.shadowColor = '#f0f';
+        // Boss body (32x32 area using 4px pixels)
+        // Crown
+        ctx.fillStyle = '#ff0';
+        ctx.fillRect(bx+4, by, 4, 4);
+        ctx.fillRect(bx+12, by, 4, 4);
+        ctx.fillRect(bx+20, by, 4, 4);
+        // Crown base
+        ctx.fillRect(bx+2, by+4, 24, 4);
+        // Head
+        ctx.fillStyle = bFlash ? '#f8f' : '#d0d';
+        ctx.fillRect(bx+2, by+8, 24, 16);
+        // Eyes
+        ctx.fillStyle = '#ff0';
+        ctx.fillRect(bx+6, by+12, 4, 4);
+        ctx.fillRect(bx+18, by+12, 4, 4);
+        // Pupils
+        ctx.fillStyle = '#000';
+        ctx.fillRect(bx+7, by+13, 2, 2);
+        ctx.fillRect(bx+19, by+13, 2, 2);
+        // Nose/mouth
+        ctx.fillStyle = '#f44';
+        ctx.fillRect(bx+12, by+16, 4, 2);
+        ctx.fillRect(bx+8, by+20, 12, 2);
+        // Shoulders
+        ctx.fillStyle = '#808';
+        ctx.fillRect(bx, by+24, 28, 6);
+        // Arms (claws)
+        ctx.fillStyle = '#a0a';
+        ctx.fillRect(bx-4, by+24, 6, 10);
+        ctx.fillRect(bx+26, by+24, 6, 10);
+        // Claw tips
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(bx-4, by+34, 2, 3);
+        ctx.fillRect(bx-1, by+34, 2, 3);
+        ctx.fillRect(bx+26, by+34, 2, 3);
+        ctx.fillRect(bx+29, by+34, 2, 3);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // BOSS label
         ctx.fillStyle = '#ff0'; ctx.font = 'bold 8px monospace';
-        ctx.textAlign = 'center'; ctx.fillText('BOSS', b12.x + 10, b12.y - 2); ctx.textAlign = 'left';
-        // HP バー
-        ctx.fillStyle = '#500'; ctx.fillRect(b12.x, b12.y - 8, 20, 4);
-        ctx.fillStyle = '#f00'; ctx.fillRect(b12.x, b12.y - 8, 20 * (b12.hp / b12.maxHp), 4);
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 6; ctx.shadowColor = '#ff0';
+        ctx.fillText('BOSS', bx + 14, by - 4);
+        ctx.shadowBlur = 0; ctx.textAlign = 'left';
+
+        // HP bar (wider, detailed)
+        ctx.fillStyle = '#500'; ctx.fillRect(bx - 2, by - 10, 32, 5);
+        ctx.fillStyle = '#f00'; ctx.fillRect(bx - 2, by - 10, 32 * (b12.hp / b12.maxHp), 5);
+        ctx.strokeStyle = '#f44'; ctx.lineWidth = 1; ctx.strokeRect(bx - 2, by - 10, 32, 5);
+        ctx.lineWidth = 1;
     }
     for (let bl of this.stage12BossBullets) {
         ctx.fillStyle = '#f0f'; ctx.beginPath(); ctx.arc(bl.x, bl.y, 4, 0, Math.PI * 2); ctx.fill();
