@@ -295,8 +295,11 @@ const PCApp = {
 
         let n = this.cols, cs = this.cellSize, bx0 = this.boardX, by0 = this.boardY;
 
+        // Difficulty-based board background color
+        let boardBgColor = { easy: 'rgba(0,30,10,0.55)', normal: 'rgba(0,15,40,0.55)', hard: 'rgba(30,5,0,0.55)' }[this.difficulty] || 'rgba(0,20,40,0.55)';
+        ctx.fillStyle = boardBgColor; ctx.fillRect(bx0 - 3, by0 - 3, n * cs + 6, n * cs + 6);
+
         // Board glow border
-        ctx.fillStyle = 'rgba(0,20,40,0.55)'; ctx.fillRect(bx0 - 3, by0 - 3, n * cs + 6, n * cs + 6);
         ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
         ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
         ctx.strokeRect(bx0 - 3, by0 - 3, n * cs + 6, n * cs + 6);
@@ -316,19 +319,59 @@ const PCApp = {
             let val = this.board[i];
 
             if (val === -1) {
-                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx, by, cs, cs); continue;
+                // Empty cell: dark grid pattern
+                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx, by, cs, cs);
+                ctx.strokeStyle = 'rgba(0,100,100,0.3)'; ctx.lineWidth = 0.5;
+                for (let gx = 0; gx < cs; gx += 8) {
+                    ctx.beginPath(); ctx.moveTo(bx+gx, by); ctx.lineTo(bx+gx, by+cs); ctx.stroke();
+                }
+                for (let gy = 0; gy < cs; gy += 8) {
+                    ctx.beginPath(); ctx.moveTo(bx, by+gy); ctx.lineTo(bx+cs, by+gy); ctx.stroke();
+                }
+                ctx.lineWidth = 1;
+                continue;
             }
+
+            ctx.save();
+
+            // Correct position glow (green)
+            let isCorrect = (val === i);
+            // Wrong position (subtle red glow)
+            let isWrong = !isCorrect;
+
+            if (isCorrect) {
+                ctx.shadowBlur = 6; ctx.shadowColor = '#00ff44';
+            } else if (isWrong && this.scanTimer <= 0 && this.hintPiece !== i) {
+                ctx.shadowBlur = 3; ctx.shadowColor = 'rgba(255,50,50,0.5)';
+            }
+
             if (this.img) {
                 ctx.drawImage(this.img, (val % n) * cs, Math.floor(val / n) * cs, cs, cs, bx, by, cs, cs);
             }
 
-            // SCAN overlay
+            // Piece gradient overlay (makes it look 3D)
+            let pieceGrad = ctx.createLinearGradient(bx, by, bx, by+cs);
+            pieceGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+            pieceGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
+            pieceGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
+            ctx.fillStyle = pieceGrad; ctx.fillRect(bx, by, cs, cs);
+
+            // SCAN overlay with large centered number
             if (this.scanTimer > 0) {
                 ctx.fillStyle = 'rgba(0,18,0,0.78)'; ctx.fillRect(bx, by, cs, cs);
                 ctx.shadowBlur = 6; ctx.shadowColor = '#0f0';
                 ctx.fillStyle = '#0f0'; ctx.font = `bold ${cs > 40 ? 18 : cs > 32 ? 14 : 11}px monospace`;
                 ctx.textAlign = 'center'; ctx.fillText(val + 1, bx + cs / 2, by + cs / 2 + 5);
                 ctx.shadowBlur = 0;
+            } else {
+                // Piece number overlay (large, centered, with shadow)
+                ctx.save();
+                ctx.shadowBlur = 3; ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                ctx.font = `bold ${cs > 40 ? 14 : cs > 32 ? 11 : 9}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillText(val + 1, bx + cs / 2, by + cs / 2 + (cs > 32 ? 4 : 3));
+                ctx.restore();
             }
 
             // HINT glow
@@ -340,9 +383,14 @@ const PCApp = {
                 ctx.shadowBlur = 0; ctx.lineWidth = 1;
             }
 
-            // Piece borders
-            ctx.strokeStyle = 'rgba(0,255,255,0.2)'; ctx.strokeRect(bx, by, cs, cs);
-            ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.strokeRect(bx + 1, by + 1, cs - 2, cs - 2);
+            ctx.restore();
+
+            // 2px black border on every piece
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 2;
+            ctx.strokeRect(bx, by, cs, cs);
+            // 1px inner highlight
+            ctx.strokeStyle = 'rgba(255,255,255,0.20)'; ctx.lineWidth = 1;
+            ctx.strokeRect(bx + 1, by + 1, cs - 2, cs - 2);
         }
 
         // Cursor (pulsing glow)
