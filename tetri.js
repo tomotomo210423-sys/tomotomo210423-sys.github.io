@@ -10,9 +10,15 @@ const Tetri = {
     // 弾幕モード用変数
     starFall: false, starX: 0, starY: 0,
     danmakuMode: false, danmakuTimer: 0, danmakuBullets: [], playerHit: false, scoreBeforeDanmaku: 0,
-    
+
     // ★ EXPERT限定シールド
-    shields: 0,
+    shields: 0, shieldUses: 0,
+
+    // ★ NEW RECORD表示
+    newRecord: false, newRecordTmr: 0,
+
+    // ★ タイトルブロックアニメ
+    titleBlocks: [],
 
     playSE(id) { if(typeof playSnd === 'function') playSnd(id); },
     shakeCam(val) { if(typeof screenShake === 'function') screenShake(val); },
@@ -31,30 +37,94 @@ const Tetri = {
     ],
 
     SPRITES: [
-        [ "0000000220000000","0000009229000000","0000002222000000","0000092442900000",
-          "0000922442290000","0009222222229000","0092222222222900","0920222222220290",
-          "0900022222200090","0000092442900000","0000004444000000" ],
-        [ "00000000000000b0","0000000000000bb0","0000000000033300","0000000003331000",
-          "0000000333100000","0000033310000000","0003331010000000","0033310000000000",
-          "0330000000000000","0b00000000000000" ],
-        [ "0000000000000000","0000000000000000","0000000060000000","0000006666000000",
-          "0000066e66600000","0000666666e00000","0000eeeeeeee0000","0004444444444000",
-          "0000444444440000","0000000000000000" ],
-        [ "0000000000000000","0000008888000000","0000001111000000","0000008888000000",
-          "0000001111000000","0000998888990000","0009198888919000","0009198888919000",
-          "0000998888990000","0000000000000000" ],
-        [ "0000000000000000","0000009999000000","0000091991900000","0000999199990000",
-          "0009992222999000","0099992c22999900","0099992222999900","0099099999909900",
-          "0099099999909900","0000000000000000" ],
-        [ "0000000660000000","0000006f66000000","0000044444000000","0000444e44400000",
-          "0004444e444e0000","0004e44444e40000","0004e4444e440000","000044e444400000",
-          "0000044444000000","0000000000000000" ],
-        [ "0000000100000000","000000d1d0000000","00000ddddd000000","00000d2d2d000000",
-          "0000077777000000","0000073737000000","0000077777000000","0000007770000000",
-          "0000000700000000","0000000000000000" ],
-        [ "0000006f66000000","00006f66f6660000","00066f6f66f66000","000066f66f660000",
-          "0000006666000000","0000077777700000","0000772772770000","0000777777770000",
-          "0000077777700000","0000770000770000" ]
+        // [0] 標準戦闘機: 対称シャープファイター、先端が細く後端に噴射口
+        [ "0000001110000000",
+          "0000012210000000",
+          "0000122221000000",
+          "0001222122100000",
+          "0012221122210000",
+          "0122211112221000",
+          "0125511115521000",
+          "0012222222210000",
+          "0001988899810000",
+          "0000199999100000" ],
+        // [1] 完熟バナナ: 曲がった形、黄色メイン
+        [ "0000000013000000",
+          "0000000133300000",
+          "0000001333b00000",
+          "0000013c3b000000",
+          "0000133cb0000000",
+          "0001333b00000000",
+          "0013c3b000000000",
+          "0133b00000000000",
+          "013b000000000000",
+          "0b0000000000000b" ],
+        // [2] 激辛ペペロンチーノ: ペッパー型、緑/赤/オレンジ
+        [ "0000000600000000",
+          "0000006660000000",
+          "0000064640000000",
+          "0000646640000000",
+          "0006e6464e000000",
+          "006e7646466e0000",
+          "006e7777466e0000",
+          "0006e74744e00000",
+          "0000647444000000",
+          "0000044440000000" ],
+        // [3] 重戦車大砲: 砲台型、灰色のごつい形
+        [ "0000009900000000",
+          "0000099990000000",
+          "0000899998000000",
+          "0000898898000000",
+          "0008888888800000",
+          "0099999999990000",
+          "0091999999190000",
+          "0091999999190000",
+          "0099999999990000",
+          "0000000000000000" ],
+        // [4] 虹色ゴリラ: ゴリラシルエット、マゼンタ中心
+        [ "0001100011000000",
+          "0019900099100000",
+          "0099a2aa29900000",
+          "0099a22a29900000",
+          "0009922299900000",
+          "0009aaaa99000000",
+          "0099aaaa99900000",
+          "0991a00a19900000",
+          "0990000000990000",
+          "0000000000000000" ],
+        // [5] キラキラ黄金トマト: トマト型、黄色/金色、丸い
+        [ "0000006600000000",
+          "0000066660000000",
+          "0000364360000000",
+          "0003c3336c300000",
+          "0033c3333c330000",
+          "003ccf3ffcc30000",
+          "0033cc3fcc330000",
+          "0003333333c30000",
+          "0000333333000000",
+          "0000043340000000" ],
+        // [6] サンマ人参mk-II: 細長い青緑体、人参オレンジアクセント
+        [ "0000000100000000",
+          "0000005d50000000",
+          "0000055d55000000",
+          "000055d2d5500000",
+          "000057d2d7500000",
+          "0000077d77000000",
+          "0000757777500000",
+          "0000005555000000",
+          "0000000700000000",
+          "0000000000000000" ],
+        // [7] 悟りブロッコリー神: ブロッコリー型、緑、木状シルエット
+        [ "0000006660000000",
+          "0000666f66000000",
+          "0006f66f66f60000",
+          "0006666666660000",
+          "0000666f66000000",
+          "0000066660000000",
+          "0000007700000000",
+          "0000077770000000",
+          "0000077770000000",
+          "0000066660000000" ]
     ],
 
     SPRITE_STAR: "0001000000111000011111001111111001111100001110000001000000000000",
@@ -82,6 +152,19 @@ const Tetri = {
         this.hiScore = SaveSys.data.tetriHi || 0;
         this.stars = [];
         for(let i=0; i<50; i++) { this.stars.push({x: Math.random()*200, y: Math.random()*300, s: Math.random()*2+1}); }
+        // ★ タイトル用テトリミノ背景ブロック初期化
+        this.titleBlocks = [];
+        const TB_MINOS = [
+            {s:[[1,1,1,1]],c:'rgba(0,255,255,0.18)'},
+            {s:[[1,1],[1,1]],c:'rgba(255,255,0,0.18)'},
+            {s:[[0,1,0],[1,1,1]],c:'rgba(160,0,255,0.18)'},
+            {s:[[1,0,0],[1,1,1]],c:'rgba(255,128,0,0.18)'},
+            {s:[[0,1,1],[1,1,0]],c:'rgba(0,255,0,0.18)'}
+        ];
+        for(let i=0;i<4;i++){
+            let mino = TB_MINOS[Math.floor(Math.random()*TB_MINOS.length)];
+            this.titleBlocks.push({shape:mino.s, c:mino.c, x:Math.random()*160+20, y:-60+Math.random()*100, spd:0.3+Math.random()*0.4});
+        }
         if(typeof BGM !== 'undefined') BGM.play('menu');
     },
 
@@ -89,9 +172,11 @@ const Tetri = {
         this.st = 'play'; this.tmr = 0; this.score = 0;
         this.px = 100; this.bullets = []; this.blocks = []; this.parts = [];
         this.danmakuMode = false; this.starFall = false;
-        
-        // ★ EXPERT限定：初期シールド付与
+        this.newRecord = false; this.newRecordTmr = 0;
+
+        // ★ EXPERT限定：初期シールド付与 (最大5回使用)
         this.shields = (this.diff === 2) ? 1 : 0;
+        this.shieldUses = (this.diff === 2) ? 5 : 0;
         
         if(typeof BGM !== 'undefined') BGM.play('action');
     },
@@ -168,9 +253,11 @@ const Tetri = {
                     this.hiScore = this.score;
                     SaveSys.data.tetriHi = this.hiScore;
                     SaveSys.save();
+                    this.newRecord = true; this.newRecordTmr = 0;
                 }
                 SaveSys.addLog('テトリベーダー', `スコア: ${this.score}`);
             }
+            if (this.newRecord) this.newRecordTmr++;
             if (this.tmr > 60 && (keysDown.a || keysDown.b)) {
                 this.st = 'title';
             }
@@ -248,10 +335,10 @@ const Tetri = {
             
             // ★ EXPERT限定：ツインブラスター (2発同時発射)
             if (this.diff === 2) {
-                this.bullets.push({ x: this.px - 6, y: this.py - 10, vy: -9, col: bCol });
-                this.bullets.push({ x: this.px + 6, y: this.py - 10, vy: -9, col: bCol });
+                this.bullets.push({ x: this.px - 6, y: this.py - 10, vy: -9, col: bCol, trail: [] });
+                this.bullets.push({ x: this.px + 6, y: this.py - 10, vy: -9, col: bCol, trail: [] });
             } else {
-                this.bullets.push({ x: this.px, y: this.py - 10, vy: -9, col: bCol });
+                this.bullets.push({ x: this.px, y: this.py - 10, vy: -9, col: bCol, trail: [] });
             }
             
             this.playSE('sel');
@@ -260,6 +347,9 @@ const Tetri = {
 
         for (let i = this.bullets.length - 1; i >= 0; i--) {
             let b = this.bullets[i];
+            if (!b.trail) b.trail = [];
+            b.trail.unshift({x: b.x, y: b.y});
+            if (b.trail.length > 3) b.trail.pop();
             b.y += b.vy;
             this.parts.push({ x: b.x, y: b.y, vx: 0, vy: 0, life: 12, maxLife: 12, col: b.col, type: 'trail' });
             if (b.y < -15) this.bullets.splice(i, 1);
@@ -287,7 +377,7 @@ const Tetri = {
                 this.starFall = false;
                 this.scoreBeforeDanmaku = this.score;
                 this.danmakuMode = true;
-                this.danmakuTimer = 600; 
+                this.danmakuTimer = [600, 480, 360][this.diff];
                 this.danmakuBullets = [];
                 this.playerHit = false;
                 this.playSE('combo');
@@ -343,9 +433,10 @@ const Tetri = {
 
             // ★ 防衛ライン越え判定（シールド処理を追加）
             if (blk.y + blk.h > 280) {
-                if (this.shields > 0) {
+                if (this.shields > 0 && this.shieldUses > 0) {
                     // シールド発動！(ボム効果)
                     this.shields--;
+                    this.shieldUses--;
                     this.playSE('combo');
                     this.shakeCam(20);
                     
@@ -416,16 +507,41 @@ const Tetri = {
         }
 
         if (this.st === 'title') {
+            // ★ タイトルブロックアニメ (背景に落下するテトリミノ)
+            const B_SZ = 16;
+            for (let tb of this.titleBlocks) {
+                tb.y += tb.spd;
+                if (tb.y > 320) {
+                    const TB_MINOS2 = [
+                        {s:[[1,1,1,1]],c:'rgba(0,255,255,0.18)'},
+                        {s:[[1,1],[1,1]],c:'rgba(255,255,0,0.18)'},
+                        {s:[[0,1,0],[1,1,1]],c:'rgba(160,0,255,0.18)'},
+                        {s:[[1,0,0],[1,1,1]],c:'rgba(255,128,0,0.18)'},
+                        {s:[[0,1,1],[1,1,0]],c:'rgba(0,255,0,0.18)'}
+                    ];
+                    let nm = TB_MINOS2[Math.floor(Math.random()*TB_MINOS2.length)];
+                    tb.shape = nm.s; tb.c = nm.c; tb.x = Math.random()*160+20; tb.y = -30; tb.spd = 0.3+Math.random()*0.4;
+                }
+                for (let r = 0; r < tb.shape.length; r++) {
+                    for (let c = 0; c < tb.shape[r].length; c++) {
+                        if (tb.shape[r][c] === 1) {
+                            ctx.fillStyle = tb.c;
+                            ctx.fillRect(tb.x + c*B_SZ, tb.y + r*B_SZ, B_SZ-1, B_SZ-1);
+                        }
+                    }
+                }
+            }
+
             ctx.fillStyle = '#0ff'; ctx.font = 'bold 24px "Arial Black", sans-serif';
             ctx.textAlign = 'center'; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
             ctx.fillText('TETRIVADER', 100, 100);
             ctx.fillStyle = '#ff0'; ctx.font = 'bold 18px "Arial Black", sans-serif'; ctx.shadowColor = '#ff0';
             ctx.fillText('V2', 165, 120);
             ctx.shadowBlur = 0;
-            
+
             ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
             ctx.fillText('- REMAKE V2.3 -', 100, 145);
-            
+
             if (this.tmr % 50 < 25) { ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace'; ctx.fillText('PRESS [A] TO START', 100, 220); }
             ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.fillText(`HI-SCORE: ${this.hiScore}`, 100, 280);
             ctx.textAlign = 'left';
@@ -522,6 +638,16 @@ const Tetri = {
         if (this.starFall) this.drawStar(this.starX, this.starY);
 
         for (let b of this.bullets) {
+            // ★ 弾トレイル (過去3フレームの位置を淡い円で描画)
+            if (b.trail) {
+                for (let ti = 0; ti < b.trail.length; ti++) {
+                    let alpha = (1 - (ti + 1) / (b.trail.length + 1)) * 0.5;
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = b.col;
+                    ctx.beginPath(); ctx.arc(b.trail[ti].x, b.trail[ti].y, 3 - ti * 0.5, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+            }
             ctx.fillStyle = b.col; ctx.fillRect(b.x - 2.5, b.y - 7, 5, 14);
             ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 1, b.y - 5, 2, 10);
         }
@@ -584,6 +710,13 @@ const Tetri = {
             ctx.fillStyle = this.score >= this.hiScore ? '#ff0' : '#888';
             ctx.font = 'bold 11px monospace';
             ctx.fillText(`HI: ${this.hiScore}`, 100, 180);
+            // ★ NEW RECORD!! 黄色点滅テキスト
+            if (this.newRecord && this.newRecordTmr % 30 < 20) {
+                ctx.shadowBlur = 12; ctx.shadowColor = '#ff0';
+                ctx.fillStyle = '#ff0'; ctx.font = 'bold 14px "Arial Black", sans-serif';
+                ctx.fillText('NEW RECORD!!', 100, 205);
+                ctx.shadowBlur = 0;
+            }
             if (this.tmr > 60) {
                 ctx.fillStyle = '#ff0'; ctx.font = 'bold 11px monospace';
                 ctx.fillText('PRESS [A] TO RETURN', 100, 230);

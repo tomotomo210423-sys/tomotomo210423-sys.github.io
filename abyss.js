@@ -1,25 +1,27 @@
-// === ABYSS GENERAL (Phase 10: Despair Rush & Holy Seals) ===
+// === ABYSS GENERAL v2 — DEEP ABYSS EVOLUTION ===
 const Abyss = {
     st: 'title',
     tmr: 0,
     core: { x: 40, y: 120 },
     target: { x: 150, y: 120 },
-    tentacles: [], 
-    
+    tentacles: [],
+
     prevPointerActive: false,
-    winding: false, 
-    musicBox: 100,  
-    
-    vfx: [], shieldTmr: 0, swarms: [], eyes: [], 
-    projectiles: [], // 邪眼の弾
-    enemies: [], 
-    enemyProjectiles: [], // 遠距離兵の矢
-    holySeals: [], // 聖なる封印（タップ破壊タスク）
-    
+    winding: false,
+    musicBox: 100,
+
+    vfx: [], shieldTmr: 0, swarms: [], eyes: [],
+    projectiles: [],
+    enemies: [],
+    enemyProjectiles: [],
+    holySeals: [],
+    bubbles: [], // deep-sea bubble particles
+    wave: 0,
+
     coreHp: 100, coreMaxHp: 100, score: 0, soul: 0,
     lv: { tentacle: 1, meteor: 1, swarm: 1 },
-    
-    bgmInt: null, // 絶望BGM用
+
+    bgmInt: null,
 
     init() {
         document.getElementById('gameboy').classList.add('mode-abyss');
@@ -71,13 +73,17 @@ const Abyss = {
 
     startGame() {
         this.st = 'play';
-        this.tmr = 0; 
+        this.tmr = 0;
         this.vfx = []; this.shieldTmr = 0; this.swarms = [];
-        this.eyes = []; this.projectiles = []; this.enemies = []; 
+        this.eyes = []; this.projectiles = []; this.enemies = [];
         this.enemyProjectiles = []; this.holySeals = [];
         this.coreHp = 100; this.coreMaxHp = 100; this.score = 0; this.soul = 0;
         this.lv = { tentacle: 1, meteor: 1, swarm: 1 };
-        this.musicBox = 100; this.winding = false;
+        this.musicBox = 100; this.winding = false; this.wave = 0;
+        this.bubbles = [];
+        for (let i = 0; i < 20; i++) {
+            this.bubbles.push({ x: Math.random()*400, y: Math.random()*240+240, r: 1+Math.random()*3, spd: 0.3+Math.random()*0.5 });
+        }
         
         this.tentacles = [];
         this.addTentacle();
@@ -345,7 +351,15 @@ const Abyss = {
             let eType = 'normal';
             let eHp = 15, eAtk = 2, eSpeed = 0.5 + Math.random();
             
-            if (r < 0.1) { eType = 'boss'; eHp = 200; eAtk = 15; eSpeed = 0.3; this.vfx.push({ type: 'text', text: 'BOSS WARNING!', x: 250, y: 120, life: 90, color: '#f00' }); }
+            if (r < 0.1) {
+                eType = 'boss'; eHp = 1000; eAtk = 15; eSpeed = 0.3;
+                this.vfx.push({ type: 'text', text: '!! BOSS INCOMING !!', x: 160, y: 100, life: 120, color: '#f00' });
+                // 8-direction bullet burst on spawn
+                for (let d = 0; d < 8; d++) {
+                    let ang = d * Math.PI / 4;
+                    this.enemyProjectiles.push({ x: 400, y: 120, vx: Math.cos(ang)*3.5, vy: Math.sin(ang)*3.5, life: 100 });
+                }
+            }
             else if (r < 0.25) { eType = 'archer'; eHp = 10; eSpeed = 0.6; }
             else if (r < 0.35) { eType = 'jammer'; eHp = 20; eSpeed = 0.8; }
 
@@ -528,6 +542,15 @@ const Abyss = {
         }
 
         this.updateVFX(ts);
+
+        // Wave counter
+        if (this.tmr % 600 === 0 && this.st === 'play') this.wave++;
+
+        // Bubble animation
+        for (let b of this.bubbles) {
+            b.y -= b.spd * ts; b.x += Math.sin(b.y * 0.05) * 0.4;
+            if (b.y < -10) { b.y = 250; b.x = Math.random() * 400; }
+        }
     },
     
     updateVFX(ts) {
@@ -560,10 +583,209 @@ const Abyss = {
         }
     },
     
+    // === 高品質コア描画 (宝石/結晶 + 16角形トゲ付き輪郭) ===
+    drawCore() {
+        let cx = this.core.x, cy = this.core.y;
+        let pulse = (Math.sin(this.tmr * 0.08) + 1) / 2;
+        let cr = 30 + Math.sin(this.tmr * 0.1) * 4;
+        let spikeBase = cr + 5;
+        let spikeLen = 8 + pulse * 6; // 脈動でトゲ伸縮
+
+        // ① 外殻: 16角形のトゲ付き輪郭
+        ctx.save();
+        ctx.shadowBlur = 18 + pulse * 12; ctx.shadowColor = '#f00';
+        let spikes = 16;
+        ctx.beginPath();
+        for (let i = 0; i < spikes * 2; i++) {
+            let ang = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+            let r = (i % 2 === 0) ? spikeBase + spikeLen : spikeBase - 4;
+            ctx.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r);
+        }
+        ctx.closePath();
+        let outerGrad = ctx.createRadialGradient(cx, cy, cr * 0.5, cx, cy, spikeBase + spikeLen);
+        outerGrad.addColorStop(0, `rgba(255,80,0,${0.5 + pulse * 0.3})`);
+        outerGrad.addColorStop(0.6, `rgba(180,0,0,${0.3 + pulse * 0.2})`);
+        outerGrad.addColorStop(1, 'rgba(80,0,0,0.1)');
+        ctx.fillStyle = outerGrad;
+        ctx.fill();
+        ctx.strokeStyle = `hsl(${10 + pulse * 20},100%,${40 + pulse * 20}%)`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // ② 基本脈動円 (グラデーション)
+        ctx.save();
+        ctx.shadowBlur = 20 + pulse * 15; ctx.shadowColor = '#f00';
+        let cg = ctx.createRadialGradient(cx, cy, 4, cx, cy, cr);
+        cg.addColorStop(0, `hsl(60,100%,${70 + pulse * 20}%)`);
+        cg.addColorStop(0.2, `hsl(20,100%,${55 + pulse * 10}%)`);
+        cg.addColorStop(0.5, `hsl(0,100%,${40 + pulse * 10}%)`);
+        cg.addColorStop(1, `hsl(0,80%,${20 + pulse * 5}%)`);
+        ctx.fillStyle = cg;
+        ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // ③ 中心: 正八角形に近い宝石/結晶ドット絵 (hslグラデーション)
+        ctx.save();
+        ctx.translate(cx, cy);
+        let sz = 12; // 半径12の結晶
+        // 6色グラデーション (内側から外側へ)
+        let colors = [
+            `hsl(60,100%,90%)`,   // 白黄 (中心ハイライト)
+            `hsl(30,100%,75%)`,   // 淡橙
+            `hsl(10,100%,60%)`,   // 橙赤
+            `hsl(0,100%,50%)`,    // 赤
+            `hsl(340,80%,35%)`,   // 暗赤
+            `hsl(320,60%,20%)`,   // 深紫
+        ];
+        // 正八角形を同心円状に塗る
+        for (let ci = colors.length - 1; ci >= 0; ci--) {
+            let r2 = sz * (ci + 1) / colors.length;
+            ctx.fillStyle = colors[ci];
+            ctx.beginPath();
+            for (let j = 0; j < 8; j++) {
+                let a = (j / 8) * Math.PI * 2 - Math.PI / 8;
+                let px = Math.cos(a) * r2, py = Math.sin(a) * r2;
+                j === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.closePath(); ctx.fill();
+        }
+        // ハイライト
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillRect(-2, -4, 2, 2);
+        ctx.fillRect(-1, -5, 1, 1);
+
+        // ④ 中心の暗い核
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+        // 内側グロー
+        ctx.strokeStyle = `rgba(255,100,0,${0.4 + pulse * 0.4})`; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(0, 0, sz * 0.55, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.restore();
+    },
+
+    // === 高品質敵描画 (眼球/触手モンスター) ===
+    drawAbyssEnemy(e) {
+        let ex = e.x, ey = e.y;
+        ctx.translate(ex, ey);
+        let isBoss = (e.type === 'boss');
+        let sz = isBoss ? 12 : 8; // 半径 (boss:24x24, normal:16x16)
+
+        // HPバー
+        let bw = isBoss ? 24 : 16;
+        let bary = -(sz + (isBoss ? 16 : 10));
+        ctx.fillStyle = '#400';
+        ctx.fillRect(-bw/2, bary, bw, 3);
+        ctx.fillStyle = '#f00';
+        ctx.fillRect(-bw/2, bary, bw * Math.max(0, e.hp / e.maxHp), 3);
+
+        if (isBoss) {
+            // === ボス: 24×24, 複数の目 ===
+            // 体 (暗紫/黒)
+            ctx.fillStyle = '#1a0030';
+            ctx.fillRect(-sz, -sz, sz*2, sz*2);
+            ctx.fillStyle = '#2d0050';
+            ctx.fillRect(-sz+1, -sz+1, sz*2-2, sz*2-2);
+            // 触手 x4方向
+            ctx.strokeStyle = '#600080'; ctx.lineWidth = 3;
+            for (let i = 0; i < 4; i++) {
+                let ang = (i / 4) * Math.PI * 2;
+                let len = sz + 8 + Math.sin(this.tmr * 0.08 + i) * 3;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(ang) * (sz - 1), Math.sin(ang) * (sz - 1));
+                ctx.lineTo(Math.cos(ang) * len, Math.sin(ang) * len);
+                ctx.stroke();
+                // 触手先端の球
+                ctx.fillStyle = '#800080';
+                ctx.beginPath();
+                ctx.arc(Math.cos(ang) * len, Math.sin(ang) * len, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            // 目 x3
+            let eyeData = [[-4, -4, 3], [4, -4, 3], [0, 2, 2]];
+            for (let [ex2, ey2, er] of eyeData) {
+                ctx.fillStyle = '#f00';
+                ctx.beginPath(); ctx.arc(ex2, ey2, er, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#800';
+                ctx.beginPath(); ctx.arc(ex2, ey2, er * 0.6, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(ex2 + 0.5, ey2, er * 0.3, 0, Math.PI * 2); ctx.fill();
+                // 白ハイライト
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.fillRect(ex2 - er + 1, ey2 - er + 1, 1, 1);
+            }
+            // 輪郭
+            ctx.shadowBlur = 10; ctx.shadowColor = '#f0f';
+            ctx.strokeStyle = '#a0f'; ctx.lineWidth = 1.5;
+            ctx.strokeRect(-sz, -sz, sz*2, sz*2);
+            ctx.shadowBlur = 0;
+
+        } else {
+            // === 通常敵: 16×16 眼球/触手モンスター ===
+            // 体の色 (typeで変える)
+            let bodyCol, eyeCol;
+            if (e.type === 'archer')      { bodyCol = '#003300'; eyeCol = '#00ff44'; }
+            else if (e.type === 'jammer') { bodyCol = '#2d002d'; eyeCol = '#ff44ff'; }
+            else                          { bodyCol = '#1a1a2e'; eyeCol = '#ff2200'; }
+
+            // 体
+            ctx.fillStyle = bodyCol;
+            ctx.fillRect(-sz, -sz, sz*2, sz*2);
+            ctx.fillStyle = bodyCol === '#1a1a2e' ? '#252550' : bodyCol;
+            ctx.fillRect(-sz+1, -sz+1, sz*2-2, sz*2-2);
+
+            // 触手 x4方向 (短め)
+            let tentCol = e.type === 'jammer' ? '#800080' : (e.type === 'archer' ? '#005500' : '#333366');
+            ctx.strokeStyle = tentCol; ctx.lineWidth = 1.5;
+            for (let i = 0; i < 4; i++) {
+                let ang = (i / 4) * Math.PI * 2;
+                let len = sz + 4 + Math.sin(this.tmr * 0.1 + i * 1.5) * 2;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(ang) * (sz - 1), Math.sin(ang) * (sz - 1));
+                ctx.lineTo(Math.cos(ang) * len, Math.sin(ang) * len);
+                ctx.stroke();
+            }
+
+            // 大きな目 (中央)
+            let eyeR = sz * 0.55;
+            ctx.fillStyle = eyeCol;
+            ctx.beginPath(); ctx.arc(0, 0, eyeR, 0, Math.PI * 2); ctx.fill();
+            // 虹彩
+            ctx.fillStyle = e.type === 'archer' ? '#006600' : '#8b0000';
+            ctx.beginPath(); ctx.arc(0, 0, eyeR * 0.7, 0, Math.PI * 2); ctx.fill();
+            // 瞳孔
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(0.5, 0, eyeR * 0.35, 0, Math.PI * 2); ctx.fill();
+            // 白ハイライト
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillRect(-eyeR + 1, -eyeR + 1, 2, 2);
+
+            // ジャマー: 妨害オーラ
+            if (e.type === 'jammer') {
+                ctx.strokeStyle = `rgba(255,0,255,${0.3 + Math.sin(this.tmr * 0.2) * 0.3})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(0, 0, sz + 5, 0, Math.PI * 2); ctx.stroke();
+            }
+
+            ctx.strokeStyle = eyeCol.replace(')', ',0.5)').replace('rgb', 'rgba');
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-sz, -sz, sz*2, sz*2);
+        }
+    },
+
     draw() {
-        const bgGrad = ctx.createLinearGradient(0, 0, 400, 0);
-        bgGrad.addColorStop(0, '#200'); bgGrad.addColorStop(1, '#001'); 
+        // Deep abyss background
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, 240);
+        bgGrad.addColorStop(0, '#0a0015'); bgGrad.addColorStop(0.5, '#100020'); bgGrad.addColorStop(1, '#050008');
         ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 400, 240);
+
+        // Bubble particles
+        ctx.strokeStyle = 'rgba(100,80,180,0.35)'; ctx.lineWidth = 0.8;
+        for (let b of this.bubbles) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.stroke(); }
+        ctx.lineWidth = 1;
 
         // 聖なる封印（魔法陣）
         for (let s of this.holySeals) {
@@ -595,22 +817,11 @@ const Abyss = {
             ctx.fillRect(p.x-4, p.y-2, 8, 4);
         }
 
-        // 敵の描画（種類で色分け）
+        // 敵の描画（種類別高品質ドット絵）
         for (let e of this.enemies) {
-            if (e.type === 'normal') ctx.fillStyle = '#ccc';
-            else if (e.type === 'archer') ctx.fillStyle = '#0a0';
-            else if (e.type === 'jammer') ctx.fillStyle = '#a0a';
-            else if (e.type === 'boss') ctx.fillStyle = '#44f';
-            
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.type === 'boss' ? 20 : 8, 0, Math.PI*2); ctx.fill();
-            
-            // ボスは少し豪華に
-            if (e.type === 'boss') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); }
-            // ジャマーは妨害オーラ
-            if (e.type === 'jammer') { ctx.strokeStyle = `rgba(255,0,255,${Math.random()})`; ctx.beginPath(); ctx.arc(e.x, e.y, 15, 0, Math.PI*2); ctx.stroke(); }
-
-            ctx.fillStyle = '#f00'; ctx.fillRect(e.x - 10, e.y - (e.type === 'boss'? 28 : 14), 20, 3);
-            ctx.fillStyle = '#0f0'; ctx.fillRect(e.x - 10, e.y - (e.type === 'boss'? 28 : 14), 20 * (e.hp/e.maxHp), 3);
+            ctx.save();
+            this.drawAbyssEnemy(e);
+            ctx.restore();
         }
 
         ctx.fillStyle = '#f00';
@@ -651,9 +862,9 @@ const Abyss = {
         }
 
         if (this.coreHp > 0) {
-            ctx.fillStyle = '#f00'; ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
-            ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 30 + Math.sin(this.tmr * 0.1) * 3, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.core.x, this.core.y, 10, 0, Math.PI * 2); ctx.fill();
+            ctx.save();
+            this.drawCore();
+            ctx.restore();
         }
 
         ctx.globalCompositeOperation = 'lighter';
@@ -677,27 +888,48 @@ const Abyss = {
             }
         }
 
-        if (!this.winding && this.st === 'play' && typeof pointer !== 'undefined' && pointer.active && pointer.path.length > 0) {
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
-            ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-            ctx.beginPath(); ctx.moveTo(pointer.path[0].x, pointer.path[0].y);
-            for (let i = 1; i < pointer.path.length; i++) ctx.lineTo(pointer.path[i].x, pointer.path[i].y);
-            ctx.stroke(); ctx.shadowBlur = 0;
+        if (!this.winding && this.st === 'play' && typeof pointer !== 'undefined' && pointer.active && pointer.path.length > 1) {
+            // ファイヤーエフェクト風グラデーション線: 始点=白, 終点=暗赤->透明
+            let path = pointer.path;
+            let n = path.length;
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            for (let i = 1; i < n; i++) {
+                let t = i / (n - 1); // 0=始点(白), 1=終点(暗赤)
+                let r = Math.floor(255);
+                let g = Math.floor(255 * (1 - t) * 0.8);
+                let b = Math.floor(255 * (1 - t) * 0.5);
+                let a = (1 - t * 0.85) * 0.9;
+                let lw = 4 * (1 - t * 0.7) + 0.5;
+                ctx.strokeStyle = `rgba(${r},${g},${b},${a})`;
+                ctx.lineWidth = lw;
+                ctx.shadowBlur = 10 * (1 - t * 0.7);
+                ctx.shadowColor = `rgba(255,${Math.floor(140*(1-t))},0,0.8)`;
+                ctx.beginPath();
+                ctx.moveTo(path[i-1].x, path[i-1].y);
+                ctx.lineTo(path[i].x, path[i].y);
+                ctx.stroke();
+            }
+            ctx.shadowBlur = 0; ctx.lineWidth = 1;
         }
 
         if (this.st === 'title') {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(0, 0, 400, 240);
-            ctx.fillStyle = '#f00'; ctx.font = 'bold 30px monospace';
-            ctx.shadowBlur = 20; ctx.shadowColor = '#f00';
-            ctx.fillText('ABYSS GENERAL', 80, 100);
+            // Semi-transparent overlay (tentacles visible behind)
+            ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0,0,400,240);
+            ctx.shadowBlur = 28; ctx.shadowColor = '#f00';
+            ctx.fillStyle = '#f44'; ctx.font = 'bold 30px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('ABYSS GENERAL', 200, 95);
             ctx.shadowBlur = 0;
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace';
-            ctx.fillText('- 深 淵 の 魔 将 -', 135, 130);
-            
+            ctx.fillStyle = '#c8a'; ctx.font = 'bold 13px monospace';
+            ctx.fillText('- 深 淵 の 魔 将 v2 -', 200, 118);
+            ctx.fillStyle = '#555'; ctx.font = '10px monospace';
+            ctx.fillText('DRAW GESTURES TO COMMAND', 200, 150);
             if (this.tmr % 60 < 30) {
-                ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-                ctx.fillText('TAP TO START', 140, 200);
+                ctx.shadowBlur = 10; ctx.shadowColor = '#0f0';
+                ctx.fillStyle = '#0f0'; ctx.font = 'bold 15px monospace';
+                ctx.fillText('TAP TO START', 200, 200);
+                ctx.shadowBlur = 0;
             }
+            ctx.textAlign = 'left';
         } 
         else if (this.st === 'gameover') {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; ctx.fillRect(0, 0, 400, 240);
@@ -711,10 +943,11 @@ const Abyss = {
             }
         }
         else {
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
-            ctx.fillText(`HP:${Math.floor(this.coreHp)}/${this.coreMaxHp}`, 70, 20);
-            ctx.fillStyle = '#ff0'; ctx.fillText(`SOUL:${this.soul}`, 170, 20);
-            ctx.fillStyle = '#fff'; ctx.fillText(`SCORE:${this.score}`, 250, 20);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace';
+            ctx.fillText('HP:'+Math.floor(this.coreHp)+'/'+this.coreMaxHp, 70, 20);
+            ctx.fillStyle = '#ff0'; ctx.fillText('SOUL:'+this.soul, 170, 20);
+            ctx.fillStyle = '#fff'; ctx.fillText('SCORE:'+this.score, 250, 20);
+            ctx.fillStyle = '#f8a'; ctx.fillText('W'+this.wave, 360, 20);
 
             // ジャマー影響時はオルゴールUIを紫に点滅
             let hasJammer = this.enemies.some(e => e.type === 'jammer');

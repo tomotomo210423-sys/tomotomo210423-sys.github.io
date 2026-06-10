@@ -1,4 +1,4 @@
-// === CORE SYSTEM (13in1 RETRO SYSTEM - v17.0) ===
+// === CORE SYSTEM (11in1 Local Save & SpriteCache Fix Edition) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -53,8 +53,9 @@ const SaveSys = {
         trashFiles: d.trashFiles||{},
         tetriHi: d.tetriHi||0,
         chainBest: d.chainBest||0,
-        dashBest: d.dashBest||0
-    }; 
+        dashBest: d.dashBest||0,
+        pcBest: d.pcBest||{easy:0,normal:0,hard:0}
+    };
   })(),
   
   save() { localStorage.setItem('4in1_ultimate', JSON.stringify(this.data)); },
@@ -79,11 +80,7 @@ const BGM = {
       menu:   { t1:[262,330,392,523,392,330], t2:[131,165,196,262,196,165], t3:[65,0,98,0,65,0], n:[0,0,1,0,0,1], spd: 300 },
       tetri:  { t1:[330,392,349,330,294,330,349,392], t2:[165,196,174,165,147,165,174,196], t3:[82,82,87,87,73,73,87,87], n:[1,0,1,0,1,0,1,0], spd: 200 },
       action: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,123,0,131,0,98,0], n:[1,1,0,1,1,1,0,1], spd: 220 },
-      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 },
-      musou:  { t1:[392,466,523,466,392,349,392,523], t2:[196,233,262,233,196,174,196,262], t3:[98,98,0,131,98,0,131,98], n:[1,0,1,1,0,1,1,0], spd: 155 },
-      puzzle: { t1:[392,440,494,523,494,440,392,349], t2:[196,220,247,262,247,220,196,174], t3:[98,0,0,131,0,0,98,0], n:[0,0,0,0,0,0,0,0], spd: 420 },
-      dash:   { t1:[440,494,554,659,554,494,523,440], t2:[220,247,277,330,277,247,262,220], t3:[110,0,138,0,110,0,138,0], n:[1,0,0,1,1,0,0,1], spd: 175 },
-      boss:   { t1:[294,311,294,262,294,349,311,294], t2:[147,155,147,131,147,174,155,147], t3:[73,0,87,73,0,87,73,0], n:[1,1,0,1,1,0,1,0], spd: 250 }
+      spell:  { t1:[523,659,784,1046], t2:[0,0,0,0], t3:[0,0,0,0], n:[0,0,0,0], spd: 120 }
     };
     const tr = mels[type] || mels.menu; let i = 0;
     bgmInterval = setInterval(() => {
@@ -259,57 +256,77 @@ const Menu = {
       document.getElementById('gameboy').className = '';
   },
   
+  // ONLINE対戦 はインターネット接続が必要 (apps 配列上の index)
+  onlineRequiredIndices: [3],
+
+  isOfflineApp(i) {
+    return this.onlineRequiredIndices.includes(i) && !window.isOnline;
+  },
+
   update() {
     if (keys.select) { this.holdTimer++; if (this.holdTimer === 30) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme + 1) % bgThemes.length; SaveSys.save(); playSnd('combo'); } } else { this.holdTimer = 0; }
     if (keysDown.down) { this.cur = (this.cur + 1) % this.apps.length; playSnd('sel'); }
     if (keysDown.up) { this.cur = (this.cur - 1 + this.apps.length) % this.apps.length; playSnd('sel'); }
-    
-    if (keysDown.a) { 
+
+    if (keysDown.a) {
+        // オフライン中はオンライン必須アプリを起動不可
+        if (this.isOfflineApp(this.cur)) { playSnd('hit'); return; }
         const appObjs = [
-            typeof Guide !== 'undefined' ? Guide : null, 
-            typeof Tetri !== 'undefined' ? Tetri : null, 
-            typeof Action !== 'undefined' ? Action : null, 
-            typeof Online !== 'undefined' ? Online : null, 
-            typeof Rhythm !== 'undefined' ? Rhythm : null, 
-            typeof Slot !== 'undefined' ? Slot : null, 
-            typeof Musou !== 'undefined' ? Musou : null, 
-            typeof Abyss !== 'undefined' ? Abyss : null, 
-            typeof Noise !== 'undefined' ? Noise : null, 
-            typeof PCApp !== 'undefined' ? PCApp : null, 
+            typeof Guide !== 'undefined' ? Guide : null,
+            typeof Tetri !== 'undefined' ? Tetri : null,
+            typeof Action !== 'undefined' ? Action : null,
+            typeof Online !== 'undefined' ? Online : null,
+            typeof Rhythm !== 'undefined' ? Rhythm : null,
+            typeof Slot !== 'undefined' ? Slot : null,
+            typeof Musou !== 'undefined' ? Musou : null,
+            typeof Abyss !== 'undefined' ? Abyss : null,
+            typeof Noise !== 'undefined' ? Noise : null,
+            typeof PCApp !== 'undefined' ? PCApp : null,
             typeof Biotope !== 'undefined' ? Biotope : null,
             typeof Horror !== 'undefined' ? Horror : null,
             typeof ChainBlast !== 'undefined' ? ChainBlast : null,
             typeof TurboDash !== 'undefined' ? TurboDash : null,
             typeof Settings !== 'undefined' ? Settings : null
-        ]; 
+        ];
         if (appObjs[this.cur]) { switchApp(appObjs[this.cur]); } else { playSnd('hit'); }
     }
   },
-  
+
   draw() {
-    bgThemes[SaveSys.data.bgTheme].draw(ctx); 
-    
+    bgThemes[SaveSys.data.bgTheme].draw(ctx);
+
+    // ★ 11in1 に変更！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-    ctx.fillText('13in1 RETRO', 50, 25); ctx.shadowBlur = 0;
-    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v17.0', 45, 40);
-    
+    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.3', 45, 40);
+
     let startY = 63;
     let drawStart = Math.max(0, this.cur - 8);
-    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) { 
+    for (let i = drawStart; i < Math.min(this.apps.length, drawStart + 10); i++) {
         let col = this.appColors[i];
-        ctx.font = 'bold 11px monospace'; 
-        
+        let offline = this.isOfflineApp(i);
+        ctx.font = 'bold 11px monospace';
+
+        // オフライン無効アプリはグレーアウト
+        if (offline) col = '#444';
+
         if (i === this.cur) {
-            ctx.fillStyle = col;
+            ctx.fillStyle = offline ? '#2a2a2a' : col;
             ctx.fillRect(8, startY + (i - drawStart) * 19 - 11, 184, 15);
-            ctx.fillStyle = '#000';
-            ctx.fillText('▶ ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+            ctx.fillStyle = offline ? '#666' : '#000';
+            ctx.fillText('▶ ' + this.apps[i] + (offline ? ' [圏外]' : ''), 12, startY + (i - drawStart) * 19);
         } else {
             ctx.fillStyle = col;
-            ctx.fillText('  ' + this.apps[i], 12, startY + (i - drawStart) * 19); 
+            ctx.fillText('  ' + this.apps[i] + (offline ? ' [圏外]' : ''), 12, startY + (i - drawStart) * 19);
         }
     }
-    
+
+    // 圏外インジケーター
+    if (!window.isOnline) {
+        ctx.fillStyle = '#555'; ctx.font = '8px monospace';
+        ctx.fillText('● 圏外', 130, 288);
+    }
+
     ctx.fillStyle = '#666'; ctx.font = '8px monospace'; ctx.fillText(`BG: ${bgThemes[SaveSys.data.bgTheme].name}`, 10, 288);
   }
 };

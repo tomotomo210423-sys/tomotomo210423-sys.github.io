@@ -192,7 +192,7 @@ const Noise = {
     p: { x: 100, y: 280, r: 6, spd: 3.0, box: false }, o2: 100, o2Cd: 0, 
     texts: [], enemies: [], walls: [], doors: [], switches: [], terminals: [], lasers: [], lockers: [],
     goal: { x: 100, y: 20, r: 15 }, stats: { kills: 0, noise: 0, boxTime: 0, time: 0 },
-    commTmr: 100, commQueue: [], escapeTimer: -1, 
+    commTmr: 100, commQueue: [], escapeTimer: -1, dialogSkipHold: 0,
     
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss'); canvas.width = 200; canvas.height = 300;
@@ -369,13 +369,26 @@ const Noise = {
                 this.strToShow += msg.t[this.strToShow.length];
                 if (this.strToShow.length % 3 === 0) playSE('sel');
             }
+            // ★ ダイアログスキップ: Aボタン長押し15フレームで全スキップ
+            if (keys.a) {
+                this.dialogSkipHold++;
+                if (this.dialogSkipHold >= 15) {
+                    this.dialogSkipHold = 0;
+                    playSE('hit');
+                    if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; }
+                    else { this.loadLevel(); }
+                    return;
+                }
+            } else {
+                this.dialogSkipHold = 0;
+            }
             if (keysDown.a) {
-                if (this.strToShow.length < msg.t.length) { this.strToShow = msg.t; } 
+                if (this.strToShow.length < msg.t.length) { this.strToShow = msg.t; }
                 else {
                     this.msgIdx++;
-                    if (this.msgIdx < SCENARIOS[this.scIdx].length) { this.strToShow = ''; } 
+                    if (this.msgIdx < SCENARIOS[this.scIdx].length) { this.strToShow = ''; }
                     else {
-                        if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; } 
+                        if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; }
                         else { this.loadLevel(); }
                     }
                 }
@@ -452,6 +465,8 @@ const Noise = {
             if (this.o2 < 100) this.o2 += 0.4;
             if (this.o2Cd > 0) this.o2Cd--;
         }
+        // ★ O2自動回復: 30フレームごとに+0.5 (ボックス中も適用)
+        if (this.tmr % 30 === 0 && this.o2 < 100) this.o2 = Math.min(100, this.o2 + 0.5);
 
         let moved = false; let vx = 0, vy = 0;
         if (keys.left)  { vx -= currentSpd; moved = true; }
@@ -552,8 +567,14 @@ const Noise = {
         if (!spotted) {
             for (let e of this.enemies) {
                 let prevX = e.x, prevY = e.y;
-                if (e.type === 'boss') { e.dir += 0.03; } 
-                else if (e.type === 'sniper') { e.sweepTmr = (e.sweepTmr || 0) + 1; e.dir = Math.PI/2 + Math.sin(e.sweepTmr * 0.02) * 1.0; }
+                if (e.type === 'boss') { e.dir += 0.03; }
+                else if (e.type === 'sniper') {
+                    // ★ スナイパー: sweepAngleが±45°(0.785rad)を0.8°/frame(0.01396rad/frame)で往復
+                    if (e.sweepAngle === undefined) { e.sweepAngle = 0; e.sweepDir = 1; }
+                    e.sweepAngle += 0.01396 * e.sweepDir;
+                    if (e.sweepAngle > 0.785 || e.sweepAngle < -0.785) e.sweepDir *= -1;
+                    e.dir = Math.PI / 2 + e.sweepAngle;
+                }
                 else {
                     let moveX = 0, moveY = 0;
                     if (e.inv && e.inv.tmr > 0) { 
@@ -590,7 +611,7 @@ const Noise = {
                 if (!this.p.box && !inLocker) {
                     let pdx = this.p.x - e.x, pdy = this.p.y - e.y;
                     let sightRadius = e.type === 'dog' ? 50 : (e.type === 'boss' ? 220 : (e.type === 'sniper' ? 300 : 90)); 
-                    let fov = e.type === 'boss' ? 0.8 : (e.type === 'sniper' ? 0.2 : 0.6);
+                    let fov = e.type === 'boss' ? 1.309 : (e.type === 'sniper' ? 0.2 : 0.6); // ★ ボスFOV=150°(half=75°=1.309rad)
                     if (Math.hypot(pdx, pdy) < sightRadius) {
                         let angleDiff = Math.abs(Math.atan2(pdy, pdx) - e.dir);
                         if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
@@ -786,7 +807,7 @@ const Noise = {
 
         for (let e of this.enemies) {
             let sightRadius = e.type === 'dog' ? 50 : (e.type === 'boss' ? 220 : (e.type === 'sniper' ? 300 : 90));
-            let fov = e.type === 'boss' ? 0.8 : (e.type === 'sniper' ? 0.2 : 0.6);
+            let fov = e.type === 'boss' ? 1.309 : (e.type === 'sniper' ? 0.2 : 0.6); // ★ ボスFOV=150°(half=75°=1.309rad)
             ctx.fillStyle = e.type === 'boss' ? 'rgba(255, 0, 255, 0.3)' : (e.type === 'sniper' ? 'rgba(255, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)'); 
             ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, sightRadius, e.dir - fov, e.dir + fov); ctx.fill();
             
@@ -805,7 +826,70 @@ const Noise = {
             ctx.fillRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16);
             ctx.fillStyle = '#000'; ctx.fillRect(this.p.x - 4, this.p.y - 2 + waveY, 8, 2);
         } else if (!inLocker) {
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.p.x, this.p.y, this.p.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
+            // === STEALTH AGENT 8×8 pixel art ===
+            // Determine facing direction from last movement
+            let facingRight = (Math.cos(this.enemies.length > 0 ? 0 : 0) >= 0); // default right
+            // Use velocity direction if moving
+            let vx = (keys && keys.right ? 1 : 0) - (keys && keys.left ? 1 : 0);
+            if (vx !== 0) facingRight = vx > 0;
+
+            let ax = this.p.x - 4; // anchor: center the 8-wide sprite
+            let ay = this.p.y - 6; // anchor: center the 8-tall sprite
+            const S = 2; // each dot = 2px
+            function dot(col, row, w, h) {
+                ctx.fillRect(ax + col * S, ay + row * S, (w||1)*S, (h||1)*S);
+            }
+            // Black bodysuit (full silhouette)
+            ctx.fillStyle = '#111';
+            dot(1,0,2,1); // top of head
+            dot(0,1,4,1); // head row1
+            dot(0,2,4,1); // head row2
+            dot(0,3,4,1); // neck+shoulder
+            dot(0,4,4,2); // torso
+            dot(0,6,2,2); // left leg
+            dot(2,6,2,2); // right leg
+
+            // Goggles/visor (white glow)
+            ctx.fillStyle = '#fff';
+            if (facingRight) {
+                dot(1,1,2,1); // left goggle
+                dot(3,1,1,1); // right goggle
+            } else {
+                dot(0,1,1,1); // left goggle (mirrored)
+                dot(1,1,2,1); // right goggle
+            }
+
+            // Goggle shine (light blue tint)
+            ctx.fillStyle = '#9ef';
+            if (facingRight) {
+                dot(1,1,1,1);
+            } else {
+                dot(2,1,1,1);
+            }
+
+            // Dark edge outline
+            ctx.fillStyle = '#000';
+            dot(0,0,1,1); dot(3,0,1,1); // head top corners
+            dot(4,1,1,1); dot(4,2,1,1); // right side head
+            dot(4,3,1,3); // right torso edge
+            dot(0,6,1,1); dot(4,6,1,1); // leg tops outer
+
+            // Belt / equipment detail
+            ctx.fillStyle = '#333';
+            dot(0,5,4,1); // belt line
+            ctx.fillStyle = '#555';
+            dot(1,5,1,1); // belt buckle highlight
+
+            // Shoe soles
+            ctx.fillStyle = '#222';
+            dot(0,7,2,1); // left shoe
+            dot(2,7,2,1); // right shoe
+
+            // Walk animation shimmer (subtle)
+            if (this.tmr % 20 < 10) {
+                ctx.fillStyle = 'rgba(0,255,255,0.18)';
+                dot(1,4,2,1);
+            }
         }
 
         for (let t of this.texts) {

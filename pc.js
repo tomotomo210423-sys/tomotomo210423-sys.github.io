@@ -1,397 +1,506 @@
-// === HACKER'S 15 (Image Upload & Cheat Puzzle - Visual Enhanced) ===
-// マトリックス風演出、グリッチエフェクト、サイバーUIを搭載した完全ハッカー仕様
-
+// === HACKER'S 15 — CYBER PUZZLE SYSTEM v2.0 ===
 const PCApp = {
-    st: 'title',
-    mode: 0, // 0: PURE, 1: HACKER
-    img: null,
-    board: [], 
-    cursor: 0,
-    hp: 100,
-    timer: 0,
-    scanTimer: 0,
-    cheatSel: 0,
-    swap1: -1,
-    titleCur: 0,
-    drops: [], // デジタルレイン用
+    st: 'title', // title/upload/play/cheat/cheat_swap1/cheat_swap2/clear
+    difficulty: 'normal', // easy/normal/hard
+    cols: 4, cellSize: 40, boardX: 20, boardY: 50,
+    img: null, board: [], cursor: 0,
+    hp: 100, timer: 0, clearTime: 0,
+    scanTimer: 0, hintPiece: -1,
+    cheatSel: 0, swap1: -1,
+    titleCur: 1, // 0=easy 1=normal 2=hard
+    drops: [], slideAnim: [],
+    clearFlash: 0, newRecord: false,
 
     init() {
         this.st = 'title';
         this.img = null;
+        this.slideAnim = [];
+        this.timer = 0;
+        this.titleCur = 1;
         BGM.stop();
         this.createUI();
-        
-        // デジタルレイン（マトリックスの雨）初期化
         this.drops = [];
-        for(let i=0; i<20; i++) {
-            this.drops.push({ x: i*10, y: Math.random()*-300, speed: 1 + Math.random()*2 });
+        for (let i = 0; i < 20; i++) {
+            this.drops.push({ x: i * 10, y: Math.random() * -300, speed: 1 + Math.random() * 2 });
         }
     },
 
-    // ★ 画像アップロードボタンもハッカー（CUIターミナル）風に魔改造！
     createUI() {
         let wrap = document.getElementById('hacker-file-wrap');
         if (!wrap) {
             wrap = document.createElement('div');
             wrap.id = 'hacker-file-wrap';
-            wrap.style.position = 'absolute';
-            wrap.style.top = '50%'; wrap.style.left = '50%';
-            wrap.style.transform = 'translate(-50%, -50%)';
-            wrap.style.zIndex = '100';
-            wrap.style.display = 'none';
-            wrap.style.flexDirection = 'column';
-            wrap.style.gap = '15px';
-            wrap.style.alignItems = 'center';
-            wrap.style.width = '100%';
-            
+            wrap.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;display:none;flex-direction:column;gap:15px;align-items:center;width:100%';
+
             let lbl = document.createElement('label');
-            lbl.style.background = '#000'; lbl.style.color = '#0f0';
-            lbl.style.padding = '12px 20px'; lbl.style.fontFamily = 'monospace';
-            lbl.style.fontWeight = 'bold'; lbl.style.cursor = 'pointer';
-            lbl.style.border = '2px solid #0f0'; lbl.style.borderRadius = '0px';
-            lbl.style.boxShadow = '0 0 10px #0f0, inset 0 0 10px #0f0';
-            lbl.style.textShadow = '0 0 5px #0f0';
+            lbl.style.cssText = 'background:#000;color:#0f0;padding:12px 20px;font-family:monospace;font-weight:bold;cursor:pointer;border:2px solid #0f0;box-shadow:0 0 10px #0f0,inset 0 0 10px #0f0;text-shadow:0 0 5px #0f0';
             lbl.innerText = '> UPLOAD_IMAGE.exe';
-            
+
             let inp = document.createElement('input');
             inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
             inp.onchange = (e) => {
                 let file = e.target.files[0];
-                if(file) {
+                if (file) {
                     let r = new FileReader();
-                    r.onload = ev => {
-                        let i = new Image(); i.onload = () => this.setupImage(i); i.src = ev.target.result;
-                    };
+                    r.onload = ev => { let i = new Image(); i.onload = () => this.setupImage(i); i.src = ev.target.result; };
                     r.readAsDataURL(file);
                 }
                 wrap.style.display = 'none';
             };
-            
+
             let cancel = document.createElement('button');
             cancel.innerText = '> LOAD_DEFAULT.bat';
-            cancel.style.background = '#000'; cancel.style.color = '#aaa';
-            cancel.style.border = '1px solid #aaa'; cancel.style.padding = '8px 15px';
-            cancel.style.fontFamily = 'monospace'; cancel.style.borderRadius = '0px';
-            cancel.style.boxShadow = '0 0 5px #aaa';
-            cancel.onclick = () => {
-                wrap.style.display = 'none';
-                this.generateDefaultImage();
-            };
+            cancel.style.cssText = 'background:#000;color:#aaa;border:1px solid #aaa;padding:8px 15px;font-family:monospace;box-shadow:0 0 5px #aaa';
+            cancel.onclick = () => { wrap.style.display = 'none'; this.generateDefaultImage(); };
 
-            lbl.appendChild(inp);
-            wrap.appendChild(lbl);
-            wrap.appendChild(cancel);
+            lbl.appendChild(inp); wrap.appendChild(lbl); wrap.appendChild(cancel);
             document.getElementById('screen-container').appendChild(wrap);
         }
     },
 
-    hideUI() {
-        let wrap = document.getElementById('hacker-file-wrap');
-        if (wrap) wrap.style.display = 'none';
+    hideUI() { let w = document.getElementById('hacker-file-wrap'); if (w) w.style.display = 'none'; },
+
+    setupDifficulty(diff) {
+        this.difficulty = diff;
+        if (diff === 'easy')   { this.cols = 3; this.cellSize = 60; this.boardX = 10; this.boardY = 60; }
+        if (diff === 'normal') { this.cols = 4; this.cellSize = 40; this.boardX = 20; this.boardY = 50; }
+        if (diff === 'hard')   { this.cols = 5; this.cellSize = 32; this.boardX = 20; this.boardY = 50; }
     },
 
     setupImage(img) {
-        let size = Math.min(img.width, img.height);
-        let sx = (img.width - size) / 2; let sy = (img.height - size) / 2;
-        let offC = document.createElement('canvas'); offC.width = 160; offC.height = 160;
-        let offCtx = offC.getContext('2d');
-        offCtx.drawImage(img, sx, sy, size, size, 0, 0, 160, 160);
-        let newImg = new Image();
-        newImg.onload = () => { this.img = newImg; this.startPuzzle(); };
-        newImg.src = offC.toDataURL();
+        let n = this.cols, sz = n * this.cellSize;
+        let side = Math.min(img.width, img.height);
+        let sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        let offC = document.createElement('canvas'); offC.width = sz; offC.height = sz;
+        offC.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, sz, sz);
+        let ni = new Image(); ni.onload = () => { this.img = ni; this.startPuzzle(); }; ni.src = offC.toDataURL();
     },
 
     generateDefaultImage() {
-        let offC = document.createElement('canvas'); offC.width = 160; offC.height = 160;
+        let n = this.cols, sz = n * this.cellSize;
+        let offC = document.createElement('canvas'); offC.width = sz; offC.height = sz;
         let c = offC.getContext('2d');
-        c.fillStyle = '#001'; c.fillRect(0,0,160,160);
-        c.strokeStyle = '#0f0'; c.lineWidth = 1;
-        for(let i=0; i<=160; i+=10) { c.beginPath(); c.moveTo(i,0); c.lineTo(i,160); c.stroke(); c.beginPath(); c.moveTo(0,i); c.lineTo(160,i); c.stroke(); }
-        c.fillStyle = '#f0f'; c.font = 'bold 24px monospace'; c.textAlign='center';
-        c.fillText('SYSTEM', 80, 70); c.fillText('HACKED', 80, 100);
-        let newImg = new Image();
-        newImg.onload = () => { this.img = newImg; this.startPuzzle(); };
-        newImg.src = offC.toDataURL();
+        let g = c.createLinearGradient(0, 0, sz, sz);
+        g.addColorStop(0, '#000510'); g.addColorStop(0.5, '#001a2e'); g.addColorStop(1, '#000510');
+        c.fillStyle = g; c.fillRect(0, 0, sz, sz);
+        c.strokeStyle = '#0f0'; c.lineWidth = 0.5;
+        for (let i = 0; i <= sz; i += sz / n) {
+            c.beginPath(); c.moveTo(i, 0); c.lineTo(i, sz); c.stroke();
+            c.beginPath(); c.moveTo(0, i); c.lineTo(sz, i); c.stroke();
+        }
+        c.shadowBlur = 10; c.textAlign = 'center';
+        c.fillStyle = '#f0f'; c.shadowColor = '#f0f'; c.font = `bold ${Math.floor(sz/5)}px monospace`;
+        c.fillText('SYS', sz / 2, sz * 0.42);
+        c.fillStyle = '#0ff'; c.shadowColor = '#0ff';
+        c.fillText('HACK', sz / 2, sz * 0.72);
+        c.shadowBlur = 0;
+        let ni = new Image(); ni.onload = () => { this.img = ni; this.startPuzzle(); }; ni.src = offC.toDataURL();
     },
 
     startPuzzle() {
+        let n = this.cols, total = n * n;
         this.board = [];
-        for(let i=0; i<16; i++) this.board.push(i);
-        this.board[15] = -1; 
-        
-        let empty = 15;
-        for(let i=0; i<250; i++) {
+        for (let i = 0; i < total; i++) this.board.push(i);
+        this.board[total - 1] = -1;
+        let empty = total - 1;
+        let shuffles = 300 + n * 60;
+        for (let i = 0; i < shuffles; i++) {
             let valid = [];
-            if (empty >= 4) valid.push(-4); 
-            if (empty <= 11) valid.push(4); 
-            if (empty % 4 !== 0) valid.push(-1); 
-            if (empty % 4 !== 3) valid.push(1); 
-            
+            if (empty >= n) valid.push(-n); if (empty < total - n) valid.push(n);
+            if (empty % n !== 0) valid.push(-1); if (empty % n !== n - 1) valid.push(1);
             let m = valid[Math.floor(Math.random() * valid.length)];
             this.board[empty] = this.board[empty + m]; this.board[empty + m] = -1; empty += m;
         }
-        
-        this.st = 'play'; this.hp = 100; this.timer = 0; this.scanTimer = 0;
-        this.cursor = 0; this.swap1 = -1;
+        this.slideAnim = new Array(total).fill(null).map(() => ({ dx: 0, dy: 0 }));
+        this.st = 'play'; this.hp = 100; this.timer = 0;
+        this.scanTimer = 0; this.hintPiece = -1;
+        this.cursor = 0; this.swap1 = -1; this.clearFlash = 0; this.newRecord = false;
         BGM.play('puzzle');
     },
 
     checkClear() {
-        let ok = true;
-        for(let i=0; i<16; i++) { if (this.board[i] !== i && this.board[i] !== -1) ok = false; }
-        if (ok) { this.st = 'clear'; playSnd('combo'); }
+        let n = this.cols, total = n * n;
+        for (let i = 0; i < total; i++) { if (this.board[i] !== i && this.board[i] !== -1) return; }
+        this.st = 'clear'; this.clearTime = this.timer; this.clearFlash = 60;
+        playSnd('combo'); screenShake(4);
+        for (let i = 0; i < total; i++) {
+            if (this.board[i] === -1) continue;
+            let bx = this.boardX + (i % n) * this.cellSize + this.cellSize / 2;
+            let by = this.boardY + Math.floor(i / n) * this.cellSize + this.cellSize / 2;
+            addParticle(bx, by, '#0ff', 'explosion');
+        }
+        let diff = this.difficulty, t = this.clearTime;
+        if (!SaveSys.data.pcBest) SaveSys.data.pcBest = { easy: 0, normal: 0, hard: 0 };
+        if (!SaveSys.data.pcBest[diff] || t < SaveSys.data.pcBest[diff]) {
+            SaveSys.data.pcBest[diff] = t; SaveSys.save(); this.newRecord = true;
+        }
     },
 
     update() {
         if (keysDown.select) { this.hideUI(); switchApp(Menu); return; }
+        this.timer++;
+        let n = this.cols;
 
         if (this.st === 'title') {
-            if (keysDown.up || keysDown.down) { this.titleCur = this.titleCur === 0 ? 1 : 0; playSnd('sel'); }
+            if (keysDown.up || keysDown.down) {
+                this.titleCur = (this.titleCur + (keysDown.up ? -1 : 1) + 3) % 3; playSnd('sel');
+            }
             if (keysDown.a) {
-                this.mode = this.titleCur; 
+                let diffs = ['easy', 'normal', 'hard'];
+                this.setupDifficulty(diffs[this.titleCur]);
                 this.st = 'upload';
-                document.getElementById('hacker-file-wrap').style.display = 'flex'; 
+                document.getElementById('hacker-file-wrap').style.display = 'flex';
                 playSnd('jmp');
             }
             return;
         }
-        
-        if (this.st === 'upload') return; 
-        if (this.st === 'clear') { if (keysDown.a) { this.hideUI(); this.init(); } return; }
-
+        if (this.st === 'upload') return;
+        if (this.st === 'clear') {
+            if (this.clearFlash > 0) this.clearFlash--;
+            if (keysDown.a) { this.hideUI(); this.init(); }
+            return;
+        }
         if (this.scanTimer > 0) this.scanTimer--;
 
         if (this.st === 'play') {
-            if (keysDown.up && this.cursor >= 4) { this.cursor -= 4; playSnd('sel'); }
-            if (keysDown.down && this.cursor <= 11) { this.cursor += 4; playSnd('sel'); }
-            if (keysDown.left && this.cursor % 4 !== 0) { this.cursor -= 1; playSnd('sel'); }
-            if (keysDown.right && this.cursor % 4 !== 3) { this.cursor += 1; playSnd('sel'); }
-
-            if (keysDown.b && this.mode === 1) { this.st = 'cheat'; this.cheatSel = 0; playSnd('jmp'); }
-
+            if (keysDown.up && this.cursor >= n) { this.cursor -= n; playSnd('sel'); }
+            if (keysDown.down && this.cursor < n * n - n) { this.cursor += n; playSnd('sel'); }
+            if (keysDown.left && this.cursor % n !== 0) { this.cursor -= 1; playSnd('sel'); }
+            if (keysDown.right && this.cursor % n !== n - 1) { this.cursor += 1; playSnd('sel'); }
+            if (keysDown.b) { this.st = 'cheat'; this.cheatSel = 0; playSnd('jmp'); }
             if (keysDown.a && this.board[this.cursor] !== -1) {
-                let c = this.cursor; let moves = [];
-                if (c >= 4) moves.push(-4); if (c <= 11) moves.push(4);
-                if (c % 4 !== 0) moves.push(-1); if (c % 4 !== 3) moves.push(1);
-
+                let c = this.cursor, moves = [];
+                if (c >= n) moves.push(-n); if (c < n * n - n) moves.push(n);
+                if (c % n !== 0) moves.push(-1); if (c % n !== n - 1) moves.push(1);
                 for (let m of moves) {
-                    if (this.board[c + m] === -1) { 
-                        this.board[c + m] = this.board[c]; this.board[c] = -1; playSnd('hit');
-                        if (this.mode === 1 && this.board[c + m] === c + m) this.hp = Math.min(100, this.hp + 5);
-                        this.checkClear(); break;
+                    if (this.board[c + m] === -1) {
+                        let dx = 0, dy = 0;
+                        if (m === 1)  dx = -this.cellSize; else if (m === -1) dx = this.cellSize;
+                        else if (m === n)  dy = -this.cellSize; else if (m === -n) dy = this.cellSize;
+                        this.slideAnim[c + m] = { dx, dy };
+                        this.board[c + m] = this.board[c]; this.board[c] = -1;
+                        playSnd('hit'); this.checkClear(); break;
                     }
                 }
             }
-        } 
-        else if (this.st === 'cheat') {
+        } else if (this.st === 'cheat') {
             if (keysDown.up) { this.cheatSel = (this.cheatSel - 1 + 3) % 3; playSnd('sel'); }
             if (keysDown.down) { this.cheatSel = (this.cheatSel + 1) % 3; playSnd('sel'); }
             if (keysDown.b) { this.st = 'play'; playSnd('sel'); }
             if (keysDown.a) {
-                if (this.cheatSel === 0 && this.hp >= 30) { this.hp -= 30; this.st = 'cheat_swap1'; this.swap1 = -1; playSnd('combo'); } 
-                else if (this.cheatSel === 1 && this.hp >= 20) { this.hp -= 20; this.scanTimer = 300; this.st = 'play'; playSnd('combo'); } 
-                else if (this.cheatSel === 2 && this.hp >= 50) { this.hp -= 50; this.st = 'cheat_del'; playSnd('combo'); } 
-                else { playSnd('hit'); } 
+                if (this.cheatSel === 0 && this.hp >= 30) {
+                    this.hp -= 30; this.st = 'cheat_swap1'; this.swap1 = -1; playSnd('combo');
+                } else if (this.cheatSel === 1 && this.hp >= 20) {
+                    this.hp -= 20; this.scanTimer = 180; this.st = 'play'; playSnd('combo');
+                } else if (this.cheatSel === 2 && this.hp >= 15) {
+                    this.hp -= 15; this.hintPiece = -1;
+                    for (let i = 0; i < n * n; i++) {
+                        if (this.board[i] !== -1 && this.board[i] !== i) { this.hintPiece = i; break; }
+                    }
+                    this.st = 'play'; playSnd('combo');
+                } else { playSnd('hit'); }
             }
-        }
-        else if (this.st === 'cheat_swap1' || this.st === 'cheat_swap2' || this.st === 'cheat_del') {
-            if (keysDown.up && this.cursor >= 4) { this.cursor -= 4; playSnd('sel'); }
-            if (keysDown.down && this.cursor <= 11) { this.cursor += 4; playSnd('sel'); }
-            if (keysDown.left && this.cursor % 4 !== 0) { this.cursor -= 1; playSnd('sel'); }
-            if (keysDown.right && this.cursor % 4 !== 3) { this.cursor += 1; playSnd('sel'); }
-            if (keysDown.b) { this.st = 'play'; playSnd('sel'); } 
-
+        } else if (this.st === 'cheat_swap1' || this.st === 'cheat_swap2') {
+            if (keysDown.up && this.cursor >= n) { this.cursor -= n; playSnd('sel'); }
+            if (keysDown.down && this.cursor < n * n - n) { this.cursor += n; playSnd('sel'); }
+            if (keysDown.left && this.cursor % n !== 0) { this.cursor -= 1; playSnd('sel'); }
+            if (keysDown.right && this.cursor % n !== n - 1) { this.cursor += 1; playSnd('sel'); }
+            if (keysDown.b) { this.st = 'play'; playSnd('sel'); }
             if (keysDown.a) {
                 if (this.st === 'cheat_swap1') {
                     if (this.board[this.cursor] !== -1) { this.swap1 = this.cursor; this.st = 'cheat_swap2'; playSnd('jmp'); }
-                } else if (this.st === 'cheat_swap2') {
+                } else {
                     if (this.cursor !== this.swap1 && this.board[this.cursor] !== -1) {
                         let tmp = this.board[this.swap1]; this.board[this.swap1] = this.board[this.cursor]; this.board[this.cursor] = tmp;
                         this.st = 'play'; playSnd('combo'); screenShake(3); this.checkClear();
                     }
-                } else if (this.st === 'cheat_del') {
-                    if (this.board[this.cursor] !== -1) {
-                        this.board[this.cursor] = -1; this.st = 'play'; playSnd('hit');
-                        addParticle(20 + (this.cursor%4)*40 + 20, 50 + Math.floor(this.cursor/4)*40 + 20, '#f00', 'explosion');
-                        screenShake(5); this.checkClear();
-                    }
                 }
             }
         }
+
+        for (let s of this.slideAnim) {
+            s.dx *= 0.5; s.dy *= 0.5;
+            if (Math.abs(s.dx) < 0.5) s.dx = 0;
+            if (Math.abs(s.dy) < 0.5) s.dy = 0;
+        }
     },
 
-    // 画面全体にブラウン管風のスキャンラインを描画する関数
     drawScanlines() {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        for (let i = 0; i < 300; i += 2) { ctx.fillRect(0, i, 200, 1); }
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        for (let i = 0; i < 300; i += 2) ctx.fillRect(0, i, 200, 1);
     },
 
     draw() {
-        this.timer++;
-        
-        // 全体の背景とサイバーグリッド
-        ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)'; ctx.lineWidth = 1;
-        let tOffset = (this.timer * 0.5) % 20;
-        for (let i = 0; i <= 200; i += 20) {
-            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 300); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i + tOffset); ctx.lineTo(200, i + tOffset); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i + tOffset + 100); ctx.lineTo(200, i + tOffset + 100); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i + tOffset + 200); ctx.lineTo(200, i + tOffset + 200); ctx.stroke();
-        }
+        ctx.fillStyle = '#000510'; ctx.fillRect(0, 0, 200, 300);
+        let offset = (this.timer * 0.3) % 20;
+        ctx.strokeStyle = 'rgba(0,255,255,0.07)'; ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 200; i += 20) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 300); ctx.stroke(); }
+        for (let i = -20; i <= 300; i += 20) { ctx.beginPath(); ctx.moveTo(0, i + offset); ctx.lineTo(200, i + offset); ctx.stroke(); }
+        ctx.lineWidth = 1;
 
         if (this.st === 'title') {
-            // デジタルレイン（マトリックス風）
             ctx.font = '10px monospace';
             for (let d of this.drops) {
-                d.y += d.speed; if (d.y > 300) d.y = -20;
-                let char = String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96));
-                ctx.fillStyle = `rgba(0, 255, 0, ${Math.random()})`;
-                ctx.fillText(char, d.x, d.y);
+                d.y += d.speed; if (d.y > 310) d.y = -20;
+                ctx.fillStyle = `rgba(0,255,0,${0.2 + Math.random() * 0.8})`;
+                ctx.fillText(String.fromCharCode(0x30A0 + Math.floor(Math.random() * 96)), d.x, d.y);
             }
-
-            // タイトルロゴ（グリッチ＆ネオン発光）
-            let logoY = 90 + Math.sin(this.timer / 20) * 5;
-            ctx.font = 'bold 24px monospace'; ctx.textAlign = 'center';
-            
-            // ランダムに発生する色ズレ（色収差グリッチ）
-            if (Math.random() < 0.1) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
-                ctx.fillText("HACKER'S 15", 100 - 2 + (Math.random()-0.5)*6, logoY + (Math.random()-0.5)*4);
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
-                ctx.fillText("HACKER'S 15", 100 + 2 + (Math.random()-0.5)*6, logoY + (Math.random()-0.5)*4);
+            let logoY = 72 + Math.sin(this.timer / 20) * 3;
+            ctx.textAlign = 'center';
+            if (Math.random() < 0.07) {
+                ctx.fillStyle = 'rgba(255,0,0,0.5)'; ctx.font = 'bold 17px monospace';
+                ctx.fillText("HACKER'S 15", 100 + (Math.random()-0.5)*5, logoY + (Math.random()-0.5)*3);
+                ctx.fillStyle = 'rgba(0,255,255,0.5)';
+                ctx.fillText("HACKER'S 15", 100 - (Math.random()-0.5)*5, logoY + (Math.random()-0.5)*3);
             }
+            ctx.shadowBlur = 16; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0';
+            ctx.font = 'bold 17px monospace'; ctx.fillText("HACKER'S 15", 100, logoY); ctx.shadowBlur = 0;
+            ctx.fillStyle = '#555'; ctx.font = '7px monospace';
+            ctx.fillText('CYBER PUZZLE SYSTEM v2.0', 100, logoY + 14);
 
-            ctx.shadowBlur = 15; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0';
-            ctx.fillText("HACKER'S 15", 100, logoY); ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,20,0.88)'; ctx.fillRect(25, 108, 150, 118);
+            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 1.5; ctx.strokeRect(25, 108, 150, 118); ctx.lineWidth = 1;
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 9px monospace'; ctx.fillText('SELECT DIFFICULTY', 100, 124);
+            ctx.fillStyle = '#0a0'; ctx.fillRect(30, 128, 140, 1);
 
-            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            ctx.fillText('SYSTEM OVERRIDE PUZZLE', 100, logoY + 25);
-            
-            // ターミナル風のモード選択UI
+            let diffs = [
+                { key: 'easy',   label: 'EASY   3x3', col: '#4f4' },
+                { key: 'normal', label: 'NORMAL 4x4', col: '#ff4' },
+                { key: 'hard',   label: 'HARD   5x5', col: '#f44' }
+            ];
             ctx.textAlign = 'left';
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'; ctx.fillRect(15, 170, 170, 60);
-            ctx.strokeStyle = '#0f0'; ctx.strokeRect(15, 170, 170, 60);
-
-            ctx.fillStyle = this.titleCur === 0 ? '#ff0' : '#080'; 
-            ctx.fillText((this.titleCur===0 ? '> ' : '  ') + 'PURE MODE', 30, 195);
-            ctx.fillStyle = this.titleCur === 1 ? '#ff0' : '#080'; 
-            ctx.fillText((this.titleCur===1 ? '> ' : '  ') + 'HACKER MODE', 30, 215);
-
-            ctx.fillStyle = '#666'; ctx.textAlign = 'center';
-            if (Math.floor(this.timer / 30) % 2 === 0) ctx.fillText('PRESS [A] TO EXECUTE', 100, 260);
-            
-            this.drawScanlines();
-            return;
+            if (!SaveSys.data.pcBest) SaveSys.data.pcBest = { easy: 0, normal: 0, hard: 0 };
+            for (let i = 0; i < 3; i++) {
+                let d = diffs[i], sel = this.titleCur === i;
+                ctx.fillStyle = sel ? d.col : '#555';
+                ctx.font = sel ? 'bold 11px monospace' : '10px monospace';
+                ctx.fillText((sel ? '>' : ' ') + ' ' + d.label, 34, 147 + i * 26);
+                let best = SaveSys.data.pcBest[d.key];
+                if (best) {
+                    ctx.fillStyle = '#888'; ctx.font = '7px monospace';
+                    let bs = Math.floor(best / 60);
+                    ctx.fillText('BEST ' + bs + 's', 142, 147 + i * 26);
+                }
+            }
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#555'; ctx.font = '8px monospace';
+            if (Math.floor(this.timer / 30) % 2 === 0) ctx.fillText('[ A ] EXECUTE', 100, 245);
+            this.drawScanlines(); return;
         }
 
-        if (this.st === 'upload') { 
-            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 300); 
-            this.drawScanlines(); return; 
+        if (this.st === 'upload') {
+            ctx.fillStyle = 'rgba(0,0,0,0.88)'; ctx.fillRect(0, 0, 200, 300);
+            this.drawScanlines(); return;
         }
 
-        // === プレイ画面描画 ===
-        
-        // ハッカーモード特有の画面揺れ（グリッチ）
-        let glitchX = 0; let glitchY = 0;
-        if (this.mode === 1 && this.timer % 100 < 5) {
-            glitchX = (Math.random() - 0.5) * 6; glitchY = (Math.random() - 0.5) * 6;
+        let n = this.cols, cs = this.cellSize, bx0 = this.boardX, by0 = this.boardY;
+
+        // Difficulty-based board background color
+        let boardBgColor = { easy: 'rgba(0,30,10,0.55)', normal: 'rgba(0,15,40,0.55)', hard: 'rgba(30,5,0,0.55)' }[this.difficulty] || 'rgba(0,20,40,0.55)';
+        ctx.fillStyle = boardBgColor; ctx.fillRect(bx0 - 3, by0 - 3, n * cs + 6, n * cs + 6);
+
+        // Board glow border
+        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
+        ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+        ctx.strokeRect(bx0 - 3, by0 - 3, n * cs + 6, n * cs + 6);
+        ctx.shadowBlur = 0; ctx.lineWidth = 1;
+
+        // Clear flash
+        if (this.clearFlash > 0) {
+            ctx.fillStyle = `rgba(0,255,200,${this.clearFlash / 60 * 0.45})`;
+            ctx.fillRect(0, 0, 200, 300);
         }
 
-        // パズル枠（サイバー風）
-        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.shadowBlur = 5; ctx.shadowColor = '#0ff';
-        ctx.strokeRect(19, 49, 162, 162); ctx.lineWidth = 1; ctx.shadowBlur = 0;
-
-        for (let i = 0; i < 16; i++) {
-            let bx = 20 + (i % 4) * 40; let by = 50 + Math.floor(i / 4) * 40;
+        for (let i = 0; i < n * n; i++) {
+            let col = i % n, row = Math.floor(i / n);
+            let sa = this.slideAnim[i] || { dx: 0, dy: 0 };
+            let bx = bx0 + col * cs + sa.dx;
+            let by = by0 + row * cs + sa.dy;
             let val = this.board[i];
-            
-            if (val !== -1) {
-                let sx = (val % 4) * 40; let sy = Math.floor(val / 4) * 40;
-                
-                // 色反転バグエフェクト
-                if (this.mode === 1 && Math.random() < 0.01) ctx.filter = 'invert(100%) hue-rotate(90deg)';
-                
-                if (this.img) ctx.drawImage(this.img, sx, sy, 40, 40, bx + glitchX, by + glitchY, 40, 40);
-                ctx.filter = 'none';
 
-                // ピースの境界線（立体感）
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'; ctx.strokeRect(bx, by, 40, 40);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.strokeRect(bx+1, by+1, 38, 38);
+            if (val === -1) {
+                // Empty cell: dark grid pattern
+                ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(bx, by, cs, cs);
+                ctx.strokeStyle = 'rgba(0,100,100,0.3)'; ctx.lineWidth = 0.5;
+                for (let gx = 0; gx < cs; gx += 8) {
+                    ctx.beginPath(); ctx.moveTo(bx+gx, by); ctx.lineTo(bx+gx, by+cs); ctx.stroke();
+                }
+                for (let gy = 0; gy < cs; gy += 8) {
+                    ctx.beginPath(); ctx.moveTo(bx, by+gy); ctx.lineTo(bx+cs, by+gy); ctx.stroke();
+                }
+                ctx.lineWidth = 1;
+                continue;
+            }
 
-                // SCAN(透視)チート発動中
-                if (this.scanTimer > 0) {
-                    ctx.fillStyle = 'rgba(0,25,0,0.7)'; ctx.fillRect(bx, by, 40, 40);
-                    ctx.shadowBlur = 5; ctx.shadowColor = '#0f0';
-                    ctx.fillStyle = '#0f0'; ctx.font = 'bold 20px monospace'; 
-                    ctx.fillText(val + 1, bx + 10, by + 28);
+            ctx.save();
+
+            // Correct position glow (green)
+            let isCorrect = (val === i);
+            // Wrong position (subtle red glow)
+            let isWrong = !isCorrect;
+
+            if (isCorrect) {
+                ctx.shadowBlur = 6; ctx.shadowColor = '#00ff44';
+            } else if (isWrong && this.scanTimer <= 0 && this.hintPiece !== i) {
+                ctx.shadowBlur = 3; ctx.shadowColor = 'rgba(255,50,50,0.5)';
+            }
+
+            if (this.img) {
+                ctx.drawImage(this.img, (val % n) * cs, Math.floor(val / n) * cs, cs, cs, bx, by, cs, cs);
+            }
+
+            // Piece gradient overlay (makes it look 3D)
+            let pieceGrad = ctx.createLinearGradient(bx, by, bx, by+cs);
+            pieceGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+            pieceGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
+            pieceGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
+            ctx.fillStyle = pieceGrad; ctx.fillRect(bx, by, cs, cs);
+
+            // SCAN overlay with large centered number
+            if (this.scanTimer > 0) {
+                ctx.fillStyle = 'rgba(0,18,0,0.78)'; ctx.fillRect(bx, by, cs, cs);
+                ctx.shadowBlur = 6; ctx.shadowColor = '#0f0';
+                ctx.fillStyle = '#0f0'; ctx.font = `bold ${cs > 40 ? 18 : cs > 32 ? 14 : 11}px monospace`;
+                ctx.textAlign = 'center'; ctx.fillText(val + 1, bx + cs / 2, by + cs / 2 + 5);
+                ctx.shadowBlur = 0;
+            } else {
+                // Piece number overlay (large, centered, with shadow)
+                ctx.save();
+                ctx.shadowBlur = 3; ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                ctx.font = `bold ${cs > 40 ? 14 : cs > 32 ? 11 : 9}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillText(val + 1, bx + cs / 2, by + cs / 2 + (cs > 32 ? 4 : 3));
+                ctx.restore();
+            }
+
+            // HINT glow
+            if (this.hintPiece === i) {
+                let pulse = Math.abs(Math.sin(this.timer * 0.12));
+                ctx.strokeStyle = `rgba(255,255,0,${0.5 + pulse * 0.5})`;
+                ctx.lineWidth = 3; ctx.shadowBlur = 8 + pulse * 12; ctx.shadowColor = '#ff0';
+                ctx.strokeRect(bx + 1.5, by + 1.5, cs - 3, cs - 3);
+                ctx.shadowBlur = 0; ctx.lineWidth = 1;
+            }
+
+            ctx.restore();
+
+            // 2px black border on every piece
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 2;
+            ctx.strokeRect(bx, by, cs, cs);
+            // 1px inner highlight
+            ctx.strokeStyle = 'rgba(255,255,255,0.20)'; ctx.lineWidth = 1;
+            ctx.strokeRect(bx + 1, by + 1, cs - 2, cs - 2);
+        }
+
+        // Cursor (pulsing cyan glow for selection)
+        let cc = this.cursor % n, cr = Math.floor(this.cursor / n);
+        let cxp = bx0 + cc * cs, cyp = by0 + cr * cs;
+        let isCheat = this.st === 'cheat' || this.st === 'cheat_swap1' || this.st === 'cheat_swap2';
+        let pulse = 3 + Math.sin(this.timer * 0.18) * 3;
+        let cursorColor = isCheat ? '#f44' : '#0ff';
+        ctx.strokeStyle = cursorColor;
+        ctx.lineWidth = 2.5;
+        ctx.shadowBlur = pulse * 2.5; ctx.shadowColor = cursorColor;
+        ctx.strokeRect(cxp + 1, cyp + 1, cs - 2, cs - 2);
+        // Pulsing fill overlay for cursor
+        ctx.fillStyle = isCheat ? `rgba(255,60,60,${0.08 + Math.sin(this.timer*0.18)*0.06})` : `rgba(0,255,255,${0.08 + Math.sin(this.timer*0.18)*0.06})`;
+        ctx.fillRect(cxp + 1, cyp + 1, cs - 2, cs - 2);
+        ctx.shadowBlur = 0; ctx.lineWidth = 1;
+
+        // Swap1 highlight
+        if (this.swap1 !== -1) {
+            let s1x = bx0 + (this.swap1 % n) * cs, s1y = by0 + Math.floor(this.swap1 / n) * cs;
+            let fp = Math.abs(Math.sin(this.timer * 0.2));
+            ctx.fillStyle = `rgba(255,0,0,${0.2 + fp * 0.25})`; ctx.fillRect(s1x, s1y, cs, cs);
+            ctx.strokeStyle = '#f44'; ctx.lineWidth = 2; ctx.strokeRect(s1x, s1y, cs, cs); ctx.lineWidth = 1;
+        }
+
+        // HUD
+        ctx.fillStyle = 'rgba(0,0,0,0.82)'; ctx.fillRect(0, 0, 200, 48);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0ff'; ctx.font = 'bold 8px monospace'; ctx.fillText('TIME:', 8, 15);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px monospace';
+        ctx.fillText(Math.floor(this.timer / 60) + 's', 47, 15);
+        if (this.scanTimer > 0) {
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 8px monospace';
+            ctx.fillText('SCAN:' + Math.ceil(this.scanTimer / 60) + 's', 90, 15);
+        }
+        ctx.fillStyle = '#333'; ctx.fillRect(8, 22, 90, 9);
+        ctx.fillStyle = this.hp < 30 ? '#f44' : (this.hp < 60 ? '#fa0' : '#0f0');
+        ctx.fillRect(8, 22, 90 * this.hp / 100, 9);
+        ctx.strokeStyle = '#0f0'; ctx.strokeRect(8, 22, 90, 9);
+        ctx.fillStyle = '#0f0'; ctx.font = '7px monospace'; ctx.fillText('HP', 102, 30);
+        let dColor = { easy: '#4f4', normal: '#ff4', hard: '#f44' }[this.difficulty];
+        ctx.fillStyle = dColor; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'right';
+        ctx.fillText(this.difficulty.toUpperCase(), 194, 15); ctx.textAlign = 'left';
+
+        // Hint text below board
+        let boardBottom = by0 + n * cs;
+        if (boardBottom < 278) {
+            ctx.fillStyle = '#555'; ctx.font = '7px monospace';
+            if (this.st === 'play') ctx.fillText('A:スライド  B:HACKメニュー', 8, boardBottom + 14);
+            else if (this.st === 'cheat_swap1') { ctx.fillStyle = '#f44'; ctx.fillText('1枚目を選択 [A]  戻る[B]', 8, boardBottom + 14); }
+            else if (this.st === 'cheat_swap2') { ctx.fillStyle = '#f44'; ctx.fillText('2枚目を選択 [A]  戻る[B]', 8, boardBottom + 14); }
+        }
+
+        // Cheat menu overlay
+        if (this.st === 'cheat') {
+            ctx.fillStyle = 'rgba(0,0,18,0.93)'; ctx.fillRect(15, 98, 170, 112);
+            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(15, 98, 170, 112); ctx.lineWidth = 1;
+            ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('OVERRIDE MENU', 100, 116);
+            ctx.fillStyle = '#0a0'; ctx.fillRect(20, 120, 160, 1);
+            let cheats = [
+                { name: 'SWAP  入替', cost: 30 },
+                { name: 'SCAN  透視', cost: 20 },
+                { name: 'HINT  ヒント', cost: 15 }
+            ];
+            ctx.textAlign = 'left';
+            for (let i = 0; i < 3; i++) {
+                let sel = this.cheatSel === i, canAff = this.hp >= cheats[i].cost;
+                ctx.fillStyle = sel ? (canAff ? '#ff0' : '#840') : (canAff ? '#888' : '#444');
+                ctx.font = sel ? 'bold 10px monospace' : '10px monospace';
+                if (sel) { ctx.shadowBlur = 6; ctx.shadowColor = '#ff0'; }
+                ctx.fillText((sel ? '>' : ' ') + ' ' + cheats[i].name, 28, 138 + i * 26);
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#555'; ctx.font = '8px monospace';
+                ctx.fillText(cheats[i].cost + 'HP', 155, 138 + i * 26);
+            }
+            ctx.fillStyle = '#444'; ctx.font = '7px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('[B] CANCEL', 100, 202);
+        }
+
+        // Clear overlay
+        if (this.st === 'clear') {
+            ctx.fillStyle = 'rgba(0,18,0,0.92)'; ctx.fillRect(20, 88, 160, 112);
+            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(20, 88, 160, 112); ctx.lineWidth = 1;
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 14; ctx.shadowColor = '#0f0';
+            ctx.fillStyle = '#ff0'; ctx.font = 'bold 14px monospace'; ctx.fillText('ACCESS GRANTED', 100, 112);
+            ctx.shadowBlur = 0;
+            let s = Math.floor(this.clearTime / 60), ms = Math.floor((this.clearTime % 60) * 100 / 60);
+            ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+            ctx.fillText('CLEAR: ' + s + '.' + String(ms).padStart(2, '0') + 's', 100, 132);
+            let best = SaveSys.data.pcBest && SaveSys.data.pcBest[this.difficulty];
+            if (best) {
+                let bs = Math.floor(best / 60), bm = Math.floor((best % 60) * 100 / 60);
+                ctx.fillStyle = '#888';
+                ctx.fillText('BEST: ' + bs + '.' + String(bm).padStart(2, '0') + 's', 100, 148);
+            }
+            if (this.newRecord) {
+                if (Math.floor(this.timer / 20) % 2 === 0) {
+                    ctx.shadowBlur = 10; ctx.shadowColor = '#ff0';
+                    ctx.fillStyle = '#ff0'; ctx.font = 'bold 9px monospace';
+                    ctx.fillText('*** NEW RECORD! ***', 100, 168);
                     ctx.shadowBlur = 0;
                 }
-            } else {
-                ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(bx, by, 40, 40); // 空白（黒抜き）
+            }
+            if (Math.floor(this.timer / 30) % 2 === 0) {
+                ctx.fillStyle = '#0f0'; ctx.font = '8px monospace'; ctx.fillText('[A] RETURN', 100, 190);
             }
         }
 
-        // カーソル描画（チート時は赤色、通常は黄色）
-        let cx = 20 + (this.cursor % 4) * 40; let cy = 50 + Math.floor(this.cursor / 4) * 40;
-        ctx.strokeStyle = (this.st.includes('cheat')) ? '#f00' : '#ff0';
-        ctx.lineWidth = 3; ctx.strokeRect(cx, cy, 40, 40); ctx.lineWidth = 1;
-
-        // SWAPチート選択中の1つ目のピース
-        if (this.swap1 !== -1) {
-            let s1x = 20 + (this.swap1 % 4) * 40; let s1y = 50 + Math.floor(this.swap1 / 4) * 40;
-            ctx.fillStyle = 'rgba(255,0,0,0.5)'; ctx.fillRect(s1x, s1y, 40, 40);
-        }
-
-        // UI（時間・HP）
-        ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 200, 30);
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace';
-        let timeStr = Math.floor(this.timer / 60) + 's';
-        ctx.fillText(`TIME: ${timeStr}`, 15, 20);
-        
-        if (this.mode === 1) { 
-            ctx.fillStyle = '#0f0'; ctx.fillText(`HP:`, 110, 20); 
-            ctx.fillStyle = this.hp < 30 ? '#f00' : '#0f0';
-            ctx.fillRect(135, 12, 50 * (this.hp/100), 8); // HPバー
-            ctx.strokeStyle = '#fff'; ctx.strokeRect(135, 12, 50, 8);
-        }
-
-        // 操作説明（下部）
-        ctx.fillStyle = '#aaa'; ctx.font = '9px monospace';
-        if (this.st === 'play') {
-            ctx.fillText('A:スライド', 20, 230);
-            if (this.mode === 1) { ctx.fillStyle='#0ff'; ctx.fillText('B:HACK MENU(チート)', 80, 230); }
-        } else if (this.st === 'cheat_swap1') { ctx.fillStyle = '#f00'; ctx.fillText('1つ目のピースを選択 (A)', 20, 230);
-        } else if (this.st === 'cheat_swap2') { ctx.fillStyle = '#f00'; ctx.fillText('2つ目のピースを選択 (A)', 20, 230);
-        } else if (this.st === 'cheat_del') { ctx.fillStyle = '#f00'; ctx.fillText('破壊するピースを選択 (A)', 20, 230); }
-
-        // ハックメニュー（チート）
-        if (this.st === 'cheat') {
-            ctx.fillStyle = 'rgba(0,0,20,0.9)'; ctx.fillRect(15, 90, 170, 100); 
-            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(15, 90, 170, 100); ctx.lineWidth=1;
-            ctx.fillStyle = '#0f0'; ctx.font = 'bold 12px monospace'; ctx.fillText('OVERRIDE MENU', 55, 110);
-            ctx.fillStyle = '#0a0'; ctx.fillRect(20, 115, 160, 1);
-            
-            let cheats = [ { name: 'SWAP(強制入替)', cost: 30 }, { name: 'SCAN(透視)', cost: 20 }, { name: 'DELETE(破壊)', cost: 50 } ];
-            ctx.font = '10px monospace';
-            for(let i=0; i<3; i++) {
-                let mark = (this.cheatSel === i) ? '▶' : ' ';
-                ctx.fillStyle = (this.hp >= cheats[i].cost) ? (this.cheatSel === i ? '#ff0' : '#fff') : '#555';
-                ctx.fillText(`${mark}${cheats[i].name}`, 30, 135 + i * 20);
-                ctx.fillText(`${cheats[i].cost}HP`, 135, 135 + i * 20);
-            }
-        }
-
-        // クリア画面
-        if (this.st === 'clear') {
-            ctx.fillStyle = 'rgba(0,20,0,0.9)'; ctx.fillRect(20, 100, 160, 80);
-            ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2; ctx.strokeRect(20, 100, 160, 80);
-            ctx.fillStyle = '#ff0'; ctx.font = 'bold 20px monospace'; ctx.fillText('ACCESS GRANTED', 25, 135);
-            ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(`CLEAR TIME: ${timeStr}`, 55, 155); 
-            ctx.fillText('PRESS [A] TO RETURN', 45, 170);
-        }
-
-        // 全体にブラウン管の走査線を重ねる
         this.drawScanlines();
     }
 };
