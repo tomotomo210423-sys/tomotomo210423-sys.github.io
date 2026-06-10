@@ -106,14 +106,33 @@ const ChainBlast = {
     },
 
     reshuffleBoard() {
-        let cells = this.grid.filter(v => v >= 0);
-        cells.sort(() => Math.random() - 0.5);
-        let idx = 0;
+        // 占有マスの位置と値を取得
+        let occupied = [];
         for (let i = 0; i < this.grid.length; i++)
-            if (this.grid[i] >= 0) this.grid[i] = cells[idx++];
-        this.moves += 3;
-        this.shuffleMsg = 90;
-        playSnd('combo');
+            if (this.grid[i] >= 0) occupied.push(i);
+        let vals = occupied.map(i => this.grid[i]);
+
+        // 解ける配置が見つかるまで最大200回シャッフル (Fisher-Yates)
+        let solved = false;
+        for (let attempt = 0; attempt < 200 && !solved; attempt++) {
+            for (let k = vals.length - 1; k > 0; k--) {
+                let j = Math.floor(Math.random() * (k + 1));
+                [vals[k], vals[j]] = [vals[j], vals[k]];
+            }
+            for (let k = 0; k < occupied.length; k++) this.grid[occupied[k]] = vals[k];
+            if (this.hasValidMoves()) solved = true;
+        }
+
+        if (solved) {
+            this.moves += 3;
+            this.shuffleMsg = 90;
+            playSnd('combo');
+        } else {
+            // どう並べ替えても解けない (1個だけ/孤立/全色バラバラ等) → 詰み回避で全消去
+            // この後 isEmpty() 判定でレベルクリア扱いになり盤面が再生成される
+            for (let i = 0; i < this.grid.length; i++) this.grid[i] = -1;
+            playSnd('combo');
+        }
     },
 
     shuffleMsg: 0,

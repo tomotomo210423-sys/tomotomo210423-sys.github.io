@@ -64,6 +64,7 @@ const Action = {
     if (SaveSys.data.actLives === undefined) { SaveSys.data.actLives = 5; SaveSys.save(); }
     this.checkpointX = 20; this.bgTimer = 0; this.titleCur = 0;
     this.stageSelect = SaveSys.data.actStage;
+    this.stageSeed = Math.floor(Math.random() * 1000000);
   },
   
   load() {
@@ -93,7 +94,9 @@ const Action = {
     if (this.stageTheme === 'desert' || this.stageTheme === 'final') this.sun = {x: 0, y: 50, state: 'wait', timer: 0};
     if (this.stageTheme === 'void' || this.stageTheme === 'final') this.blackHole = {x: -300, y: 150, radius: 40, speed: (this.stageTheme === 'final' ? 1.5 : 1.0)};
 
-    let seed = stage * 100 + SaveSys.data.actSeed;
+    // ★ 完全ランダム化: ステージ突入ごとに新しいシード (チェックポイント復活時は同一レイアウト維持)
+    if (this.stageSeed === undefined) this.stageSeed = Math.floor(Math.random() * 1000000);
+    let seed = this.stageSeed + stage * 100;
     let rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
 
     this.map.push({x: 0, y: 270, w: 200, h: 30, type: 'ground'});
@@ -195,8 +198,42 @@ const Action = {
     if (stage === 12) {
         this.stage12Boss = { x: 3900, y: 240, vx: 1.5, hp: 200, maxHp: 200, shotTimer: 0, dead: false };
     }
+
+    // ★ 詰み防止: 跳べない隙間に踏み台を自動挿入
+    this.ensurePassable();
   },
-  
+
+  // ★ ランダム生成後の安全パス: 着地可能な足場の隙間が跳躍限界を超えないよう踏み台を追加
+  ensurePassable() {
+    const MAX_GAP = 130;   // 単発ジャンプで安全に越えられる最大の隙間 (px)
+    const FLOOR_Y = 270;
+    // 着地できる固体スパンを収集 (メイン地面 + 静止プラットフォーム)
+    let spans = [];
+    for (let m of this.map) {
+      if ((m.type === 'ground' || m.type === 'checkpoint' || m.type === 'goal') && m.y === FLOOR_Y)
+        spans.push({ s: m.x, e: m.x + m.w });
+    }
+    for (let p of this.platforms) {
+      if (!p.moving) spans.push({ s: p.x, e: p.x + p.w });
+    }
+    if (spans.length < 2) return;
+    spans.sort((a, b) => a.s - b.s);
+
+    // 隣接スパン間の隙間をチェックし、広すぎる隙間に踏み台を分割挿入
+    let maxEnd = spans[0].e;
+    for (let i = 1; i < spans.length; i++) {
+      let gap = spans[i].s - maxEnd;
+      if (gap > MAX_GAP) {
+        let steps = Math.ceil(gap / MAX_GAP) - 1;   // 必要な踏み台の数
+        for (let k = 1; k <= steps; k++) {
+          let px = maxEnd + (gap * k / (steps + 1)) - 20;
+          this.platforms.push({ x: px, y: 225, w: 40, h: 10, moving: false, safety: true });
+        }
+      }
+      maxEnd = Math.max(maxEnd, spans[i].e);
+    }
+  },
+
   die(reason) {
     this.deathReason = reason; SaveSys.data.actLives--; SaveSys.save(); 
     playSnd('hit'); screenShake(12); addParticle(this.p.x, this.p.y, '#f00', 'explosion'); addParticle(this.p.x, this.p.y, '#ff0', 'explosion');
@@ -217,7 +254,7 @@ const Action = {
       }
       
       if (keysDown.a) { 
-        if (this.titleCur === 0) { this.checkpointX = 20; this.score = 0; this.load(); playSnd('jmp'); } 
+        if (this.titleCur === 0) { this.checkpointX = 20; this.score = 0; this.stageSeed = Math.floor(Math.random() * 1000000); this.load(); playSnd('jmp'); }
         else { this.st = 'confirmDelete'; this.mIdx = 1; playSnd('sel'); }
       }
       return;
@@ -278,7 +315,7 @@ const Action = {
         } else if (m.type === 'goal') {
            SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}クリア`);
            SaveSys.data.actStage++; this.checkpointX = 20; SaveSys.save(); playSnd('combo');
-           if (SaveSys.data.actStage > 12) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else { this.stageSelect = SaveSys.data.actStage; this.load(); } return;
+           if (SaveSys.data.actStage > 12) { this.st = 'clear'; SaveSys.data.actStage = 1; SaveSys.save(); } else { this.stageSelect = SaveSys.data.actStage; this.stageSeed = Math.floor(Math.random() * 1000000); this.load(); } return;
         } else {
            if (this.p.vy > 0 && this.p.y + 20 <= m.y + 5) { ny = m.y - 20; this.p.vy = 0; grounded = true; this.p.jumpCount = 0; this.coyoteTime = 5; }
            else if (nx + 20 > m.x && this.p.x + 20 <= m.x) nx = m.x - 20; 
