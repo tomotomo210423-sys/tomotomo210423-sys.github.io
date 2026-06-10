@@ -826,7 +826,70 @@ const Noise = {
             ctx.fillRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(this.p.x - 8, this.p.y - 8 + waveY, 16, 16);
             ctx.fillStyle = '#000'; ctx.fillRect(this.p.x - 4, this.p.y - 2 + waveY, 8, 2);
         } else if (!inLocker) {
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(this.p.x, this.p.y, this.p.r, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke();
+            // === STEALTH AGENT 8×8 pixel art ===
+            // Determine facing direction from last movement
+            let facingRight = (Math.cos(this.enemies.length > 0 ? 0 : 0) >= 0); // default right
+            // Use velocity direction if moving
+            let vx = (keys && keys.right ? 1 : 0) - (keys && keys.left ? 1 : 0);
+            if (vx !== 0) facingRight = vx > 0;
+
+            let ax = this.p.x - 4; // anchor: center the 8-wide sprite
+            let ay = this.p.y - 6; // anchor: center the 8-tall sprite
+            const S = 2; // each dot = 2px
+            function dot(col, row, w, h) {
+                ctx.fillRect(ax + col * S, ay + row * S, (w||1)*S, (h||1)*S);
+            }
+            // Black bodysuit (full silhouette)
+            ctx.fillStyle = '#111';
+            dot(1,0,2,1); // top of head
+            dot(0,1,4,1); // head row1
+            dot(0,2,4,1); // head row2
+            dot(0,3,4,1); // neck+shoulder
+            dot(0,4,4,2); // torso
+            dot(0,6,2,2); // left leg
+            dot(2,6,2,2); // right leg
+
+            // Goggles/visor (white glow)
+            ctx.fillStyle = '#fff';
+            if (facingRight) {
+                dot(1,1,2,1); // left goggle
+                dot(3,1,1,1); // right goggle
+            } else {
+                dot(0,1,1,1); // left goggle (mirrored)
+                dot(1,1,2,1); // right goggle
+            }
+
+            // Goggle shine (light blue tint)
+            ctx.fillStyle = '#9ef';
+            if (facingRight) {
+                dot(1,1,1,1);
+            } else {
+                dot(2,1,1,1);
+            }
+
+            // Dark edge outline
+            ctx.fillStyle = '#000';
+            dot(0,0,1,1); dot(3,0,1,1); // head top corners
+            dot(4,1,1,1); dot(4,2,1,1); // right side head
+            dot(4,3,1,3); // right torso edge
+            dot(0,6,1,1); dot(4,6,1,1); // leg tops outer
+
+            // Belt / equipment detail
+            ctx.fillStyle = '#333';
+            dot(0,5,4,1); // belt line
+            ctx.fillStyle = '#555';
+            dot(1,5,1,1); // belt buckle highlight
+
+            // Shoe soles
+            ctx.fillStyle = '#222';
+            dot(0,7,2,1); // left shoe
+            dot(2,7,2,1); // right shoe
+
+            // Walk animation shimmer (subtle)
+            if (this.tmr % 20 < 10) {
+                ctx.fillStyle = 'rgba(0,255,255,0.18)';
+                dot(1,4,2,1);
+            }
         }
 
         for (let t of this.texts) {

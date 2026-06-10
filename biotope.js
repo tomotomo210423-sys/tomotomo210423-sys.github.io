@@ -381,27 +381,141 @@ const Biotope = {
     },
 
     drawEntity(e) {
-        let px=e.x*this.cellSize, py=e.y*this.cellSize;
-        ctx.fillStyle='rgba(0,0,0,0.4)';
-        ctx.fillRect(px-1,py+2,6,3);
-        if (e.type===10) {
-            // Herbivore: white body + pink ears
-            ctx.fillStyle='#eee'; ctx.fillRect(px,py,4,4);
-            ctx.fillStyle='#faa'; ctx.fillRect(px,py-1,1,2); ctx.fillRect(px+3,py-1,1,2); // ears
-            ctx.fillStyle='#000'; ctx.fillRect(px+1,py+1,1,1); ctx.fillRect(px+3,py+1,1,1); // eyes
-        } else if (e.type===11) {
-            // Wolf: grey angular silhouette + red eyes
-            ctx.fillStyle='#555'; ctx.fillRect(px-1,py-1,7,5);
-            ctx.fillStyle='#333'; ctx.fillRect(px+1,py-2,2,2); ctx.fillRect(px+4,py-2,2,2); // ears
-            ctx.fillStyle='#f00'; ctx.fillRect(px,py,1,1); ctx.fillRect(px+3,py,1,1); // eyes
-        } else if (e.type===12) {
-            // Human: triangle head + blue body
-            ctx.fillStyle='#fcc'; ctx.fillRect(px+1,py-2,2,3); // head
-            ctx.fillStyle='#35f'; ctx.fillRect(px,py+1,4,3);   // body
-            ctx.fillStyle='#fcc'; ctx.fillRect(px,py+4,1,2); ctx.fillRect(px+3,py+4,1,2); // legs
-            if (e.chatTimer>0) {
-                ctx.fillStyle='rgba(255,255,0,0.9)';ctx.fillRect(px-8,py-10,18,8);
-                ctx.fillStyle='#000';ctx.font='7px monospace';ctx.fillText(e.chatMsg,px-6,py-4);
+        let bx = e.x * this.cellSize;
+        let by = e.y * this.cellSize;
+        let cs = this.cellSize; // typically 4px per cell
+
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(bx, by + cs - 1, cs, 1);
+
+        if (e.type === 10) {
+            // === HERBIVORE (ウサギ/羊) 8×8 scaled to cellSize ===
+            // Walk animation: 4 frames based on entity age
+            let wf = Math.floor(e.age / 2) % 4;
+            let sc = cs / 4; // scale factor (cellSize=4 → sc=1)
+
+            // Body (white)
+            ctx.fillStyle = '#eee';
+            ctx.fillRect(bx,        by + sc,     cs,      cs * 2);   // body block
+            // Head (white, slightly smaller)
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(bx + sc,   by - sc,     cs - sc * 2, cs);   // head
+            // Ears (pink, tall)
+            ctx.fillStyle = '#faa';
+            ctx.fillRect(bx + sc,         by - cs,     sc, cs);       // left ear
+            ctx.fillRect(bx + cs - sc * 2, by - cs,    sc, cs);       // right ear
+            // Eyes (black)
+            ctx.fillStyle = '#222';
+            ctx.fillRect(bx + sc,         by - sc,     sc, sc);       // left eye
+            ctx.fillRect(bx + cs - sc * 2, by - sc,    sc, sc);       // right eye
+            // Nose (pink dot)
+            ctx.fillStyle = '#f88';
+            ctx.fillRect(bx + cs/2 - sc/2, by,        sc, sc);
+            // Outline
+            ctx.fillStyle = '#aaa';
+            ctx.fillRect(bx,       by + sc,     sc, cs * 2);           // left edge
+            ctx.fillRect(bx + cs - sc, by + sc, sc, cs * 2);           // right edge
+            // Legs animated
+            ctx.fillStyle = '#ddd';
+            if (wf === 0 || wf === 2) {
+                ctx.fillRect(bx + sc,       by + cs * 3 - sc, sc, sc); // left foot down
+                ctx.fillRect(bx + cs - sc*2, by + cs * 3 - sc * 2, sc, sc); // right foot up
+            } else {
+                ctx.fillRect(bx + sc,        by + cs * 3 - sc * 2, sc, sc); // left foot up
+                ctx.fillRect(bx + cs - sc*2, by + cs * 3 - sc,     sc, sc); // right foot down
+            }
+
+        } else if (e.type === 11) {
+            // === WOLF 8×8 scaled ===
+            let wf = Math.floor(e.age / 2) % 4;
+            let sc = cs / 4;
+
+            // Body (dark grey)
+            ctx.fillStyle = '#555';
+            ctx.fillRect(bx - sc, by + sc, cs + sc * 2, cs);          // wide body
+            // Ears (pointed, dark)
+            ctx.fillStyle = '#333';
+            ctx.fillRect(bx,           by - sc, sc,      cs);          // left ear
+            ctx.fillRect(bx + cs - sc, by - sc, sc,      cs);          // right ear
+            // Head
+            ctx.fillStyle = '#666';
+            ctx.fillRect(bx, by, cs, cs);                               // head
+            // Snout
+            ctx.fillStyle = '#777';
+            ctx.fillRect(bx + sc, by + sc * 2, cs - sc * 2, sc * 2);  // snout
+            // Eyes (red — menacing)
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(bx + sc,           by + sc, sc, sc);           // left eye
+            ctx.fillRect(bx + cs - sc * 2,  by + sc, sc, sc);           // right eye
+            // Teeth flash
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(bx + sc * 2, by + cs - sc, sc * 2, sc);        // teeth
+            // Tail
+            ctx.fillStyle = '#444';
+            ctx.fillRect(bx - sc * 2, by, sc * 2, sc);                  // tail stub
+            // Legs
+            ctx.fillStyle = '#444';
+            if (wf === 0 || wf === 2) {
+                ctx.fillRect(bx,           by + cs * 2 - sc, sc, sc);
+                ctx.fillRect(bx + sc * 2,  by + cs * 2 - sc * 2, sc, sc);
+                ctx.fillRect(bx + cs - sc, by + cs * 2 - sc, sc, sc);
+            } else {
+                ctx.fillRect(bx,           by + cs * 2 - sc * 2, sc, sc);
+                ctx.fillRect(bx + sc * 2,  by + cs * 2 - sc,     sc, sc);
+                ctx.fillRect(bx + cs - sc, by + cs * 2 - sc * 2, sc, sc);
+            }
+
+        } else if (e.type === 12) {
+            // === HUMAN 6×10 pixel art scaled ===
+            let wf = Math.floor(e.age / 3) % 2;
+            let sc = cs / 4;
+
+            // Head (skin tone)
+            ctx.fillStyle = '#fcc';
+            ctx.fillRect(bx + sc, by - cs, cs - sc * 2, cs);
+            // Hair (dark brown)
+            ctx.fillStyle = '#531';
+            ctx.fillRect(bx + sc, by - cs,     cs - sc * 2, sc);       // hair top
+            // Eyes
+            ctx.fillStyle = '#222';
+            ctx.fillRect(bx + sc,           by - cs + sc, sc, sc);
+            ctx.fillRect(bx + cs - sc * 2,  by - cs + sc, sc, sc);
+            // Shirt (blue)
+            ctx.fillStyle = '#35f';
+            ctx.fillRect(bx,      by, cs, cs);                          // torso
+            // White collar
+            ctx.fillStyle = '#ddf';
+            ctx.fillRect(bx + sc, by, sc * 2, sc);
+            // Pants (dark brown)
+            ctx.fillStyle = '#531';
+            ctx.fillRect(bx,      by + cs, cs, cs - sc);
+            // Belt
+            ctx.fillStyle = '#310';
+            ctx.fillRect(bx, by + cs, cs, sc);
+            // Legs animated
+            ctx.fillStyle = '#531';
+            if (wf === 0) {
+                ctx.fillRect(bx,           by + cs * 2 - sc, sc + sc/2|0, sc); // left foot
+                ctx.fillRect(bx + cs - sc, by + cs * 2 - sc * 2, sc, sc);      // right leg up
+            } else {
+                ctx.fillRect(bx,           by + cs * 2 - sc * 2, sc + sc/2|0, sc); // left leg up
+                ctx.fillRect(bx + cs - sc, by + cs * 2 - sc, sc, sc);               // right foot
+            }
+            // Shoes
+            ctx.fillStyle = '#111';
+            if (wf === 0) {
+                ctx.fillRect(bx - sc/2|0,  by + cs * 2 - sc, sc * 2, sc);
+            } else {
+                ctx.fillRect(bx + cs - sc * 2, by + cs * 2 - sc, sc * 2, sc);
+            }
+            // Chat bubble
+            if (e.chatTimer > 0) {
+                ctx.fillStyle = 'rgba(255,255,0,0.9)';
+                ctx.fillRect(bx - cs * 2, by - cs * 3, cs * 5, cs + sc);
+                ctx.fillStyle = '#000';
+                ctx.font = '6px monospace';
+                ctx.fillText(e.chatMsg, bx - cs * 2 + 2, by - cs * 2);
             }
         }
     },

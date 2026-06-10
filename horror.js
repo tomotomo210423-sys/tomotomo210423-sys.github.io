@@ -352,24 +352,106 @@ const Horror = {
     },
 
     drawGhost(x, y) {
-        let r=this.e.r, t=this.timer;
-        ctx.shadowBlur=12; ctx.shadowColor='#f00';
-        ctx.fillStyle=this.e.state==='chase'?'#f00':'#800';
-        ctx.beginPath();
-        ctx.arc(x, y-r*0.2, r*0.9, Math.PI, 0);
-        let waves=4, ww=r*1.8/waves;
-        ctx.lineTo(x+r*0.9, y+r*0.8);
-        for (let i=waves; i>=0; i--) {
-            let wx=x-r*0.9+i*ww;
-            let wy=y+r*0.8-Math.sin(t*0.08+i*1.2)*r*0.4;
-            ctx.lineTo(wx, wy);
+        let t = this.timer;
+        let isChase = this.e.state === 'chase';
+        // distanceパラメータ: 近いほど赤みが増す
+        let dist = Math.hypot(this.p.x - this.e.x, this.p.y - this.e.y);
+        let nearFactor = Math.max(0, Math.min(1, 1 - dist / 120));
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        // 全体の透明度 (幽霊らしく半透明)
+        let baseAlpha = isChase ? 0.92 : 0.78;
+        ctx.globalAlpha = baseAlpha;
+
+        // 影のような暗い青のベースシルエット (少しずれてオフセット)
+        let shadowShift = Math.sin(t * 0.07) * 1.5;
+        ctx.globalAlpha = baseAlpha * 0.35;
+        ctx.fillStyle = `rgba(10,10,60,0.9)`;
+        ctx.save();
+        ctx.translate(shadowShift + 1, 1);
+        this._ghostShape(t, 1.08, true);
+        ctx.restore();
+
+        ctx.globalAlpha = baseAlpha;
+
+        // 本体カラー: 近いほど赤みが増す
+        let rVal = Math.floor(200 + nearFactor * 55);
+        let gVal = Math.floor(200 - nearFactor * 180);
+        let bVal = Math.floor(220 - nearFactor * 200);
+        let mainColor = `rgba(${rVal},${gVal},${bVal},0.85)`;
+        let shadowColor = isChase ? '#f00' : '#003366';
+
+        ctx.shadowBlur = 14 + nearFactor * 10; ctx.shadowColor = isChase ? '#f00' : '#336';
+        ctx.fillStyle = mainColor;
+        this._ghostShape(t, 1.0, false);
+
+        ctx.shadowBlur = 0;
+
+        // 内側ハイライト (明るい芯)
+        ctx.globalAlpha = baseAlpha * 0.4;
+        ctx.fillStyle = `rgba(255,255,255,0.6)`;
+        this._ghostShape(t, 0.65, false);
+        ctx.globalAlpha = baseAlpha;
+
+        // 目 (暗赤/黒 の恐ろしい目)
+        let eyeY = -5;
+        let eyeGlowR = isChase ? 255 : 180;
+        let eyeGlowG = isChase ? 0 : 0;
+
+        // 左目
+        ctx.shadowBlur = 8; ctx.shadowColor = `rgb(${eyeGlowR},${eyeGlowG},0)`;
+        ctx.fillStyle = isChase ? '#ff0000' : '#cc1111';
+        ctx.fillRect(-4, eyeY - 1, 3, 3);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(-3, eyeY, 1, 1);
+
+        // 右目
+        ctx.fillStyle = isChase ? '#ff0000' : '#cc1111';
+        ctx.fillRect( 1, eyeY - 1, 3, 3);
+        ctx.fillStyle = '#000';
+        ctx.fillRect( 2, eyeY, 1, 1);
+        ctx.shadowBlur = 0;
+
+        // 追跡中: 口 (ぎざぎざの恐ろしい口)
+        if (isChase) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(-4, eyeY + 4, 8, 2);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-4, eyeY + 4, 1, 2);
+            ctx.fillRect(-2, eyeY + 4, 1, 2);
+            ctx.fillRect( 0, eyeY + 4, 1, 2);
+            ctx.fillRect( 2, eyeY + 4, 1, 2);
         }
-        ctx.closePath(); ctx.fill();
-        ctx.shadowBlur=0;
-        // Eyes
-        ctx.fillStyle=this.e.state==='chase'?'#ff0':'#faa';
-        ctx.beginPath(); ctx.arc(x-r*0.3,y-r*0.3,2,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x+r*0.3,y-r*0.3,2,0,Math.PI*2); ctx.fill();
+
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    },
+
+    // ゴーストシルエット描画ヘルパー
+    // tmrに基づいて下端がゆらゆら揺れる
+    _ghostShape(t, scale, isShadow) {
+        let w = 8 * scale;   // 横幅
+        let htop = 10 * scale; // 上部の高さ
+        let hbot = 10 * scale; // 下部の長さ
+        let waves = 4;
+        let ww = (w * 2) / waves;
+
+        ctx.beginPath();
+        // 上部: 丸いアーチ
+        ctx.arc(0, -htop * 0.3, w, Math.PI, 0, false);
+        // 右端から下へ
+        ctx.lineTo(w, hbot * 0.5);
+        // 下端: sinカーブで揺れるひらひら
+        for (let i = waves; i >= 0; i--) {
+            let wx = -w + i * ww;
+            let wobble = Math.sin(t * 0.09 + i * 1.4) * (3 * scale);
+            if (isShadow) wobble *= 0.5;
+            ctx.lineTo(wx, hbot * 0.5 - wobble);
+        }
+        ctx.closePath();
+        ctx.fill();
     },
 
     drawMinimap() {

@@ -32,6 +32,50 @@ const Slot = {
         'FRE': "0bbbbbb00bb000000bb000000bbbbb000bb000000bb000000bb0000000000000",
         'JP':  "0800008008800880088888800888888008588580088888800888888000000000"
     },
+
+    // High-quality pixel art symbol renderer (40x40 space, using fillRect only)
+    drawSymHQ(x, y, symStr) {
+        if (!symStr) return;
+        ctx.save();
+        ctx.translate(x, y);
+        // Outer glow/background panel
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(1, 1, 30, 30);
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                let p = symStr[r * 8 + c];
+                if (p !== '0') {
+                    let baseCol;
+                    switch(p) {
+                        case '3': baseCol = '#555'; break;
+                        case '5': baseCol = '#f22'; break;
+                        case '6': baseCol = '#0f0'; break;
+                        case '8': baseCol = '#ff0'; break;
+                        case 'a': baseCol = '#0ff'; break;
+                        case 'b': baseCol = '#fa0'; break;
+                        case 'c': baseCol = '#f8f'; break;
+                        default:  baseCol = '#fff'; break;
+                    }
+                    let px = c * 4, py = r * 4;
+                    // Main pixel
+                    ctx.fillStyle = baseCol;
+                    ctx.fillRect(px, py, 4, 4);
+                    // Highlight top-left pixel (brighten)
+                    ctx.fillStyle = 'rgba(255,255,255,0.38)';
+                    ctx.fillRect(px, py, 2, 2);
+                    // Shadow bottom-right pixel
+                    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+                    ctx.fillRect(px+2, py+2, 2, 2);
+                }
+            }
+        }
+        // Gold border around the whole symbol
+        ctx.strokeStyle = '#aa8800';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, 32, 32);
+        ctx.restore();
+    },
     pays: { '7': 50, 'BAR': 20, 'BEL': 10, 'SUI': 5, 'CHE': 2 },
     lay: [
         ['CHE','SUI','BEL','BAR','CHE','SUI','CHE','BEL','7','CHE','SUI','FRE','CHE','BEL','BAR','SUI','WLD','CHE','7','SUI'],
@@ -408,7 +452,7 @@ const Slot = {
             let bIdx = Math.floor(r.p / this.symH), off = r.p % this.symH;
             for (let j = -1; j <= 4; j++) {
                 let sIdx = (bIdx + j + 20) % 20;
-                this.drawSym(rx, 68 - off + j * this.symH + bOff, this.sprs[this.lay[i][sIdx]], 4.0);
+                this.drawSymHQ(rx, 68 - off + j * this.symH + bOff, this.sprs[this.lay[i][sIdx]]);
             }
         }
         ctx.restore();

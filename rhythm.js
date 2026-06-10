@@ -359,13 +359,14 @@ const Rhythm = {
         let cx = 25 + lane * 50 + laneOffset;
 
         let msg = '', pts = 0;
-        if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); this.laneGlow[lane] = 1.0; }
-        else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); this.laneGlow[lane] = 0.5; }
-        else { msg = 'GOOD'; pts = 10; this.laneGlow[lane] = 0.2; }
-        
+        let jColor;
+        if(minDiff < 0.10){ msg = 'PERFECT'; pts = 100; addParticle(cx, this.lineY, '#ff0', 'explosion'); this.laneGlow[lane] = 1.0; jColor = '#ff0'; }
+        else if(minDiff < 0.20){ msg = 'GREAT'; pts = 50; addParticle(cx, this.lineY, this.colors[lane], 'star'); this.laneGlow[lane] = 0.5; jColor = '#ffd700'; }
+        else { msg = 'GOOD'; pts = 10; this.laneGlow[lane] = 0.2; jColor = '#00ff88'; }
+
         this.combo++; if(this.combo > this.maxCombo) this.maxCombo = this.combo;
         this.score += pts * (1 + Math.floor(this.combo / 10) * 0.1);
-        this.judgements.push({ msg: msg, life: 30, color: '#ff0', lane: lane }); 
+        this.judgements.push({ msg: msg, life: 30, color: jColor, lane: lane }); 
         
         if (this.combo > 0 && this.combo % 50 === 0) {
             screenShake(8); playSnd('combo');
@@ -696,41 +697,72 @@ const Rhythm = {
 
       let laneOffset = (this.mode === 'nightmare' && this.st === 'play') ? Math.sin(now * 5) * 15 : 0;
 
+      // Lane divider lines
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'; ctx.lineWidth = 1;
-      for(let i=0; i<=4; i++) { let cx = 25 + i*50 - 25 + laneOffset; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, 400); ctx.stroke(); }
-      
-      let k = typeof keys !== 'undefined' ? keys : {};
-      
+      for(let i=0; i<=4; i++) { let lcx = 25 + i*50 - 25 + laneOffset; ctx.beginPath(); ctx.moveTo(lcx, 0); ctx.lineTo(lcx, 400); ctx.stroke(); }
+
+      // Lane gradient backgrounds (dark at top, lighter at bottom)
       for(let i=0; i<4; i++) {
-         let cx = 25 + i * 50 + laneOffset; 
+          let lcx = 25 + i * 50 + laneOffset;
+          let lgrad = ctx.createLinearGradient(0, 0, 0, cvs.height);
+          lgrad.addColorStop(0, 'rgba(0,0,0,0.5)');
+          lgrad.addColorStop(0.7, 'rgba(0,0,0,0.15)');
+          lgrad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = lgrad;
+          ctx.fillRect(lcx - 25, 0, 50, cvs.height);
+      }
+
+      let k = typeof keys !== 'undefined' ? keys : {};
+
+      for(let i=0; i<4; i++) {
+         let lcx = 25 + i * 50 + laneOffset;
          let isP = (i===0 && (k.left || k.l0 || this.laneTouch[0])) || (i===1 && (k.down || k.l1 || this.laneTouch[1])) || (i===2 && (k.up || k.l2 || this.laneTouch[2])) || (i===3 && (k.right || k.l3 || this.laneTouch[3]));
-         
+
          if (this.laneGlow[i] > 0 || isP) {
              let alpha = Math.max(this.laneGlow[i], isP ? 0.3 : 0);
              let grad = ctx.createLinearGradient(0, cvs.height, 0, 0);
-             grad.addColorStop(0, this.colors[i]); 
-             grad.addColorStop(1, 'rgba(0,0,0,0)'); 
-             ctx.globalAlpha = alpha; ctx.fillStyle = grad; 
-             ctx.fillRect(cx - 25, 0, 50, cvs.height); 
+             grad.addColorStop(0, this.colors[i]);
+             grad.addColorStop(1, 'rgba(0,0,0,0)');
+             ctx.globalAlpha = alpha; ctx.fillStyle = grad;
+             ctx.fillRect(lcx - 25, 0, 50, cvs.height);
              ctx.globalAlpha = 1;
          }
-         
-         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = isP ? 4 : 2; 
-         ctx.beginPath(); ctx.arc(cx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke();
-         ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], cx - 9, this.lineY + 6);
+
+         // Enhanced hit circle
+         ctx.save();
+         if (isP) {
+             ctx.shadowBlur = 14; ctx.shadowColor = this.colors[i];
+         }
+         ctx.strokeStyle = this.colors[i]; ctx.lineWidth = isP ? 4 : 2;
+         ctx.beginPath(); ctx.arc(lcx, this.lineY, 18, 0, Math.PI * 2); ctx.stroke();
+         // Inner ring
+         ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+         ctx.beginPath(); ctx.arc(lcx, this.lineY, 12, 0, Math.PI * 2); ctx.stroke();
+         ctx.restore();
+         ctx.fillStyle = this.colors[i]; ctx.font = 'bold 18px monospace'; ctx.fillText(this.arrows[i], lcx - 9, this.lineY + 6);
       }
       
-      // Ghost notes: semi-transparent preview 80px before the hit zone
+      // Ghost notes: semi-transparent outline crystal
       this.notes.forEach(n => {
         let ghostY = this.lineY - 80;
         if(!n.missed && !n.hit && n.y > ghostY - 20 && n.y < ghostY + 20) {
           let gcx = 25 + n.lane * 50 + laneOffset;
           if(n.curve) gcx += Math.sin((ghostY / 400) * Math.PI * 2) * 40;
           if(this.mode === 'nightmare') gcx += Math.sin(ghostY * 0.05 + now * 10) * 25;
-          ctx.globalAlpha = 0.35;
+          ctx.save();
+          ctx.globalAlpha = 0.38;
+          // Ghost crystal outline (hexagon-like pixel art)
           ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(gcx, ghostY, 16, 0, Math.PI * 2); ctx.stroke();
-          ctx.globalAlpha = 1;
+          ctx.beginPath();
+          ctx.moveTo(gcx, ghostY - 14);
+          ctx.lineTo(gcx + 10, ghostY - 7);
+          ctx.lineTo(gcx + 10, ghostY + 7);
+          ctx.lineTo(gcx, ghostY + 14);
+          ctx.lineTo(gcx - 10, ghostY + 7);
+          ctx.lineTo(gcx - 10, ghostY - 7);
+          ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
         }
       });
 
@@ -743,22 +775,52 @@ const Rhythm = {
                cx += Math.sin(n.y * 0.05 + now * 10) * 25;
            }
 
+           // Proximity glow: closer to lineY = brighter
+           let dist = Math.abs(n.y - this.lineY);
+           let glowAmt = Math.max(0, 1 - dist / 200);
+
+           ctx.save();
+           if (glowAmt > 0.1) {
+               ctx.shadowBlur = 4 + glowAmt * 16;
+               ctx.shadowColor = this.colors[n.lane];
+           }
+
            if (this.noteSkin === 0) {
+               // CLASSIC skin - enhanced with crystal look
                ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.fill();
                ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, n.y, 16, 0, Math.PI * 2); ctx.stroke();
                ctx.fillStyle = this.colors[n.lane]; ctx.font = 'bold 16px monospace'; ctx.fillText(this.arrows[n.lane], cx - 8, n.y + 5);
-           } else if (this.noteSkin === 1) { 
+           } else if (this.noteSkin === 1) {
+               // CYBER skin
                ctx.fillStyle = '#000'; ctx.fillRect(cx-18, n.y-8, 36, 16);
                ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2; ctx.strokeRect(cx-18, n.y-8, 36, 16);
                ctx.fillStyle = '#fff'; ctx.fillRect(cx-8, n.y-2, 16, 4);
-           } else if (this.noteSkin === 2) { 
+           } else if (this.noteSkin === 2) {
+               // DOT skin
                ctx.fillStyle = this.colors[n.lane]; ctx.beginPath(); ctx.arc(cx, n.y, 14, 0, Math.PI * 2); ctx.fill();
-               ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx+4, n.y-4, 4, 0, Math.PI * 2); ctx.fill(); 
-           } else if (this.noteSkin === 3) { 
-               ctx.fillStyle = this.colors[n.lane];
-               ctx.beginPath(); ctx.moveTo(cx, n.y-16); ctx.lineTo(cx+16, n.y); ctx.lineTo(cx, n.y+16); ctx.lineTo(cx-16, n.y); ctx.fill();
-               ctx.strokeStyle = '#fff'; ctx.lineWidth=1; ctx.stroke();
+               ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx+4, n.y-4, 4, 0, Math.PI * 2); ctx.fill();
+           } else if (this.noteSkin === 3) {
+               // GEM skin - crystal/hexagon pixel art (fillRect only)
+               let nc = this.colors[n.lane];
+               // Hexagon body using fillRects
+               ctx.fillStyle = nc;
+               ctx.fillRect(cx-6, n.y-14, 12, 4);  // top cap
+               ctx.fillRect(cx-10, n.y-10, 20, 4);  // upper middle
+               ctx.fillRect(cx-12, n.y-6, 24, 4);   // widest
+               ctx.fillRect(cx-12, n.y-2, 24, 4);   // center
+               ctx.fillRect(cx-10, n.y+2, 20, 4);   // lower middle
+               ctx.fillRect(cx-6, n.y+6, 12, 4);    // bottom cap
+               // White gloss highlight
+               ctx.fillStyle = 'rgba(255,255,255,0.55)';
+               ctx.fillRect(cx-4, n.y-12, 4, 3);
+               ctx.fillRect(cx-8, n.y-8, 4, 3);
+               // Dark edge shadow
+               ctx.fillStyle = 'rgba(0,0,0,0.30)';
+               ctx.fillRect(cx+4, n.y+2, 6, 4);
+               ctx.fillRect(cx+2, n.y+6, 4, 4);
            }
+
+           ctx.restore();
         }
       });
       drawParticles();
@@ -786,14 +848,29 @@ const Rhythm = {
       }
       
       for(let j of this.judgements) {
+         ctx.save();
          ctx.globalAlpha = j.life / 30;
-         ctx.fillStyle = j.color; ctx.font = 'bold 12px monospace';
-         if(j.msg === 'PERFECT' || j.msg === 'GREAT' || j.msg === 'GOOD') {
-           ctx.shadowBlur = 8; ctx.shadowColor = j.color;
+         // High-quality judgement colors
+         let jColor, jShadow;
+         if (j.msg === 'PERFECT') {
+             // Rainbow cycling color
+             let hue = (Date.now() / 5) % 360;
+             jColor = `hsl(${hue}, 100%, 65%)`;
+             jShadow = `hsl(${hue}, 100%, 85%)`;
+         } else if (j.msg === 'GREAT') {
+             jColor = '#ffd700'; jShadow = '#ffaa00';
+         } else if (j.msg === 'GOOD') {
+             jColor = '#00ff88'; jShadow = '#00cc44';
+         } else if (j.msg === 'MISS') {
+             jColor = '#ff2244'; jShadow = '#880011';
+         } else {
+             jColor = j.color; jShadow = j.color;
          }
+         ctx.fillStyle = jColor; ctx.font = 'bold 12px monospace';
+         ctx.shadowBlur = 10; ctx.shadowColor = jShadow;
          let jx = (25 + j.lane * 50) - (j.msg.length * 3.5) + laneOffset;
          ctx.fillText(j.msg, jx, this.lineY - 30 - (30 - j.life));
-         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+         ctx.restore();
       }
       
       ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; ctx.fillRect(5, 5, 40, 20); ctx.strokeStyle = '#f00'; ctx.strokeRect(5, 5, 40, 20);

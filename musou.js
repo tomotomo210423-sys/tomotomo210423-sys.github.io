@@ -656,6 +656,235 @@ const Musou = {
         }
     },
 
+    // === 高品質プレイヤー描画 (16×16 サムライドット絵) ===
+    drawPlayer(px, py, vx, vy, isDmg) {
+        ctx.save();
+        ctx.translate(px, py);
+
+        // 向きを速度ベクトルから判定
+        let dir = 'down';
+        if (Math.abs(vx) > Math.abs(vy)) { dir = vx > 0 ? 'right' : 'left'; }
+        else if (Math.abs(vy) > 0.05) { dir = vy > 0 ? 'down' : 'up'; }
+
+        // カラー設定
+        let mainCol  = isDmg ? '#f44' : '#0ff';
+        let darkCol  = isDmg ? '#900' : '#088';
+        let hlCol    = isDmg ? '#faa' : '#fff';
+        let armorCol = isDmg ? '#a22' : '#006680';
+        let skinCol  = isDmg ? '#faa' : '#ffd8b0';
+
+        ctx.shadowBlur = 8; ctx.shadowColor = mainCol;
+
+        // ヘルメット/兜
+        ctx.fillStyle = mainCol;
+        ctx.fillRect(-4, -8, 8, 5);    // 兜本体
+        ctx.fillStyle = darkCol;
+        ctx.fillRect(-3, -9, 6, 2);    // 兜上部
+        ctx.fillStyle = hlCol;
+        ctx.fillRect(-2, -8, 1, 1);    // 左ハイライト
+
+        // 顔
+        ctx.fillStyle = skinCol;
+        ctx.fillRect(-3, -4, 6, 4);    // 顔
+        ctx.fillStyle = '#000';
+        ctx.fillRect(-2, -3, 1, 1);    // 左目
+        ctx.fillRect( 1, -3, 1, 1);    // 右目
+
+        // 胴体 (鎧)
+        ctx.fillStyle = armorCol;
+        ctx.fillRect(-4, 0, 8, 6);     // 胴体
+        ctx.fillStyle = mainCol;
+        ctx.fillRect(-3, 0, 1, 6);     // 左鎧ライン
+        ctx.fillRect( 2, 0, 1, 6);     // 右鎧ライン
+        ctx.fillStyle = hlCol;
+        ctx.fillRect(-1, 1, 2, 1);     // 胸ハイライト
+
+        // 腕 (方向で変える)
+        ctx.fillStyle = armorCol;
+        if (dir === 'right') {
+            ctx.fillRect(-5, 0, 2, 5);     // 左腕後ろ
+            ctx.fillRect( 4, -1, 2, 4);    // 右腕前 (剣持ち)
+            // 剣
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect( 5, -6, 1, 8);    // 刀身
+            ctx.fillStyle = '#880';
+            ctx.fillRect( 4, -1, 2, 1);    // 鍔
+        } else if (dir === 'left') {
+            ctx.fillRect( 3, 0, 2, 5);     // 右腕後ろ
+            ctx.fillRect(-5, -1, 2, 4);    // 左腕前 (剣持ち)
+            // 剣
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(-6, -6, 1, 8);    // 刀身
+            ctx.fillStyle = '#880';
+            ctx.fillRect(-6, -1, 2, 1);    // 鍔
+        } else if (dir === 'up') {
+            ctx.fillRect(-6, 0, 2, 5);
+            ctx.fillRect( 4, 0, 2, 5);
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(-1, -12, 1, 6);   // 剣上向き
+            ctx.fillStyle = '#880';
+            ctx.fillRect(-2, -6, 3, 1);
+        } else {
+            ctx.fillRect(-6, 0, 2, 5);
+            ctx.fillRect( 4, 0, 2, 5);
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect( 5, 0, 1, 7);     // 剣右側
+            ctx.fillStyle = '#880';
+            ctx.fillRect( 4, 0, 2, 1);
+        }
+
+        // 脚
+        ctx.fillStyle = darkCol;
+        ctx.fillRect(-3, 6, 2, 4);
+        ctx.fillRect( 1, 6, 2, 4);
+        ctx.fillStyle = '#444';
+        ctx.fillRect(-3, 9, 2, 2);        // 足
+        ctx.fillRect( 1, 9, 2, 2);
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    },
+
+    // === 高品質敵描画 (タイプ別ドット絵) ===
+    drawEnemy(e, hitFlash) {
+        let ex = e.x, ey = e.y;
+        ctx.save();
+        ctx.translate(ex, ey);
+
+        // ヒット時は白く点滅
+        if (hitFlash) {
+            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = '#fff';
+        }
+
+        // タイプ判定 (size大 = boss相当とみなす)
+        let isBoss = e.size >= 20;
+        let color = e.color || '#0f0';
+
+        if (isBoss) {
+            // === ボス: 20×20 赤/黒 複数の目 ===
+            ctx.fillStyle = hitFlash ? '#fff' : '#300';
+            ctx.fillRect(-10, -10, 20, 20);
+            ctx.fillStyle = hitFlash ? '#faa' : '#800';
+            ctx.fillRect(-8, -8, 16, 16);
+            // トゲ
+            ctx.fillStyle = hitFlash ? '#fff' : '#f00';
+            for (let i = 0; i < 4; i++) {
+                let ang = (i / 4) * Math.PI * 2;
+                let tx = Math.cos(ang) * 10, ty = Math.sin(ang) * 10;
+                ctx.save(); ctx.translate(tx, ty);
+                ctx.fillRect(-2, -4, 4, 8);
+                ctx.restore();
+            }
+            // 目 x3
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(-5, -3, 3, 3);
+            ctx.fillRect( 2, -3, 3, 3);
+            ctx.fillRect(-1, -6, 3, 3);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(-4, -2, 1, 1);
+            ctx.fillRect( 3, -2, 1, 1);
+            ctx.fillRect( 0, -5, 1, 1);
+            // 口
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(-4, 2, 8, 2);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-4, 2, 1, 1);
+            ctx.fillRect(-2, 2, 1, 1);
+            ctx.fillRect( 0, 2, 1, 1);
+            ctx.fillRect( 2, 2, 1, 1);
+            // 輪郭グロー
+            ctx.shadowBlur = 12; ctx.shadowColor = '#f00';
+            ctx.strokeStyle = '#f00'; ctx.lineWidth = 1;
+            ctx.strokeRect(-10, -10, 20, 20);
+            ctx.shadowBlur = 0;
+
+        } else if (color === '#f0f' || e.size <= 7) {
+            // === ゴブリン: 8×12 小悪魔 ===
+            ctx.fillStyle = hitFlash ? '#fff' : '#880000';
+            ctx.fillRect(-4, -6, 8, 12);
+            ctx.fillStyle = hitFlash ? '#faa' : '#c00';
+            ctx.fillRect(-3, -5, 6, 4);  // 顔
+            // 耳
+            ctx.fillRect(-5, -5, 2, 3);
+            ctx.fillRect( 3, -5, 2, 3);
+            // 目
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(-2, -4, 1, 1);
+            ctx.fillRect( 1, -4, 1, 1);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(-2, -4, 1, 1);
+            ctx.fillRect( 1, -4, 1, 1);
+            // 口 (歯)
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-2, -2, 1, 1);
+            ctx.fillRect( 0, -2, 1, 1);
+            ctx.fillRect( 2, -2, 1, 1);
+            // 体
+            ctx.fillStyle = hitFlash ? '#faa' : '#600';
+            ctx.fillRect(-3, -1, 6, 6);
+            ctx.fillRect(-4, -1, 2, 5); // 腕左
+            ctx.fillRect( 2, -1, 2, 5); // 腕右
+            ctx.fillRect(-2, 5, 2, 3);  // 脚左
+            ctx.fillRect( 1, 5, 2, 3);  // 脚右
+
+        } else if (color === '#f00' || e.size >= 13) {
+            // === ナイト (knight): 12×16 黒い騎士 ===
+            ctx.fillStyle = hitFlash ? '#fff' : '#111';
+            // 兜
+            ctx.fillRect(-5, -8, 10, 6);
+            ctx.fillStyle = hitFlash ? '#aaa' : '#555';
+            ctx.fillRect(-4, -7, 8, 4);  // 前面板
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(-4, -6, 8, 1);  // 目スリット
+            // 鎧体
+            ctx.fillStyle = hitFlash ? '#fff' : '#222';
+            ctx.fillRect(-5, -2, 10, 9);
+            ctx.fillStyle = hitFlash ? '#aaa' : '#555';
+            ctx.fillRect(-4, -1, 8, 1);  // 胸板
+            ctx.fillRect(-1, -2, 2, 9);  // 中央縦
+            // 腕
+            ctx.fillStyle = hitFlash ? '#fff' : '#333';
+            ctx.fillRect(-7, -2, 3, 7);
+            ctx.fillRect( 4, -2, 3, 7);
+            // 剣
+            ctx.fillStyle = hitFlash ? '#ddd' : '#999';
+            ctx.fillRect( 6, -8, 1, 10);
+            ctx.fillStyle = '#880';
+            ctx.fillRect( 5, -2, 3, 1);
+            // 脚
+            ctx.fillStyle = hitFlash ? '#aaa' : '#333';
+            ctx.fillRect(-4, 7, 3, 5);
+            ctx.fillRect( 1, 7, 3, 5);
+            ctx.fillStyle = hitFlash ? '#fff' : '#111';
+            ctx.fillRect(-4, 11, 3, 2);
+            ctx.fillRect( 1, 11, 3, 2);
+
+        } else {
+            // === スライム / 汎用: 緑のスライム 12×8 ===
+            let sc = hitFlash ? '#fff' : '#0a0';
+            let sc2 = hitFlash ? '#dfd' : '#0f0';
+            // スライム本体 (丸っこい)
+            ctx.fillStyle = sc;
+            ctx.fillRect(-5, -2, 10, 6);
+            ctx.fillRect(-4, -4, 8, 8);
+            ctx.fillRect(-3, -5, 6, 10);
+            // ハイライト
+            ctx.fillStyle = sc2;
+            ctx.fillRect(-2, -4, 2, 1);
+            ctx.fillRect( 1, -4, 1, 1);
+            // 目
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(-2, -2, 2, 2);
+            ctx.fillRect( 1, -2, 2, 2);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(-2, -1, 1, 1);
+            ctx.fillRect( 2, -1, 1, 1);
+        }
+
+        ctx.restore();
+    },
+
     draw() {
         ctx.fillStyle = '#000510';
         ctx.fillRect(0, 0, 200, 300);

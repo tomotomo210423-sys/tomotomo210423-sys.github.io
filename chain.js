@@ -276,20 +276,100 @@ const ChainBlast = {
                 ctx.fillRect(x+1, y+1, this.CELL-2, this.CELL-2);
                 if (val >= 0) {
                     let inHL = hlValid && highlight.some(g => g.r===r && g.c===c);
+                    ctx.save();
                     if (inHL) {
                         ctx.shadowBlur = hlPulse*1.8; ctx.shadowColor = this.COLORS[val];
                     }
-                    ctx.fillStyle = this.COLORS[val];
-                    ctx.fillRect(x+2, y+2, this.CELL-4, this.CELL-4);
-                    ctx.shadowBlur = 0;
+
+                    // === HIGH QUALITY BLOCK ===
+                    let bx = x+2, by = y+2, bw = this.CELL-4, bh = this.CELL-4;
+                    let col = this.COLORS[val];
+
+                    // Corner-cut (4 corners 1px clip) via clipping path
+                    ctx.beginPath();
+                    ctx.moveTo(bx+1, by);
+                    ctx.lineTo(bx+bw-1, by);
+                    ctx.lineTo(bx+bw, by+1);
+                    ctx.lineTo(bx+bw, by+bh-1);
+                    ctx.lineTo(bx+bw-1, by+bh);
+                    ctx.lineTo(bx+1, by+bh);
+                    ctx.lineTo(bx, by+bh-1);
+                    ctx.lineTo(bx, by+1);
+                    ctx.closePath();
+                    ctx.clip();
+
+                    // Base color fill
+                    ctx.fillStyle = col;
+                    ctx.fillRect(bx, by, bw, bh);
+
+                    // Highlight overlay if selected
                     if (inHL) {
                         ctx.fillStyle = `rgba(255,255,255,${0.15+Math.sin(this.tmr*0.18)*0.15})`;
-                        ctx.fillRect(x+2, y+2, this.CELL-4, this.CELL-4);
+                        ctx.fillRect(bx, by, bw, bh);
                     }
-                    // Cell gloss (top-left triangle)
-                    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-                    ctx.fillRect(x+2, y+2, this.CELL-4, 3);
-                    ctx.fillRect(x+2, y+2, 3, this.CELL-4);
+
+                    // Right/bottom dark shadow (20% darker)
+                    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+                    ctx.fillRect(bx, by+bh-3, bw, 3);
+                    ctx.fillRect(bx+bw-3, by, 3, bh);
+
+                    // Top-left white gloss triangle
+                    ctx.fillStyle = 'rgba(255,255,255,0.30)';
+                    ctx.fillRect(bx, by, bw, 3);
+                    ctx.fillRect(bx, by, 3, bh);
+
+                    // Inner highlight border (2px inset)
+                    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(bx+2, by+2, bw-4, bh-4);
+
+                    // Per-color inner pattern
+                    let cx2 = bx + bw/2, cy2 = by + bh/2;
+                    ctx.shadowBlur = 0;
+                    if (val === 0) {
+                        // Red: white diamond in center
+                        ctx.fillStyle = 'rgba(255,255,255,0.60)';
+                        ctx.beginPath();
+                        ctx.moveTo(cx2, cy2-3); ctx.lineTo(cx2+3, cy2);
+                        ctx.lineTo(cx2, cy2+3); ctx.lineTo(cx2-3, cy2);
+                        ctx.closePath(); ctx.fill();
+                    } else if (val === 1) {
+                        // Green: small green cross
+                        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                        ctx.fillRect(cx2-1, cy2-4, 2, 8);
+                        ctx.fillRect(cx2-4, cy2-1, 8, 2);
+                    } else if (val === 2) {
+                        // Blue: horizontal wave lines
+                        ctx.fillStyle = 'rgba(255,255,255,0.50)';
+                        ctx.fillRect(bx+2, cy2-3, bw-4, 1);
+                        ctx.fillRect(bx+3, cy2-1, bw-6, 1);
+                        ctx.fillRect(bx+2, cy2+1, bw-4, 1);
+                    } else if (val === 3) {
+                        // Yellow: radiant dots
+                        ctx.fillStyle = 'rgba(255,255,255,0.60)';
+                        ctx.fillRect(cx2-1, cy2-1, 2, 2);
+                        for (let a = 0; a < 4; a++) {
+                            let ax = cx2 + Math.cos(a*Math.PI/2)*4 - 1;
+                            let ay = cy2 + Math.sin(a*Math.PI/2)*4 - 1;
+                            ctx.fillRect(ax, ay, 1, 1);
+                        }
+                    } else if (val === 4) {
+                        // Pink: 5-point star shape (pixel style)
+                        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+                        ctx.fillRect(cx2-1, cy2-4, 2, 2); // top
+                        ctx.fillRect(cx2-4, cy2+1, 2, 2); // lower-left
+                        ctx.fillRect(cx2+2, cy2+1, 2, 2); // lower-right
+                        ctx.fillRect(cx2-3, cy2-2, 2, 2); // upper-left
+                        ctx.fillRect(cx2+1, cy2-2, 2, 2); // upper-right
+                        ctx.fillRect(cx2-1, cy2-1, 2, 4); // center vertical
+                    }
+
+                    ctx.restore();
+                    // Re-apply shadow for cursor (needs to be outside clip)
+                    if (inHL) {
+                        ctx.shadowBlur = hlPulse*1.8; ctx.shadowColor = this.COLORS[val];
+                        ctx.shadowBlur = 0;
+                    }
                 }
             }
         }
