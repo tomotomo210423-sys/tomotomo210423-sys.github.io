@@ -538,20 +538,88 @@ const Horror = {
                 let t=this.map[y*this.mapW+x];
                 ctx.fillStyle='#1a0d0d'; ctx.fillRect(px,py,this.ts,this.ts);
                 if (t===1) {
+                    // 石積みテクスチャ: 決定論的ハッシュでランダム感
+                    let seed = x * 31 + y * 17;
+                    let h1 = ((seed * 1103515245 + 12345) & 0x7fffffff) % 100;
+                    let h2 = ((seed * 22695477 + 1) & 0x7fffffff) % 100;
+                    let h3 = ((seed * 214013 + 2531011) & 0x7fffffff) % 100;
+
+                    // ベース石色 (暗い赤茶)
                     let g=ctx.createLinearGradient(px,py,px,py+this.ts);
-                    g.addColorStop(0,'#3a2020'); g.addColorStop(0.4,'#251414'); g.addColorStop(1,'#0d0808');
+                    g.addColorStop(0,`hsl(0,${20+h1%15}%,${14+h2%8}%)`);
+                    g.addColorStop(0.5,`hsl(0,${18+h2%12}%,${10+h3%6}%)`);
+                    g.addColorStop(1,`hsl(0,${15+h3%10}%,${6+h1%5}%)`);
                     ctx.fillStyle=g; ctx.fillRect(px,py,this.ts,this.ts);
-                    ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=0.5; ctx.strokeRect(px,py,this.ts,this.ts);
-                    ctx.strokeStyle='rgba(70,20,20,0.3)';
+
+                    // 石積みの目地 (横線と縦線でレンガ模様)
+                    ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=1;
+                    // 横目地
                     ctx.beginPath(); ctx.moveTo(px,py+this.ts/2); ctx.lineTo(px+this.ts,py+this.ts/2); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(px+this.ts/2,py); ctx.lineTo(px+this.ts/2,py+this.ts/2); ctx.stroke();
+                    // 縦目地 (上下で互い違い: y偶数=左寄り、奇数=右寄り)
+                    let vx2 = (y%2===0) ? px+this.ts*0.4 : px+this.ts*0.6;
+                    ctx.beginPath(); ctx.moveTo(vx2,py); ctx.lineTo(vx2,py+this.ts/2); ctx.stroke();
+                    let vx3 = (y%2===0) ? px+this.ts*0.8 : px+this.ts*0.2;
+                    ctx.beginPath(); ctx.moveTo(vx3,py+this.ts/2); ctx.lineTo(vx3,py+this.ts); ctx.stroke();
+
+                    // 外枠 (石の輪郭)
+                    ctx.strokeStyle='rgba(0,0,0,0.45)'; ctx.lineWidth=0.8;
+                    ctx.strokeRect(px,py,this.ts,this.ts);
+
+                    // シミ/染み (h1が大きい時だけ)
+                    if (h1 > 65) {
+                        ctx.fillStyle=`rgba(60,0,0,${0.1+h2*0.002})`;
+                        ctx.fillRect(px+h2%8, py+h3%8, 4+h1%6, 3+h2%5);
+                    }
+                    // 割れ目 (h3が大きい時だけ)
+                    if (h3 > 75) {
+                        ctx.strokeStyle=`rgba(0,0,0,${0.3+h1*0.003})`; ctx.lineWidth=0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(px+h2%12+2, py+2);
+                        ctx.lineTo(px+h3%14+4, py+7);
+                        ctx.lineTo(px+h1%10+5, py+12);
+                        ctx.stroke();
+                    }
                 } else if (t===2) { ctx.fillStyle='#0a3010'; ctx.fillRect(px,py,this.ts,this.ts); ctx.fillStyle='#0f0'; ctx.font='7px monospace'; ctx.fillText('EXIT',px+2,py+12); }
-                else if (t===3) { ctx.fillStyle='#1a3050'; ctx.fillRect(px+2,py+2,this.ts-4,this.ts-4); ctx.fillStyle='#0d2240'; ctx.fillRect(px+4,py+4,4,12); ctx.fillRect(px+12,py+4,4,12); }
+                else if (t===3) {
+                    // ロッカー (木目テクスチャ)
+                    let seed3 = x * 13 + y * 7;
+                    let h4 = ((seed3 * 1103515245 + 12345) & 0x7fffffff) % 40;
+                    // 木目ベース
+                    let wg=ctx.createLinearGradient(px,py,px+this.ts,py);
+                    wg.addColorStop(0,`hsl(210,${30+h4%15}%,${12+h4%8}%)`);
+                    wg.addColorStop(0.5,`hsl(210,${25+h4%10}%,${15+h4%6}%)`);
+                    wg.addColorStop(1,`hsl(210,${28+h4%12}%,${11+h4%7}%)`);
+                    ctx.fillStyle=wg; ctx.fillRect(px+2,py+2,this.ts-4,this.ts-4);
+                    // ドア板線
+                    ctx.strokeStyle='rgba(5,10,30,0.5)'; ctx.lineWidth=0.8;
+                    for (let wi=0; wi<3; wi++) {
+                        ctx.beginPath(); ctx.moveTo(px+4+wi*4,py+2); ctx.lineTo(px+4+wi*4,py+this.ts-2); ctx.stroke();
+                    }
+                    ctx.fillStyle='#0d2240'; ctx.fillRect(px+4,py+4,4,12); ctx.fillRect(px+12,py+4,4,12);
+                    ctx.strokeStyle='rgba(40,80,120,0.5)'; ctx.lineWidth=0.5; ctx.strokeRect(px+2,py+2,this.ts-4,this.ts-4);
+                }
                 else if (t===5) { ctx.fillStyle='#110d08'; ctx.fillRect(px,py+5,20,15); ctx.fillStyle='#f0f0e0'; ctx.fillRect(px+2,py+10,16,5); }
                 else if (t===6) { ctx.fillStyle='#555'; ctx.fillRect(px+2,py+2,16,16); ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(px+10,py+10,4,0,Math.PI*2); ctx.fill(); }
                 else if (t===7) { ctx.fillStyle='#600'; ctx.fillRect(px+4,py,12,20); ctx.fillStyle='#ff0'; ctx.fillRect(px+8,py+8,4,4); }
                 else if (t===8) { ctx.fillStyle='#432'; ctx.fillRect(px+2,py,16,4); ctx.fillStyle='#800'; ctx.fillRect(px+4,py+1,12,2); }
                 else if (t===9) { ctx.fillStyle='#ccc'; ctx.fillRect(px+5,py+5,10,10); ctx.fillStyle='#f00'; ctx.fillRect(px+7,py+7,6,2); }
+                else {
+                    // 床タイル: 木目またはタイル感
+                    let seedf = x * 19 + y * 23;
+                    let hf = ((seedf * 1103515245 + 12345) & 0x7fffffff) % 100;
+                    // 交互タイルパターン (チェッカー)
+                    let even = (x + y) % 2 === 0;
+                    ctx.fillStyle = even ? `hsl(15,${15+hf%8}%,${8+hf%5}%)` : `hsl(15,${12+hf%6}%,${6+hf%4}%)`;
+                    ctx.fillRect(px,py,this.ts,this.ts);
+                    // タイルの目地
+                    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=0.5;
+                    ctx.strokeRect(px+0.5,py+0.5,this.ts-1,this.ts-1);
+                    // 木目風: 薄い横線
+                    if (hf > 50) {
+                        ctx.strokeStyle=`rgba(40,20,10,${0.08+hf*0.001})`; ctx.lineWidth=0.5;
+                        ctx.beginPath(); ctx.moveTo(px,py+hf%this.ts); ctx.lineTo(px+this.ts,py+hf%this.ts); ctx.stroke();
+                    }
+                }
             }
         }
 

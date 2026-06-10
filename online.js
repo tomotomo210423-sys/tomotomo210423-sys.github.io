@@ -549,26 +549,71 @@ const Online = {
         let isGiveSelected = this.state.turn === this.role && this.cursor === i && this.state.pendingSkill === 3 && this.state.wait === 0 && !this.isResult;
         if (isGiveSelected) y -= 5;
 
-        // Draw rounded card (my hand)
+        // Draw high quality face-up card (my hand)
         let r = 3;
+        ctx.save();
+        if (isGiveSelected) {
+            ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+        }
+
+        // Card face gradient
         ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+25-r,y);
         ctx.arcTo(x+25,y,x+25,y+r,r); ctx.lineTo(x+25,y+35-r);
         ctx.arcTo(x+25,y+35,x+25-r,y+35,r); ctx.lineTo(x+r,y+35);
         ctx.arcTo(x,y+35,x,y+35-r,r); ctx.lineTo(x,y+r);
         ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
-        ctx.fillStyle = '#ddd'; ctx.fill();
-        if (isGiveSelected) {
-          ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
-          ctx.shadowBlur = 8; ctx.shadowColor = '#0ff';
-        } else { ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.shadowBlur = 0; }
-        ctx.stroke(); ctx.shadowBlur = 0; ctx.lineWidth = 1;
 
-        // Suit symbol
+        let faceGrad = ctx.createLinearGradient(x, y, x, y+35);
+        if (myHand[i].v === 0) {
+            faceGrad.addColorStop(0, '#fff0f0');
+            faceGrad.addColorStop(1, '#ffe0e0');
+        } else {
+            faceGrad.addColorStop(0, '#ffffff');
+            faceGrad.addColorStop(1, '#e8e8f4');
+        }
+        ctx.fillStyle = faceGrad; ctx.fill();
+
+        // Gloss on face card
+        ctx.save(); ctx.clip();
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.fillRect(x+1, y+1, 23, 9);
+        ctx.restore();
+
+        // 2px black border
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+25-r,y);
+        ctx.arcTo(x+25,y,x+25,y+r,r); ctx.lineTo(x+25,y+35-r);
+        ctx.arcTo(x+25,y+35,x+25-r,y+35,r); ctx.lineTo(x+r,y+35);
+        ctx.arcTo(x,y+35,x,y+35-r,r); ctx.lineTo(x,y+r);
+        ctx.arcTo(x,y,x+r,y,r); ctx.closePath(); ctx.stroke();
+
+        // 1px inner highlight
+        ctx.strokeStyle = isGiveSelected ? '#0ff' : 'rgba(200,200,255,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x+r+1,y+1); ctx.lineTo(x+25-r-1,y+1);
+        ctx.arcTo(x+24,y+1,x+24,y+r+1,r-1); ctx.lineTo(x+24,y+35-r-1);
+        ctx.arcTo(x+24,y+34,x+25-r-1,y+34,r-1); ctx.lineTo(x+r+1,y+34);
+        ctx.arcTo(x+1,y+34,x+1,y+35-r-1,r-1); ctx.lineTo(x+1,y+r+1);
+        ctx.arcTo(x+1,y+1,x+r+1,y+1,r-1); ctx.closePath(); ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.restore();
+
+        // Suit symbol (top-left, small)
         let suits = ['♠','♥','♦','♣']; let cardSuit = suits[i % 4];
-        ctx.fillStyle = myHand[i].v === 0 ? 'rgba(200,0,0,0.4)' : 'rgba(0,0,0,0.2)'; ctx.font = '8px monospace';
-        ctx.fillText(cardSuit, x+2, y+12);
-        ctx.fillStyle = myHand[i].v === 0 ? '#f00' : '#000'; ctx.font = 'bold 14px monospace';
-        ctx.fillText(myHand[i].v === 0 ? 'J' : myHand[i].v, x + 6, y + 22);
+        let isJoker = myHand[i].v === 0;
+        let suitColor = (cardSuit === '♥' || cardSuit === '♦') ? '#cc0000' : '#000';
+        ctx.fillStyle = isJoker ? '#cc0000' : suitColor;
+        ctx.font = '7px monospace'; ctx.fillText(cardSuit, x+2, y+10);
+        // Big center number with shadow
+        ctx.save();
+        ctx.shadowBlur = 2; ctx.shadowColor = 'rgba(0,0,0,0.25)';
+        ctx.fillStyle = isJoker ? '#f00' : '#000'; ctx.font = 'bold 14px monospace';
+        ctx.fillText(isJoker ? 'J' : myHand[i].v, x + 6, y + 24);
+        // Bottom-right mirrored suit (small)
+        ctx.fillStyle = isJoker ? '#cc0000' : suitColor;
+        ctx.font = '7px monospace'; ctx.fillText(cardSuit, x+16, y+33);
+        ctx.restore();
       }
 
       let mySkills = this.state.skills[this.role];
