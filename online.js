@@ -448,7 +448,7 @@ const Online = {
 
       if (this.state.effects.global.revolution) { ctx.fillStyle = '#f0f'; ctx.font = 'bold 10px monospace'; ctx.fillText('REVOLUTION ACTIVE!', 40, 100); }
 
-      // Opponent cards with rounded corners and suit decoration
+      // Opponent cards - high quality design
       let opTargetStartX = 100 - (opHand.length * 15) / 2;
       for (let i = 0; i < opHand.length; i++) {
         // Lerp card positions for slide animation
@@ -459,26 +459,69 @@ const Online = {
         let x = this.opCardPositions[i].x, y = this.opCardPositions[i].y;
 
         let isSelected = this.state.turn === this.role && this.cursor === i && !this.isSkillMenu && this.state.pendingSkill !== 3 && this.state.wait === 0 && !this.isResult;
-        if (isSelected) y -= 5; // selected card shifts up
+        if (isSelected) y -= 6; // hover: card floats up
 
-        // Draw rounded card
+        ctx.save();
+
+        // Cyan glow for selected card
+        if (isSelected) {
+            ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
+        }
+
+        // Card back: dark gradient background
         let r = 3;
         ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+25-r,y);
         ctx.arcTo(x+25,y,x+25,y+r,r); ctx.lineTo(x+25,y+35-r);
         ctx.arcTo(x+25,y+35,x+25-r,y+35,r); ctx.lineTo(x+r,y+35);
         ctx.arcTo(x,y+35,x,y+35-r,r); ctx.lineTo(x,y+r);
         ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
-        ctx.fillStyle = '#a00'; ctx.fill();
-        if (isSelected) {
-          ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2;
-          ctx.shadowBlur = 8; ctx.shadowColor = '#0ff';
-        } else { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.shadowBlur = 0; }
-        ctx.stroke(); ctx.shadowBlur = 0; ctx.lineWidth = 1;
 
-        // Suit symbol decoration (small suits on card back)
+        // Card back gradient (blue-based grid pattern)
+        let cardGrad = ctx.createLinearGradient(x, y, x, y+35);
+        cardGrad.addColorStop(0, '#1a2a6c');
+        cardGrad.addColorStop(1, '#0d1a44');
+        ctx.fillStyle = cardGrad; ctx.fill();
+
+        // Grid pattern on card back
+        ctx.save();
+        ctx.clip(); // clip to card shape
+        ctx.strokeStyle = 'rgba(100,150,255,0.25)'; ctx.lineWidth = 1;
+        for (let gx = x; gx < x+25; gx += 5) {
+            ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y+35); ctx.stroke();
+        }
+        for (let gy = y; gy < y+35; gy += 5) {
+            ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x+25, gy); ctx.stroke();
+        }
+        // Gloss highlight top edge
+        ctx.fillStyle = 'rgba(200,220,255,0.18)';
+        ctx.fillRect(x+1, y+1, 23, 8);
+        ctx.restore();
+
+        // 2px black border
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+25-r,y);
+        ctx.arcTo(x+25,y,x+25,y+r,r); ctx.lineTo(x+25,y+35-r);
+        ctx.arcTo(x+25,y+35,x+25-r,y+35,r); ctx.lineTo(x+r,y+35);
+        ctx.arcTo(x,y+35,x,y+35-r,r); ctx.lineTo(x,y+r);
+        ctx.arcTo(x,y,x+r,y,r); ctx.closePath(); ctx.stroke();
+
+        // 1px inner highlight
+        ctx.strokeStyle = isSelected ? '#0ff' : 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x+r+1,y+1); ctx.lineTo(x+25-r-1,y+1);
+        ctx.arcTo(x+24,y+1,x+24,y+r+1,r-1); ctx.lineTo(x+24,y+35-r-1);
+        ctx.arcTo(x+24,y+34,x+25-r-1,y+34,r-1); ctx.lineTo(x+r+1,y+34);
+        ctx.arcTo(x+1,y+34,x+1,y+35-r-1,r-1); ctx.lineTo(x+1,y+r+1);
+        ctx.arcTo(x+1,y+1,x+r+1,y+1,r-1); ctx.closePath(); ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Suit symbol on back
         let suits = ['♠','♥','♦','♣']; let suit = suits[i % 4];
-        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '8px monospace';
+        ctx.fillStyle = 'rgba(150,180,255,0.35)'; ctx.font = '8px monospace';
         ctx.fillText(suit, x+8, y+14);
+
+        ctx.restore();
 
         if (this.state.activeSkill === 1 && opHand[i].v === 0) { ctx.fillStyle = '#f00'; ctx.fillRect(x+2, y+2, 21, 31); ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('J', x+8, y+20); }
         if (isSelected) {
