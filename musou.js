@@ -56,15 +56,21 @@ const Musou = {
     formatNum(num) {
         if (num < 1000) return Math.floor(num).toString();
         const s = ["", "K", "M", "B", "T"];
-        const i = Math.floor(Math.log10(num) / 3);
+        const i = Math.min(s.length - 1, Math.floor(Math.log10(num) / 3));
         return (num / Math.pow(1000, i)).toFixed(1) + s[i];
     },
 
     loadSave() {
         try {
             let data = localStorage.getItem('musou_save_v1');
-            if (data) this.saveData = JSON.parse(data);
-            if (!this.saveData.upg) this.saveData.upg = { atk: 0, hp: 0, mag: 0, spd: 0 };
+            if (data) {
+                let p = JSON.parse(data);
+                if (p && typeof p === 'object') this.saveData = p;
+            }
+            if (typeof this.saveData.coins !== 'number' || !isFinite(this.saveData.coins)) this.saveData.coins = 0;
+            if (typeof this.saveData.maxKills !== 'number' || !isFinite(this.saveData.maxKills)) this.saveData.maxKills = 0;
+            if (!this.saveData.upg || typeof this.saveData.upg !== 'object') this.saveData.upg = { atk: 0, hp: 0, mag: 0, spd: 0 };
+            ['atk','hp','mag','spd'].forEach(k => { if (typeof this.saveData.upg[k] !== 'number' || !isFinite(this.saveData.upg[k])) this.saveData.upg[k] = 0; });
         } catch(e) {}
     },
 

@@ -63,7 +63,7 @@ self.addEventListener('fetch', e => {
                     caches.open(CACHE_NAME).then(c => c.put(e.request, copy)).catch(() => {});
                 }
                 return res;
-            });
+            }).catch(() => new Response('', { status: 504, statusText: 'offline' }));
         })
     );
 });

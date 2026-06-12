@@ -68,7 +68,7 @@ const Online = {
   startPeer(isHost) {
     this.role = isHost ? 'host' : 'guest';
     this.st = 'connecting'; this.msg = 'CONNECTING TO SERVER...';
-    const myId = 'RJ_' + Math.floor(1000 + Math.random() * 9000);
+    const myId = 'RJ_' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
     this.peer = new Peer(myId);
     
     this.peer.on('open', (id) => {
@@ -94,6 +94,9 @@ const Online = {
   setupConn() {
     this.conn.on('open', () => { if (this.role === 'guest') this.conn.send({ type: 'auth', pass: this.myPass }); });
     this.conn.on('data', (data) => {
+      if (!data || typeof data !== 'object') return;
+      // 未認証ピアからのゲーム操作は無視（パスワード保護の迂回防止）
+      if (this.role === 'host' && !this.guestJoined && data.type !== 'auth') return;
       if (data.type === 'surrender') {
          this.state.msg = 'OPPONENT SURRENDERED!';
          if (this.role === 'host') this.state.guestHand = []; else this.state.hostHand = [];

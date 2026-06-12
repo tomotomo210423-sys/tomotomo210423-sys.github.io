@@ -200,7 +200,7 @@ const Noise = {
         CommSys.msg = ''; CommSys.msgLife = 0; this.commQueue = [];
         
         let saved = localStorage.getItem('noiseAgentMaxLevel');
-        if (saved !== null) { this.maxLevel = parseInt(saved); } else { this.maxLevel = 0; }
+        if (saved !== null) { this.maxLevel = parseInt(saved, 10) || 0; } else { this.maxLevel = 0; }
         
         if (typeof BGM !== 'undefined') BGM.play('boss');
     },
