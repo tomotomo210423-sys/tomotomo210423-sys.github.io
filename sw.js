@@ -1,5 +1,6 @@
 // === SERVICE WORKER — 11in1 RETRO SYSTEM ===
-const CACHE_NAME = '11in1-v1';
+// キャッシュ優先戦略のため、ファイル更新時は必ずバージョンを上げること
+const CACHE_NAME = '11in1-v2';
 
 const ASSETS = [
     './',
@@ -44,6 +45,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+    // GET 以外はキャッシュ不可 (cache.put が例外を投げる)
+    if (e.request.method !== 'GET') return;
     // Google Fonts など cross-origin はネットワーク優先、失敗しても無視
     if (!e.request.url.startsWith(self.location.origin)) {
         e.respondWith(fetch(e.request).catch(() => new Response('')));
@@ -55,7 +58,9 @@ self.addEventListener('fetch', e => {
             if (cached) return cached;
             return fetch(e.request).then(res => {
                 if (res.ok) {
-                    caches.open(CACHE_NAME).then(c => c.put(e.request, res.clone()));
+                    // ボディ消費前に同期的に clone しておく (遅延 clone は例外になる)
+                    const copy = res.clone();
+                    caches.open(CACHE_NAME).then(c => c.put(e.request, copy)).catch(() => {});
                 }
                 return res;
             });
