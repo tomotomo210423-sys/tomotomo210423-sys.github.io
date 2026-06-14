@@ -40,7 +40,7 @@ const Abyss = {
             pointer.path = [];
         }
         
-        if (typeof BGM !== 'undefined') BGM.play('spell');
+        if (typeof BGM !== 'undefined') BGM.play('dungeon');
     },
 
     playDespairBGM() {
@@ -196,7 +196,7 @@ const Abyss = {
             if (this.tmr > 60 && ((typeof keysDown !== 'undefined' && keysDown.a) || tapped)) {
                 this.st = 'title'; this.tmr = 0;
                 if (typeof pointer !== 'undefined') pointer.path = [];
-                if (typeof BGM !== 'undefined') BGM.play('spell');
+                if (typeof BGM !== 'undefined') BGM.play('dungeon');
             }
             if (typeof pointer !== 'undefined') this.prevPointerActive = pointer.active;
             return;

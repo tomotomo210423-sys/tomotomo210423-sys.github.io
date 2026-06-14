@@ -197,6 +197,9 @@ const Action = {
     // ★ ステージ12: ボスを追加
     if (stage === 12) {
         this.stage12Boss = { x: 3900, y: 240, vx: 1.5, hp: 200, maxHp: 200, shotTimer: 0, dead: false };
+        BGM.play('boss');
+    } else {
+        BGM.play('action');
     }
 
     // ★ 詰み防止: 跳べない隙間に踏み台を自動挿入
@@ -235,10 +238,10 @@ const Action = {
   },
 
   die(reason) {
-    this.deathReason = reason; SaveSys.data.actLives--; SaveSys.save(); 
+    this.deathReason = reason; SaveSys.data.actLives--; SaveSys.save();
     playSnd('hit'); screenShake(12); addParticle(this.p.x, this.p.y, '#f00', 'explosion'); addParticle(this.p.x, this.p.y, '#ff0', 'explosion');
     SaveSys.addLog('理不尽ブラザーズ', `ステージ${SaveSys.data.actStage}「${reason}」で死亡`);
-    this.st = 'dead';
+    this.st = 'dead'; BGM.play('gameover');
   },
   
   update() {

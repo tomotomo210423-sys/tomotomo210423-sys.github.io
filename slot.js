@@ -191,6 +191,7 @@ const Slot = {
         else { this.targetSym = null; }
         this.st = 'spin'; this.stoppedCount = 0; this.lines = []; this.msg = 'PRESS L/C/R or A!';
         for (let i = 0; i < 3; i++) { this.reels[i].st = false; this.reels[i].s = 12 + i * 2; }
+        if (typeof BGM !== 'undefined') BGM.play('slots');
         playSnd('jmp');
         this.jp += 2;
     },

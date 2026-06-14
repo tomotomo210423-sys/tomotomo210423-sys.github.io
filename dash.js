@@ -32,7 +32,7 @@ const DungeonCrawl = {
         this.texts = []; this.bolts = [];
         this.p = { x: 0, y: 0, hp: 30, maxHp: 30, atk: 5, lv: 1, exp: 0, nextExp: 10, gold: 0, potions: 1 };
         this.genFloor();
-        if (typeof BGM !== 'undefined') BGM.play('boss');
+        if (typeof BGM !== 'undefined') BGM.play('dungeon');
     },
 
     // ===== ダンジョン生成 (ランダムウォーク掘削) =====
@@ -291,7 +291,7 @@ const DungeonCrawl = {
         this.best = b;
         SaveSys.save();
         SaveSys.addLog('DUNGEON CRAWL', `地下${this.floor}階で死亡 スコア:${score}`);
-        if (typeof BGM !== 'undefined') BGM.stop();
+        if (typeof BGM !== 'undefined') BGM.play('gameover');
         screenShake(10);
     },
 
@@ -322,6 +322,7 @@ const DungeonCrawl = {
                 this.genFloor();
                 this.st = 'play'; this.tmr = 0;
                 playSnd('combo');
+                if (typeof BGM !== 'undefined') BGM.play(this.floor % 5 === 0 ? 'boss' : 'dungeon');
             }
             return;
         }

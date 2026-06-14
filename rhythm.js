@@ -235,7 +235,7 @@ const Rhythm = {
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
     if(this.isEndless) {
-       BGM.stop(); this.notes = [];
+       BGM.play('rhythm'); this.notes = [];
        this.life = 5; this.endlessBpm = 120;
        this.endlessBeat = 0; this.logicalBeatTime = 0; this.finalTime = 0;
        this.startTime = audioCtx.currentTime + 1.5;

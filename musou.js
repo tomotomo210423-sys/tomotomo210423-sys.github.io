@@ -79,6 +79,7 @@ const Musou = {
         this.st = 'title';
         this.menuCur = 0;
         this.resetGame();
+        if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
     resetGame() {
@@ -307,6 +308,7 @@ const Musou = {
                     if (this.menuCur === 0) {
                         this.resetGame();
                         this.st = 'play';
+                        if (typeof BGM !== 'undefined') BGM.play('action');
                         if (typeof playSnd !== 'undefined') playSnd('jmp');
                     } else {
                         this.st = 'shop';
@@ -373,6 +375,7 @@ const Musou = {
             if (typeof keysDown !== 'undefined' && keysDown.a) {
                 this.st = 'title';
                 this.menuCur = 0;
+                if (typeof BGM !== 'undefined') BGM.play('menu');
             }
             return;
         }
@@ -651,6 +654,7 @@ const Musou = {
             if (this.kills > this.saveData.maxKills) this.saveData.maxKills = this.kills;
             this.save();
             this.st = 'over';
+            if (typeof BGM !== 'undefined') BGM.play('gameover');
             if (typeof playSnd !== 'undefined') playSnd('hit');
             if (typeof screenShake !== 'undefined') screenShake(15);
         }

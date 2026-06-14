@@ -202,7 +202,7 @@ const Noise = {
         let saved = localStorage.getItem('noiseAgentMaxLevel');
         if (saved !== null) { this.maxLevel = parseInt(saved); } else { this.maxLevel = 0; }
         
-        if (typeof BGM !== 'undefined') BGM.play('boss');
+        if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
     startStory(sIdx) {
@@ -234,6 +234,7 @@ const Noise = {
 
     loadLevel() {
         this.st = 'play'; this.p.box = false; this.o2 = 100; this.o2Cd = 0;
+        if (typeof BGM !== 'undefined') BGM.play('stealth');
         this.texts = []; this.tmr = 0; this.commTmr = 150; this.commQueue = [];
         this.walls = []; this.doors = []; this.switches = []; this.enemies = []; this.terminals = []; this.lasers = []; this.lockers = [];
         this.escapeTimer = -1;
@@ -430,7 +431,8 @@ const Noise = {
                 CommSys.speak('ルナ', '基地が爆発しました！！');
                 playSE('hit'); shakeCam(30);
                 this.texts.push({ x: this.p.x, y: this.p.y, text: 'TIME OVER', col: '#f00', life: 120, maxLife: 120, size: 60, rot: 0, screenCenter: true });
-                this.st = 'gameover'; this.tmr = 0; this.gameOverCur = 0; return;
+                this.st = 'gameover'; this.tmr = 0; this.gameOverCur = 0;
+                if (typeof BGM !== 'undefined') BGM.play('gameover'); return;
             }
         }
 
@@ -627,6 +629,7 @@ const Noise = {
 
         if (spotted) {
             this.st = 'gameover'; this.tmr = 0; this.gameOverCur = 0;
+            if (typeof BGM !== 'undefined') BGM.play('gameover');
             CommSys.speak('司令官ノイズ', '捕らえろォォ！！');
             playSE('hit'); shakeCam(15);
             this.texts.push({ x: this.p.x, y: this.p.y, text: 'SPOTTED!!', col: '#f00', life: 120, maxLife: 120, size: 70, rot: 0, screenCenter: true });

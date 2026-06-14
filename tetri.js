@@ -458,6 +458,7 @@ const Tetri = {
                 } else {
                     // 通常のゲームオーバー処理
                     this.st = 'gameover'; this.tmr = 0;
+                    if(typeof BGM !== 'undefined') BGM.play('gameover');
                     this.playSE('hit'); this.shakeCam(25);
                     for(let k=0; k<40; k++) {
                         this.parts.push({ x: this.px, y: this.py, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 50, maxLife: 50, col: '#f80', type: 'shard' });
