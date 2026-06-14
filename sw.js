@@ -1,6 +1,6 @@
 // === SERVICE WORKER — 11in1 RETRO SYSTEM ===
 // キャッシュ優先戦略のため、ファイル更新時は必ずバージョンを上げること
-const CACHE_NAME = '11in1-v2';
+const CACHE_NAME = '11in1-v3';
 
 const ASSETS = [
     './',
@@ -21,6 +21,7 @@ const ASSETS = [
     './noise.js',
     './chain.js',
     './dash.js',
+    './galaxy.js',
     './king_angry.png',
     './king_disappointed.png',
     './king_laughing.png',
