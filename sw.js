@@ -1,5 +1,5 @@
 // === SERVICE WORKER — 11in1 RETRO SYSTEM ===
-const CACHE_NAME = '11in1-v2';
+const CACHE_NAME = '11in1-v3';
 
 const ASSETS = [
     './',
