@@ -1,608 +1,60 @@
 // === GALAXY BREAK — 4-Chapter Story Adventure ===
-
 const GalaxyBreak = {
-    st: 'title', // title|story|ch1_pipe|ch2_race|ch3_mine|ch4_boss|ending|gameover
-    tmr: 0,
-    chapter: 0,   // 0=prologue,1,2,3,4
-    lives: 3,
-    score: 0,
+    st: 'title', tmr: 0, chapter: 0, score: 0, lives: 3,
     best: 0,
-    storyIdx: 0,
-    storyChar: 0,
-    storyLines: [],
 
-    STORIES: [
-        // After title → CH1
+    // --- CH1: PIPE REPAIR ---
+    pipes: [], pCur: { x: 0, y: 0 }, pW: 5, pH: 5, pTime: 0,
+
+    // --- CH2: ASTEROID FIELD ---
+    ship: { x: 100, y: 250 }, asteroids: [], fuel: 100, aTime: 0,
+
+    // --- CH3: STAR MINER ---
+    mGrid: [], mCur: { x: 2, y: 2 }, mW: 7, mH: 7, crystals: 0, mEnemies: [],
+
+    // --- CH4: BOSS BATTLE ---
+    bossHp: 100, bossMaxHp: 100, bossPhase: 0, bullets: [], playerBullets: [],
+    bShip: { x: 100, y: 240 }, bTimer: 0,
+
+    // --- STORY ---
+    storyLines: [
+        // Before CH1
         [
-            { c:'NOVA',  t:'宇宙船AIです。ワープドライブが故障しました。パイプを繋いでエネルギーを修復して！' },
-            { c:'PILOT', t:'了解。パイプパズルで修理するぞ！（Aで回転、十字キーで移動）' }
+            '銀河連邦の探査船「NOVA」が',
+            '敵帝国の罠に嵌まった。',
+            'エンジンパイプが損傷！',
+            '修理しなければ航行不能だ。'
         ],
-        // After CH1 → CH2
+        // Before CH2
         [
-            { c:'NOVA',  t:'ワープ成功！でも小惑星帯に突入してしまいました！' },
-            { c:'PILOT', t:'全速前進！避けながら燃料を回収する！（左右で回避）' }
+            'エンジン復旧！しかし、',
+            '小惑星帯に突入してしまった。',
+            '燃料を集めながら',
+            '30秒間生き延びろ！'
         ],
-        // After CH2 → CH3
+        // Before CH3
         [
-            { c:'NOVA',  t:'惑星Ωに不時着。帰還のため10個のクリスタルを採掘してください。' },
-            { c:'PILOT', t:'任せろ！（十字キーで移動、Aで隣接マスを掘る）' }
+            '小惑星帯を突破！だが、',
+            '惑星に不時着してしまった。',
+            '修理用クリスタルを',
+            '10個集めるのだ！'
         ],
-        // After CH3 → CH4
+        // Before CH4
         [
-            { c:'NOVA',  t:'敵帝国艦が接近！このままでは撃墜されます！' },
-            { c:'PILOT', t:'迎撃する！（左右で回避、A連打で反撃！）' }
+            'クリスタル確保完了！',
+            '帝国艦が追ってきた！',
+            '最終決戦だ。',
+            '奴を撃ち落とせ！！'
         ],
-        // After CH4 → ending
+        // Ending
         [
-            { c:'PILOT', t:'やった！敵艦を撃破した！帰還ルートが開いたぞ！' },
-            { c:'NOVA',  t:'全員無事。ミッション完了です。お疲れ様でした、パイロット。' }
+            '帝国艦撃破！！',
+            '「NOVA」は銀河の平和を守った。',
+            'MISSION COMPLETE!!',
+            ''
         ]
     ],
-
-    // ─── CH1: PIPE PUZZLE ───
-    PIPE_SZ: 5, // 5×5 grid
-    PIPE_CELL: 32,
-    pipes: [],
-    pipeCur: { x: 0, y: 0 },
-    pipeTimer: 0,
-    PIPE_TIME: 3600, // 60 seconds
-
-    PIPE_TYPES: [
-        // [up, right, down, left] openings
-        { conn: [1,1,0,0], name: 'bend'  },  // 0
-        { conn: [1,0,0,1], name: 'bend'  },  // 1
-        { conn: [0,0,1,1], name: 'bend'  },  // 2
-        { conn: [0,1,1,0], name: 'bend'  },  // 3
-        { conn: [1,0,1,0], name: 'strait'},  // 4  vertical
-        { conn: [0,1,0,1], name: 'strait'},  // 5  horizontal
-        { conn: [1,1,0,1], name: 'T'    },  // 6
-        { conn: [1,1,1,0], name: 'T'    },  // 7
-        { conn: [0,1,1,1], name: 'T'    },  // 8
-        { conn: [1,0,1,1], name: 'T'    },  // 9
-        { conn: [1,1,1,1], name: 'cross'},  // 10
-    ],
-
-    initCh1() {
-        const SZ = this.PIPE_SZ;
-        this.pipes = [];
-        for (let y = 0; y < SZ; y++) {
-            this.pipes[y] = [];
-            for (let x = 0; x < SZ; x++) {
-                this.pipes[y][x] = { type: Math.floor(Math.random() * this.PIPE_TYPES.length), water: false };
-            }
-        }
-        // Force source at (0,2) facing right and sink at (4,2) facing left
-        this.pipes[2][0] = { type: 5, water: false, fixed: true }; // horizontal (source)
-        this.pipes[2][4] = { type: 5, water: false, fixed: true }; // horizontal (sink)
-        this.pipeCur = { x: 1, y: 2 };
-        this.pipeTimer = this.PIPE_TIME;
-        this.pipeWin = false;
-        if (typeof BGM !== 'undefined') BGM.play('puzzle');
-    },
-
-    rotatePipe(x, y) {
-        if (this.pipes[y][x].fixed) return;
-        let t = this.pipes[y][x].type;
-        // Cycle through type groups: bends(0-3), straits(4-5), T(6-9), cross(10)
-        if (t >= 0 && t <= 3) t = (t + 1) % 4;
-        else if (t >= 4 && t <= 5) t = t === 4 ? 5 : 4;
-        else if (t >= 6 && t <= 9) t = 6 + (t - 6 + 1) % 4;
-        // cross stays cross
-        this.pipes[y][x].type = t;
-    },
-
-    checkPipeWin() {
-        const SZ = this.PIPE_SZ;
-        // BFS/flood from source (0,2) going right
-        let visited = Array.from({length: SZ}, () => new Array(SZ).fill(false));
-        let queue = [{ x: 0, y: 2, from: 3 }]; // came from left
-        visited[2][0] = true;
-        const dirs = [{dx:0,dy:-1,out:0,in:2},{dx:1,dy:0,out:1,in:3},{dx:0,dy:1,out:2,in:0},{dx:-1,dy:0,out:3,in:1}];
-        while (queue.length) {
-            let { x, y, from } = queue.shift();
-            let conn = this.PIPE_TYPES[this.pipes[y][x].type].conn;
-            for (let i = 0; i < 4; i++) {
-                if (i === from) continue; // don't go back
-                if (!conn[i]) continue;
-                let nx = x + dirs[i].dx, ny = y + dirs[i].dy;
-                if (nx < 0 || nx >= SZ || ny < 0 || ny >= SZ) continue;
-                if (visited[ny][nx]) continue;
-                let nc = this.PIPE_TYPES[this.pipes[ny][nx].type].conn;
-                if (!nc[dirs[i].in]) continue; // neighbor doesn't connect back
-                visited[ny][nx] = true;
-                if (nx === 4 && ny === 2) return true; // reached sink!
-                queue.push({ x: nx, y: ny, from: dirs[i].in });
-            }
-        }
-        return false;
-    },
-
-    updateCh1() {
-        this.pipeTimer--;
-        if (this.pipeTimer <= 0) { this.lives--; this.triggerGameOver(); return; }
-
-        if (keysDown.up)    this.pipeCur.y = Math.max(0, this.pipeCur.y - 1);
-        if (keysDown.down)  this.pipeCur.y = Math.min(this.PIPE_SZ - 1, this.pipeCur.y + 1);
-        if (keysDown.left)  this.pipeCur.x = Math.max(0, this.pipeCur.x - 1);
-        if (keysDown.right) this.pipeCur.x = Math.min(this.PIPE_SZ - 1, this.pipeCur.x + 1);
-        if (keysDown.a) {
-            this.rotatePipe(this.pipeCur.x, this.pipeCur.y);
-            if (typeof playSnd !== 'undefined') playSnd('sel');
-            if (this.checkPipeWin()) {
-                if (typeof playSnd !== 'undefined') playSnd('combo');
-                this.score += Math.floor(this.pipeTimer / 60) * 10;
-                this.nextChapter();
-            }
-        }
-    },
-
-    drawCh1() {
-        ctx.fillStyle = '#001122'; ctx.fillRect(0, 0, 200, 300);
-        const SZ = this.PIPE_SZ, CS = this.PIPE_CELL;
-        const ox = (200 - SZ * CS) / 2, oy = 50;
-
-        // Grid background
-        for (let y = 0; y < SZ; y++) {
-            for (let x = 0; x < SZ; x++) {
-                let px = ox + x * CS, py = oy + y * CS;
-                ctx.fillStyle = '#0a1a2a';
-                ctx.fillRect(px + 1, py + 1, CS - 2, CS - 2);
-                let p = this.pipes[y][x];
-                let conn = this.PIPE_TYPES[p.type].conn;
-                let pcx = px + CS / 2, pcy = py + CS / 2;
-                let col = p.fixed ? '#0ff' : '#28f';
-                ctx.strokeStyle = col; ctx.lineWidth = 4;
-                const dirs2 = [[0,-CS/2],[CS/2,0],[0,CS/2],[-CS/2,0]];
-                for (let i = 0; i < 4; i++) {
-                    if (conn[i]) {
-                        ctx.beginPath(); ctx.moveTo(pcx, pcy);
-                        ctx.lineTo(pcx + dirs2[i][0], pcy + dirs2[i][1]); ctx.stroke();
-                    }
-                }
-                // Center dot
-                ctx.fillStyle = col; ctx.beginPath(); ctx.arc(pcx, pcy, 4, 0, Math.PI * 2); ctx.fill();
-                // Cursor
-                if (x === this.pipeCur.x && y === this.pipeCur.y) {
-                    ctx.strokeStyle = '#ff0'; ctx.lineWidth = 2;
-                    ctx.strokeRect(px + 2, py + 2, CS - 4, CS - 4);
-                }
-            }
-        }
-        // Source/Sink markers
-        ctx.fillStyle = '#0ff'; ctx.font = '9px monospace';
-        ctx.fillText('IN', ox - 20, oy + 2 * CS + CS / 2 + 4);
-        ctx.fillText('OUT', ox + SZ * CS + 4, oy + 2 * CS + CS / 2 + 4);
-
-        // HUD
-        ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
-        ctx.fillText('CH1: PIPE REPAIR', 10, 20);
-        ctx.fillStyle = '#ff0';
-        ctx.fillText(`TIME: ${Math.ceil(this.pipeTimer / 60)}s`, 120, 20);
-        ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
-        ctx.fillText('A:回転  十字:移動', 50, 270);
-        this.drawHUD();
-    },
-
-    // ─── CH2: GRAVITY RACER ───
-    ship: { x: 100, y: 240, vx: 0 },
-    obstacles: [],
-    fuel: 100,
-    raceTimer: 0,
-    RACE_TIME: 1800, // 30 sec
-    scrollY: 0,
-
-    initCh2() {
-        this.ship = { x: 100, y: 240, vx: 0 };
-        this.obstacles = [];
-        this.fuel = 100;
-        this.raceTimer = this.RACE_TIME;
-        this.scrollY = 0;
-        this.raceWin = false;
-        if (typeof BGM !== 'undefined') BGM.play('action');
-        for (let i = 0; i < 8; i++) this.spawnObstacle(i * 40);
-    },
-
-    spawnObstacle(yOff) {
-        let t = Math.random() < 0.25 ? 'fuel' : 'rock';
-        let x = 20 + Math.random() * 160;
-        let y = -(yOff + 20 + Math.random() * 60);
-        this.obstacles.push({ x, y, t, r: t === 'fuel' ? 8 : 10 + Math.random() * 8 });
-    },
-
-    updateCh2() {
-        this.raceTimer--;
-        if (this.raceTimer <= 0) {
-            this.score += 200;
-            this.nextChapter(); return;
-        }
-        this.scrollY += 2 + (1 - this.raceTimer / this.RACE_TIME) * 2;
-
-        // Ship movement
-        let spd = 3;
-        if (keys.left)  this.ship.vx -= 0.5;
-        if (keys.right) this.ship.vx += 0.5;
-        if (keys.a)     this.ship.vx *= 1.05; // boost
-        this.ship.vx *= 0.85;
-        this.ship.x = Math.max(10, Math.min(190, this.ship.x + this.ship.vx));
-
-        // Move obstacles down
-        for (let o of this.obstacles) o.y += 2 + (1 - this.raceTimer / this.RACE_TIME) * 2;
-
-        // Spawn new
-        let minY = Math.min(...this.obstacles.map(o => o.y));
-        while (minY > -200) {
-            this.spawnObstacle(200);
-            this.obstacles = this.obstacles.filter(o => o.y < 350);
-            minY = Math.min(...this.obstacles.map(o => o.y));
-        }
-
-        // Collision
-        for (let i = this.obstacles.length - 1; i >= 0; i--) {
-            let o = this.obstacles[i];
-            if (Math.hypot(this.ship.x - o.x, this.ship.y - o.y) < o.r + 8) {
-                if (o.t === 'fuel') {
-                    this.fuel = Math.min(100, this.fuel + 30);
-                    if (typeof playSnd !== 'undefined') playSnd('combo');
-                } else {
-                    this.fuel = Math.max(0, this.fuel - 20);
-                    if (typeof screenShake !== 'undefined') screenShake(5);
-                    if (typeof playSnd !== 'undefined') playSnd('hit');
-                }
-                this.obstacles.splice(i, 1);
-            }
-        }
-        if (this.fuel <= 0) { this.lives--; this.triggerGameOver(); }
-    },
-
-    drawCh2() {
-        // Starfield
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
-        ctx.fillStyle = '#fff';
-        for (let i = 0; i < 30; i++) {
-            let sx = (i * 71 + this.scrollY * 0.3) % 200;
-            let sy = (i * 53 + this.scrollY) % 300;
-            ctx.fillRect(sx, sy, 1, 1);
-        }
-        // Obstacles
-        for (let o of this.obstacles) {
-            if (o.y < -20 || o.y > 310) continue;
-            if (o.t === 'fuel') {
-                ctx.fillStyle = '#0af';
-                ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#fff'; ctx.font = '8px monospace';
-                ctx.fillText('⚡', o.x - 5, o.y + 3);
-            } else {
-                ctx.fillStyle = '#888';
-                ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#444';
-                ctx.beginPath(); ctx.arc(o.x - 2, o.y - 2, o.r * 0.4, 0, Math.PI * 2); ctx.fill();
-            }
-        }
-        // Ship pixel art (8×6 triangle-ish)
-        let sx = this.ship.x, sy = this.ship.y;
-        ctx.fillStyle = '#0ff';
-        ctx.beginPath(); ctx.moveTo(sx, sy - 12); ctx.lineTo(sx - 8, sy + 8); ctx.lineTo(sx + 8, sy + 8); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.moveTo(sx, sy - 8); ctx.lineTo(sx - 4, sy + 4); ctx.lineTo(sx + 4, sy + 4); ctx.closePath(); ctx.fill();
-        // Thruster flame
-        if (this.tmr % 6 < 3) {
-            ctx.fillStyle = '#fa0';
-            ctx.beginPath(); ctx.moveTo(sx - 4, sy + 8); ctx.lineTo(sx, sy + 16); ctx.lineTo(sx + 4, sy + 8); ctx.closePath(); ctx.fill();
-        }
-        // HUD
-        ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
-        ctx.fillText('CH2: ASTEROID FIELD', 5, 18);
-        ctx.fillStyle = '#ff0';
-        ctx.fillText(`TIME: ${Math.ceil(this.raceTimer / 60)}s`, 130, 18);
-        // Fuel bar
-        ctx.fillStyle = '#333'; ctx.fillRect(5, 25, 100, 7);
-        ctx.fillStyle = this.fuel > 30 ? '#0af' : '#f00';
-        ctx.fillRect(5, 25, this.fuel, 7);
-        ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('FUEL', 110, 31);
-        this.drawHUD();
-    },
-
-    // ─── CH3: STAR MINER ───
-    MINE_W: 15, MINE_H: 18,
-    mineGrid: [],
-    miner: { x: 7, y: 0 },
-    mineEnemies: [],
-    crystals: 0,
-    TARGET_CRYSTALS: 10,
-
-    initCh3() {
-        const W = this.MINE_W, H = this.MINE_H;
-        this.mineGrid = [];
-        for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-                let r = Math.random();
-                // 0=empty, 1=wall, 2=crystal
-                this.mineGrid.push(y === 0 ? 0 : r < 0.3 ? 1 : r < 0.55 ? 2 : 0);
-            }
-        }
-        this.miner = { x: 7, y: 0 };
-        this.mineEnemies = [];
-        this.crystals = 0;
-        this.mineTimer = 0;
-        this.mineMoveDelay = 0;
-        if (typeof BGM !== 'undefined') BGM.play('dungeon');
-    },
-
-    mineTile(x, y) { return this.mineGrid[y * this.MINE_W + x]; },
-    mineSet(x, y, v) { this.mineGrid[y * this.MINE_W + x] = v; },
-
-    updateCh3() {
-        this.mineTimer++;
-        if (this.mineMoveDelay > 0) { this.mineMoveDelay--; return; }
-        this.mineMoveDelay = 8;
-
-        let dx = 0, dy = 0;
-        if (keys.left) dx = -1;
-        else if (keys.right) dx = 1;
-        else if (keys.up) dy = -1;
-        else if (keys.down) dy = 1;
-
-        if (dx !== 0 || dy !== 0) {
-            let nx = this.miner.x + dx, ny = this.miner.y + dy;
-            if (nx >= 0 && nx < this.MINE_W && ny >= 0 && ny < this.MINE_H) {
-                let t = this.mineTile(nx, ny);
-                if (t === 0) { this.miner.x = nx; this.miner.y = ny; }
-            }
-        }
-
-        if (keysDown.a) {
-            // Mine adjacent cells
-            [[0,-1],[1,0],[0,1],[-1,0]].forEach(([ddx, ddy]) => {
-                let nx = this.miner.x + ddx, ny = this.miner.y + ddy;
-                if (nx < 0 || nx >= this.MINE_W || ny < 0 || ny >= this.MINE_H) return;
-                let t = this.mineTile(nx, ny);
-                if (t === 2) {
-                    this.mineSet(nx, ny, 0);
-                    this.crystals++;
-                    this.score += 30;
-                    if (typeof playSnd !== 'undefined') playSnd('combo');
-                    if (typeof addParticle !== 'undefined') addParticle(80 + nx * 8, 40 + ny * 8, '#0ff', 'spark');
-                    if (this.crystals === 5 && this.mineEnemies.length === 0) {
-                        this.mineEnemies.push({ x: Math.floor(Math.random() * this.MINE_W), y: this.MINE_H - 1 });
-                        if (typeof BGM !== 'undefined') BGM.play('boss');
-                    }
-                } else if (t === 1) {
-                    this.mineSet(nx, ny, 0);
-                    if (typeof playSnd !== 'undefined') playSnd('sel');
-                }
-            });
-        }
-
-        // Enemy AI
-        if (this.mineTimer % 16 === 0) {
-            for (let e of this.mineEnemies) {
-                let dx2 = Math.sign(this.miner.x - e.x);
-                let dy2 = Math.sign(this.miner.y - e.y);
-                let nx = e.x + (Math.abs(dx2) >= Math.abs(dy2) ? dx2 : 0);
-                let ny = e.y + (Math.abs(dy2) > Math.abs(dx2) ? dy2 : 0);
-                if (nx >= 0 && nx < this.MINE_W && ny >= 0 && ny < this.MINE_H && this.mineTile(nx, ny) !== 1) {
-                    e.x = nx; e.y = ny;
-                }
-                if (e.x === this.miner.x && e.y === this.miner.y) {
-                    this.lives--; this.triggerGameOver(); return;
-                }
-            }
-        }
-
-        if (this.crystals >= this.TARGET_CRYSTALS) {
-            this.score += 300;
-            this.nextChapter();
-        }
-    },
-
-    drawCh3() {
-        ctx.fillStyle = '#110a00'; ctx.fillRect(0, 0, 200, 300);
-        const CW = 11, CH = 11;
-        const ox = (200 - this.MINE_W * CW) / 2, oy = 40;
-        // Grid
-        for (let y = 0; y < this.MINE_H; y++) {
-            for (let x = 0; x < this.MINE_W; x++) {
-                let t = this.mineTile(x, y);
-                let px = ox + x * CW, py = oy + y * CH;
-                if (t === 1) {
-                    ctx.fillStyle = '#553311'; ctx.fillRect(px, py, CW - 1, CH - 1);
-                    ctx.fillStyle = '#664422'; ctx.fillRect(px, py, CW - 1, 2);
-                } else if (t === 2) {
-                    let glow = 0.5 + 0.5 * Math.sin(this.tmr * 0.15 + x + y);
-                    ctx.fillStyle = `rgba(0,${Math.floor(180 + 75 * glow)},255,1)`;
-                    ctx.fillRect(px + 1, py + 1, CW - 3, CH - 3);
-                } else {
-                    ctx.fillStyle = '#221100'; ctx.fillRect(px, py, CW - 1, CH - 1);
-                }
-            }
-        }
-        // Enemies
-        for (let e of this.mineEnemies) {
-            let px = ox + e.x * CW + 1, py = oy + e.y * CH + 1;
-            ctx.fillStyle = '#f00'; ctx.fillRect(px, py, CW - 3, CH - 3);
-            ctx.fillStyle = '#ff0'; ctx.fillRect(px + 2, py + 1, 2, 2); ctx.fillRect(px + 5, py + 1, 2, 2);
-        }
-        // Miner
-        let mpx = ox + this.miner.x * CW, mpy = oy + this.miner.y * CH;
-        ctx.fillStyle = '#0f0'; ctx.fillRect(mpx + 1, mpy + 1, CW - 3, CH - 3);
-        ctx.fillStyle = '#fff'; ctx.fillRect(mpx + 3, mpy + 2, 2, 2); ctx.fillRect(mpx + 6, mpy + 2, 2, 2);
-        // HUD
-        ctx.fillStyle = '#0f0'; ctx.font = 'bold 10px monospace';
-        ctx.fillText('CH3: STAR MINER', 5, 15);
-        ctx.fillStyle = '#0ff';
-        ctx.fillText(`CRYSTAL: ${this.crystals}/${this.TARGET_CRYSTALS}`, 5, 27);
-        ctx.fillStyle = '#fff'; ctx.font = '8px monospace';
-        ctx.fillText('A:掘る 十字:移動', 100, 27);
-        this.drawHUD();
-    },
-
-    // ─── CH4: BOSS BATTLE ───
-    boss: { hp: 80, maxHp: 80, x: 100, y: 60, phase: 1, shotTimer: 0, moveDir: 1 },
-    playerShip: { x: 100, y: 240, vx: 0, shotCd: 0 },
-    bossPhase: 1,
-    bBullets: [],   // boss bullets
-    pBullets: [],   // player bullets
-    bossTimer: 0,
-
-    initCh4() {
-        this.boss = { hp: 80, maxHp: 80, x: 100, y: 60, phase: 1, shotTimer: 0, moveDir: 1 };
-        this.playerShip = { x: 100, y: 240, vx: 0, shotCd: 0 };
-        this.bBullets = [];
-        this.pBullets = [];
-        this.bossTimer = 0;
-        if (typeof BGM !== 'undefined') BGM.play('boss');
-    },
-
-    updateCh4() {
-        this.bossTimer++;
-        let bs = this.boss, ps = this.playerShip;
-        let phase = bs.hp > 40 ? 1 : (bs.hp > 15 ? 2 : 3);
-        if (phase !== bs.phase) {
-            bs.phase = phase;
-            if (typeof screenShake !== 'undefined') screenShake(8);
-        }
-
-        // Boss movement
-        bs.x += bs.moveDir * (1 + phase * 0.5);
-        if (bs.x < 30 || bs.x > 170) bs.moveDir *= -1;
-
-        // Boss shooting
-        bs.shotTimer++;
-        let shotRate = phase === 1 ? 60 : (phase === 2 ? 40 : 25);
-        if (bs.shotTimer >= shotRate) {
-            bs.shotTimer = 0;
-            let angles = phase === 1 ? [Math.PI / 2] : (phase === 2 ? [Math.PI / 2 - 0.3, Math.PI / 2, Math.PI / 2 + 0.3] : [Math.PI / 2 - 0.5, Math.PI / 2 - 0.2, Math.PI / 2, Math.PI / 2 + 0.2, Math.PI / 2 + 0.5]);
-            for (let a of angles) {
-                this.bBullets.push({ x: bs.x, y: bs.y + 20, vx: Math.cos(a) * 0, vy: 3 + phase, a });
-                let bv = 2.5 + phase * 0.5;
-                this.bBullets[this.bBullets.length - 1].vx = Math.cos(a - Math.PI / 2) * bv;
-                this.bBullets[this.bBullets.length - 1].vy = Math.sin(a - Math.PI / 2 + Math.PI / 2) * bv;
-            }
-            if (typeof playSnd !== 'undefined') playSnd('hit');
-        }
-
-        // Player movement
-        if (keys.left)  ps.vx -= 0.6;
-        if (keys.right) ps.vx += 0.6;
-        ps.vx *= 0.82;
-        ps.x = Math.max(10, Math.min(190, ps.x + ps.vx));
-
-        // Player shooting
-        if (ps.shotCd > 0) ps.shotCd--;
-        if (keys.a && ps.shotCd <= 0) {
-            this.pBullets.push({ x: ps.x, y: ps.y - 10, vy: -7 });
-            ps.shotCd = 8;
-            if (typeof playSnd !== 'undefined') playSnd('sel');
-        }
-
-        // Move bullets
-        for (let b of this.bBullets) { b.x += b.vx; b.y += b.vy; }
-        for (let b of this.pBullets) b.y += b.vy;
-
-        // Boss hit
-        this.pBullets = this.pBullets.filter(b => {
-            if (b.y < -10) return false;
-            if (Math.abs(b.x - bs.x) < 25 && Math.abs(b.y - bs.y) < 20) {
-                bs.hp -= 5;
-                this.score += 10;
-                if (typeof addParticle !== 'undefined') addParticle(bs.x, bs.y, '#f80', 'spark');
-                return false;
-            }
-            return true;
-        });
-
-        // Player hit by boss bullets
-        this.bBullets = this.bBullets.filter(b => {
-            if (b.y > 310 || b.x < -10 || b.x > 210) return false;
-            if (Math.hypot(b.x - ps.x, b.y - ps.y) < 12) {
-                this.lives--;
-                if (typeof screenShake !== 'undefined') screenShake(10);
-                if (typeof playSnd !== 'undefined') playSnd('hit');
-                if (this.lives <= 0) this.triggerGameOver();
-                return false;
-            }
-            return true;
-        });
-
-        if (bs.hp <= 0) {
-            this.score += 500;
-            for (let i = 0; i < 20; i++) {
-                if (typeof addParticle !== 'undefined') addParticle(bs.x + (Math.random()-0.5)*40, bs.y + (Math.random()-0.5)*30, '#fa0', 'explosion');
-            }
-            this.nextChapter();
-        }
-    },
-
-    drawCh4() {
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 200, 300);
-        // Stars
-        ctx.fillStyle = '#fff';
-        for (let i = 0; i < 25; i++) ctx.fillRect((i * 83) % 200, (i * 61 + this.bossTimer) % 300, 1, 1);
-
-        let bs = this.boss;
-        // Boss body
-        let bc = bs.phase === 1 ? '#f80' : (bs.phase === 2 ? '#f44' : '#f0f');
-        ctx.fillStyle = bc;
-        ctx.fillRect(bs.x - 24, bs.y - 16, 48, 32);
-        ctx.fillStyle = '#300';
-        ctx.fillRect(bs.x - 18, bs.y - 10, 36, 20);
-        // Boss eyes
-        ctx.fillStyle = '#f00';
-        ctx.beginPath(); ctx.arc(bs.x - 8, bs.y, 5, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(bs.x + 8, bs.y, 5, 0, Math.PI * 2); ctx.fill();
-        if (this.bossTimer % 30 < 15) { ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(bs.x - 8, bs.y, 2, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(bs.x + 8, bs.y, 2, 0, Math.PI * 2); ctx.fill(); }
-        // Boss HP bar
-        ctx.fillStyle = '#400'; ctx.fillRect(10, 30, 180, 8);
-        ctx.fillStyle = bc;
-        ctx.fillRect(10, 30, 180 * (bs.hp / bs.maxHp), 8);
-
-        // Player ship
-        let ps = this.playerShip;
-        ctx.fillStyle = '#0ff';
-        ctx.beginPath(); ctx.moveTo(ps.x, ps.y - 12); ctx.lineTo(ps.x - 8, ps.y + 8); ctx.lineTo(ps.x + 8, ps.y + 8); ctx.closePath(); ctx.fill();
-        if (this.bossTimer % 4 < 2) { ctx.fillStyle = '#fa0'; ctx.beginPath(); ctx.moveTo(ps.x - 4, ps.y + 8); ctx.lineTo(ps.x, ps.y + 16); ctx.lineTo(ps.x + 4, ps.y + 8); ctx.closePath(); ctx.fill(); }
-
-        // Bullets
-        ctx.fillStyle = '#f44';
-        for (let b of this.bBullets) { ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill(); }
-        ctx.fillStyle = '#0ff';
-        for (let b of this.pBullets) { ctx.fillRect(b.x - 2, b.y - 6, 4, 12); }
-
-        // HUD
-        ctx.fillStyle = '#f80'; ctx.font = 'bold 11px monospace';
-        ctx.fillText(`CH4: BOSS  PH${bs.phase}`, 5, 18);
-        this.drawHUD();
-    },
-
-    // ─── COMMON ───
-    drawHUD() {
-        ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
-        ctx.fillText(`SCORE:${this.score}`, 5, 290);
-        ctx.fillStyle = '#f44';
-        for (let i = 0; i < this.lives; i++) ctx.fillText('♥', 140 + i * 18, 290);
-        ctx.fillStyle = '#fd0'; ctx.fillText(`BEST:${this.best}`, 118, 278);
-    },
-
-    nextChapter() {
-        this.chapter++;
-        this.st = 'story';
-        this.storyIdx = this.chapter - 1;
-        this.storyChar = 0;
-        this.storyLines = this.STORIES[this.storyIdx] || [];
-        this.storyLineIdx = 0;
-        this.storyTyped = '';
-        this.tmr = 0;
-        if (typeof BGM !== 'undefined') BGM.play('menu');
-    },
-
-    triggerGameOver() {
-        this.st = 'gameover'; this.tmr = 0;
-        if (this.score > this.best) {
-            this.best = this.score; SaveSys.data.galaxyBest = this.best; SaveSys.save();
-        }
-        if (typeof BGM !== 'undefined') BGM.play('gameover');
-        if (typeof screenShake !== 'undefined') screenShake(12);
-    },
+    storyIdx: 0, storyLine: 0, storyChar: 0, storyTmr: 0,
 
     init() {
         document.getElementById('gameboy').classList.remove('mode-abyss');
@@ -612,184 +64,885 @@ const GalaxyBreak = {
         if (typeof BGM !== 'undefined') BGM.play('menu');
     },
 
+    startStory(idx) {
+        this.st = 'story';
+        this.storyIdx = idx;
+        this.storyLine = 0;
+        this.storyChar = 0;
+        this.storyTmr = 0;
+        if (typeof BGM !== 'undefined') BGM.play('puzzle');
+    },
+
+    startChapter(ch) {
+        this.chapter = ch;
+        if (ch === 0) this.initPipes();
+        else if (ch === 1) this.initAsteroids();
+        else if (ch === 2) this.initMiner();
+        else if (ch === 3) this.initBoss();
+    },
+
+    // ==================== CH1: PIPE REPAIR ====================
+
+    // DFS で (0,0)→(pW-1,pH-1) の経路を生成（必ず解あり保証）
+    genPipePath() {
+        const W = this.pW, H = this.pH;
+        const vis = [];
+        for (let y = 0; y < H; y++) vis[y] = new Array(W).fill(false);
+        const path = [[0, 0]];
+        vis[0][0] = true;
+        const dfs = () => {
+            const [x, y] = path[path.length - 1];
+            if (x === W - 1 && y === H - 1) return true;
+            const dirs = [[1,0],[0,1],[-1,0],[0,-1]]
+                .filter(([dx,dy]) => { const nx=x+dx,ny=y+dy; return nx>=0&&nx<W&&ny>=0&&ny<H&&!vis[ny][nx]; })
+                .sort(() => Math.random() - 0.5);
+            for (const [dx,dy] of dirs) {
+                vis[y+dy][x+dx] = true;
+                path.push([x+dx, y+dy]);
+                if (dfs()) return true;
+                path.pop();
+                vis[y+dy][x+dx] = false;
+            }
+            return false;
+        };
+        dfs();
+        return path;
+    },
+
+    // 接続方向リストからパイプセルを生成
+    dirsToPipeCell(dirs) {
+        const l=dirs.includes('left'),r=dirs.includes('right'),u=dirs.includes('up'),d=dirs.includes('down');
+        if (l&&r) return {type:'straight',rot:0,connected:false};
+        if (u&&d) return {type:'straight',rot:1,connected:false};
+        if (r&&d) return {type:'elbow',rot:0,connected:false};
+        if (d&&l) return {type:'elbow',rot:1,connected:false};
+        if (l&&u) return {type:'elbow',rot:2,connected:false};
+        if (u&&r) return {type:'elbow',rot:3,connected:false};
+        // 端点（1方向のみ）: 余った接続は盤外へ
+        return {type:'straight',rot:(r||l)?0:1,connected:false};
+    },
+
+    initPipes() {
+        this.st = 'ch1';
+        this.pTime = 3600;
+        this.pCur = { x: 0, y: 0 };
+        const W = this.pW, H = this.pH;
+        const path = this.genPipePath();
+
+        // 全セルをランダムな囮パイプで埋める
+        this.pipes = [];
+        for (let y = 0; y < H; y++) {
+            this.pipes[y] = [];
+            for (let x = 0; x < W; x++) {
+                this.pipes[y][x] = {
+                    type: Math.random() < 0.5 ? 'straight' : 'elbow',
+                    rot: Math.floor(Math.random() * 4),
+                    connected: false
+                };
+            }
+        }
+
+        // 経路セルに正しいパイプ型を割り当てた後にスクランブル
+        for (let i = 0; i < path.length; i++) {
+            const [x, y] = path[i];
+            const dirs = [];
+            if (i > 0) {
+                const [px,py] = path[i-1];
+                dirs.push(px<x?'left':px>x?'right':py<y?'up':'down');
+            }
+            if (i < path.length - 1) {
+                const [nx,ny] = path[i+1];
+                dirs.push(nx>x?'right':nx<x?'left':ny>y?'down':'up');
+            }
+            const cell = this.dirsToPipeCell(dirs);
+            // ストレートは奇数オフセットで必ず向きが変わる、エルボーは1〜3でランダム
+            const offset = cell.type === 'straight' ? 1 : (1 + Math.floor(Math.random() * 3));
+            cell.rot = (cell.rot + offset) % 4;
+            this.pipes[y][x] = cell;
+        }
+
+        // 万が一初期状態で解けている場合は先頭セルを1回転ずらす
+        if (this.checkPipeFlow()) this.pipes[0][0].rot = (this.pipes[0][0].rot + 1) % 4;
+
+        if (typeof BGM !== 'undefined') BGM.play('puzzle');
+    },
+
+    // Returns which sides a pipe connects: array of 'up','down','left','right'
+    getPipeConnections(pipe) {
+        if (pipe.type === 'straight') {
+            return pipe.rot % 2 === 0 ? ['left', 'right'] : ['up', 'down'];
+        } else { // elbow
+            const elbows = [
+                ['right', 'down'],
+                ['down', 'left'],
+                ['left', 'up'],
+                ['up', 'right']
+            ];
+            return elbows[pipe.rot % 4];
+        }
+    },
+
+    checkPipeFlow() {
+        // BFS from (0,0) to mark connected pipes
+        for (let y = 0; y < this.pH; y++)
+            for (let x = 0; x < this.pW; x++)
+                this.pipes[y][x].connected = false;
+
+        const opp = { up: 'down', down: 'up', left: 'right', right: 'left' };
+        const dmap = { up: [0,-1], down: [0,1], left: [-1,0], right: [1,0] };
+        const queue = [{ x: 0, y: 0 }];
+        this.pipes[0][0].connected = true;
+        while (queue.length) {
+            let { x, y } = queue.shift();
+            let conns = this.getPipeConnections(this.pipes[y][x]);
+            for (let dir of conns) {
+                let [dx, dy] = dmap[dir];
+                let nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= this.pW || ny < 0 || ny >= this.pH) continue;
+                if (this.pipes[ny][nx].connected) continue;
+                let neighbor = this.getPipeConnections(this.pipes[ny][nx]);
+                if (neighbor.includes(opp[dir])) {
+                    this.pipes[ny][nx].connected = true;
+                    queue.push({ x: nx, y: ny });
+                }
+            }
+        }
+        return this.pipes[this.pH-1][this.pW-1].connected;
+    },
+
+    // ==================== CH2: ASTEROID FIELD ====================
+    initAsteroids() {
+        this.st = 'ch2';
+        this.ship = { x: 100, y: 250 };
+        this.asteroids = [];
+        this.fuel = 100;
+        this.aTime = 1800; // 30 seconds
+        for (let i = 0; i < 8; i++) {
+            this.asteroids.push({
+                x: Math.random() * 180 + 10,
+                y: -20 - Math.random() * 200,
+                r: 8 + Math.random() * 12,
+                spd: 1.5 + Math.random() * 2
+            });
+        }
+        if (typeof BGM !== 'undefined') BGM.play('action');
+    },
+
+    // ==================== CH3: STAR MINER ====================
+    initMiner() {
+        this.st = 'ch3';
+        this.crystals = 0;
+        this.mCur = { x: Math.floor(this.mW / 2), y: Math.floor(this.mH / 2) };
+        this.mEnemies = [];
+        this.mGrid = [];
+        for (let y = 0; y < this.mH; y++) {
+            this.mGrid[y] = [];
+            for (let x = 0; x < this.mW; x++) {
+                let r = Math.random();
+                this.mGrid[y][x] = r < 0.15 ? 'crystal' : (r < 0.3 ? 'rock' : 'empty');
+            }
+        }
+        this.mGrid[this.mCur.y][this.mCur.x] = 'empty';
+        if (typeof BGM !== 'undefined') BGM.play('dungeon');
+    },
+
+    // ==================== CH4: BOSS BATTLE ====================
+    initBoss() {
+        this.st = 'ch4';
+        this.bossHp = 100;
+        this.bossMaxHp = 100;
+        this.bossPhase = 0;
+        this.bullets = [];
+        this.playerBullets = [];
+        this.bShip = { x: 100, y: 240, shotCd: 0 };
+        this.bTimer = 0;
+        if (typeof BGM !== 'undefined') BGM.play('boss');
+    },
+
+    die() {
+        this.lives--;
+        if (typeof playSnd !== 'undefined') playSnd('hit');
+        if (typeof screenShake !== 'undefined') screenShake(10);
+        if (this.lives <= 0) {
+            this.st = 'gameover';
+            this.tmr = 0;
+            if (typeof BGM !== 'undefined') BGM.play('gameover');
+            if (this.score > this.best) {
+                this.best = this.score;
+                SaveSys.data.galaxyBest = this.best;
+                SaveSys.save();
+            }
+        } else {
+            // Restart current chapter
+            this.startChapter(this.chapter);
+        }
+    },
+
     update() {
+        if (typeof keysDown !== 'undefined' && keysDown.select) {
+            if (typeof switchApp !== 'undefined') switchApp(Menu);
+            return;
+        }
         this.tmr++;
 
         if (this.st === 'title') {
-            if (keysDown.a) {
-                this.chapter = 0; this.lives = 3; this.score = 0;
-                this.nextChapter();
+            if (typeof keysDown !== 'undefined' && keysDown.a) {
+                this.score = 0; this.lives = 3; this.chapter = 0;
+                this.startStory(0);
                 if (typeof playSnd !== 'undefined') playSnd('jmp');
             }
-            if (keysDown.select) { if (typeof switchApp !== 'undefined') switchApp(Menu); }
+            return;
+        }
+
+        if (this.st === 'gameover') {
+            if (this.tmr > 60 && typeof keysDown !== 'undefined' && keysDown.a) {
+                this.st = 'title'; this.tmr = 0;
+                if (typeof BGM !== 'undefined') BGM.play('menu');
+            }
             return;
         }
 
         if (this.st === 'story') {
-            let line = this.storyLines[this.storyLineIdx];
-            if (!line) {
-                // All story lines done → start next chapter
-                this.tmr = 0;
-                if (this.chapter === 5) { this.st = 'ending'; return; }
-                if (this.chapter === 1) { this.initCh1(); this.st = 'ch1_pipe'; }
-                else if (this.chapter === 2) { this.initCh2(); this.st = 'ch2_race'; }
-                else if (this.chapter === 3) { this.initCh3(); this.st = 'ch3_mine'; }
-                else if (this.chapter === 4) { this.initCh4(); this.st = 'ch4_boss'; }
-                return;
+            this.storyTmr++;
+            let lines = this.storyLines[this.storyIdx];
+            if (!lines) { this.nextAfterStory(); return; }
+            let line = lines[this.storyLine] || '';
+            if (this.storyTmr % 2 === 0 && this.storyChar < line.length) {
+                this.storyChar++;
             }
-            if (this.tmr % 2 === 0 && this.storyTyped.length < line.t.length) {
-                this.storyTyped += line.t[this.storyTyped.length];
-            }
-            if (keysDown.a) {
-                if (this.storyTyped.length < line.t.length) { this.storyTyped = line.t; }
-                else {
-                    this.storyLineIdx++;
-                    this.storyTyped = '';
-                    this.tmr = 0;
+            if (typeof keysDown !== 'undefined' && keysDown.a) {
+                if (this.storyChar < line.length) {
+                    this.storyChar = line.length;
+                } else {
+                    this.storyLine++;
+                    this.storyChar = 0;
+                    this.storyTmr = 0;
+                    if (this.storyLine >= lines.length) {
+                        this.nextAfterStory();
+                    }
                 }
             }
             return;
         }
 
-        if (this.st === 'gameover') {
-            if (this.tmr > 90 && keysDown.a) { this.init(); }
-            return;
-        }
-
-        if (this.st === 'ending') {
-            if (this.score > this.best) {
-                this.best = this.score; SaveSys.data.galaxyBest = this.best; SaveSys.save();
+        if (this.st === 'ch1') this.updatePipes();
+        else if (this.st === 'ch2') this.updateAsteroids();
+        else if (this.st === 'ch3') this.updateMiner();
+        else if (this.st === 'ch4') this.updateBoss();
+        else if (this.st === 'chclear') {
+            if (this.tmr > 90 && typeof keysDown !== 'undefined' && keysDown.a) {
+                this.chapter++;
+                if (this.chapter >= 4) {
+                    this.startStory(4); // ending
+                } else {
+                    this.startStory(this.chapter);
+                }
             }
-            if (this.tmr > 120 && keysDown.a) { this.init(); }
-            return;
+        } else if (this.st === 'ending') {
+            if (this.tmr > 120 && typeof keysDown !== 'undefined' && keysDown.a) {
+                this.st = 'title'; this.tmr = 0;
+                if (typeof BGM !== 'undefined') BGM.play('menu');
+            }
         }
-
-        if (this.st === 'ch1_pipe') this.updateCh1();
-        else if (this.st === 'ch2_race') this.updateCh2();
-        else if (this.st === 'ch3_mine') this.updateCh3();
-        else if (this.st === 'ch4_boss') this.updateCh4();
     },
 
-    draw() {
-        if (this.st === 'title') {
-            ctx.fillStyle = '#000012'; ctx.fillRect(0, 0, 200, 300);
-            // Starfield
-            ctx.fillStyle = '#fff';
-            for (let i = 0; i < 50; i++) {
-                let sx = (i * 71 + this.tmr * 0.2) % 200;
-                let sy = (i * 53) % 300;
-                let sz = 1 + (i % 3);
-                ctx.fillRect(sx, sy, sz, sz);
+    nextAfterStory() {
+        if (this.storyIdx === 4) {
+            // Ending
+            this.st = 'ending'; this.tmr = 0;
+            if (this.score > this.best) {
+                this.best = this.score;
+                SaveSys.data.galaxyBest = this.best;
+                SaveSys.save();
             }
-            ctx.shadowBlur = 15; ctx.shadowColor = '#4af';
-            ctx.fillStyle = '#4af'; ctx.font = 'bold 28px monospace';
-            ctx.textAlign = 'center'; ctx.fillText('GALAXY', 100, 100);
-            ctx.fillStyle = '#fff'; ctx.fillText('BREAK', 100, 135); ctx.shadowBlur = 0;
-            ctx.fillStyle = '#888'; ctx.font = '9px monospace';
-            ctx.fillText('4 CHAPTER STORY', 100, 160);
-            ctx.fillStyle = '#ff0'; ctx.font = '10px monospace';
-            ctx.fillText(`BEST: ${this.best}`, 100, 185);
+        } else {
+            this.startChapter(this.storyIdx);
+        }
+    },
+
+    // ==================== CH1 UPDATE ====================
+    updatePipes() {
+        this.pTime--;
+        if (this.pTime <= 0) { this.die(); return; }
+
+        if (typeof keysDown !== 'undefined') {
+            if (keysDown.up && this.pCur.y > 0) { this.pCur.y--; if (typeof playSnd !== 'undefined') playSnd('sel'); }
+            if (keysDown.down && this.pCur.y < this.pH - 1) { this.pCur.y++; if (typeof playSnd !== 'undefined') playSnd('sel'); }
+            if (keysDown.left && this.pCur.x > 0) { this.pCur.x--; if (typeof playSnd !== 'undefined') playSnd('sel'); }
+            if (keysDown.right && this.pCur.x < this.pW - 1) { this.pCur.x++; if (typeof playSnd !== 'undefined') playSnd('sel'); }
+            if (keysDown.a) {
+                this.pipes[this.pCur.y][this.pCur.x].rot = (this.pipes[this.pCur.y][this.pCur.x].rot + 1) % 4;
+                if (typeof playSnd !== 'undefined') playSnd('jmp');
+                if (this.checkPipeFlow()) {
+                    this.score += Math.floor(this.pTime / 60) * 10 + 100;
+                    this.st = 'chclear'; this.tmr = 0;
+                    if (typeof playSnd !== 'undefined') playSnd('combo');
+                    if (typeof screenShake !== 'undefined') screenShake(5);
+                }
+            }
+        }
+    },
+
+    // ==================== CH2 UPDATE ====================
+    updateAsteroids() {
+        this.aTime--;
+        if (this.aTime <= 0) {
+            // Survived!
+            this.score += 200 + Math.floor(this.fuel);
+            this.st = 'chclear'; this.tmr = 0;
+            if (typeof playSnd !== 'undefined') playSnd('combo');
+            return;
+        }
+
+        // Move ship
+        let spd = 3;
+        if (typeof keys !== 'undefined') {
+            if (keys.left)  this.ship.x -= spd;
+            if (keys.right) this.ship.x += spd;
+        }
+        this.ship.x = Math.max(8, Math.min(192, this.ship.x));
+
+        // Boost
+        if (typeof keysDown !== 'undefined' && keysDown.a) {
+            if (this.fuel > 0) {
+                this.fuel = Math.max(0, this.fuel - 20);
+                this.ship.y -= 30;
+                this.ship.y = Math.max(50, this.ship.y);
+                if (typeof playSnd !== 'undefined') playSnd('jmp');
+            }
+        }
+        // Gravity
+        if (this.ship.y < 240) this.ship.y += 1.5;
+        this.ship.y = Math.min(260, this.ship.y);
+
+        // Fuel pickups
+        for (let a of this.asteroids) {
+            if (a.isFuel && !a.picked &&
+                Math.hypot(this.ship.x - a.x, this.ship.y - a.y) < a.r + 8) {
+                a.picked = true;
+                this.fuel = Math.min(100, this.fuel + 25);
+                if (typeof playSnd !== 'undefined') playSnd('combo');
+            }
+        }
+
+        // Move asteroids
+        for (let a of this.asteroids) {
+            a.y += a.spd;
+            if (a.y > 320) {
+                a.y = -20 - Math.random() * 100;
+                a.x = Math.random() * 180 + 10;
+                a.isFuel = Math.random() < 0.2;
+                a.picked = false;
+            }
+            if (!a.isFuel && !a.picked &&
+                Math.hypot(this.ship.x - a.x, this.ship.y - a.y) < a.r + 6) {
+                this.die(); return;
+            }
+        }
+
+        // Fuel drain
+        this.fuel -= 0.05;
+        if (this.fuel <= 0) { this.die(); return; }
+    },
+
+    // ==================== CH3 UPDATE ====================
+    updateMiner() {
+        if (typeof keysDown !== 'undefined') {
+            let moved = false;
+            let nx = this.mCur.x, ny = this.mCur.y;
+            if (keysDown.up) { ny--; moved = true; }
+            if (keysDown.down) { ny++; moved = true; }
+            if (keysDown.left) { nx--; moved = true; }
+            if (keysDown.right) { nx++; moved = true; }
+
+            if (moved) {
+                nx = Math.max(0, Math.min(this.mW - 1, nx));
+                ny = Math.max(0, Math.min(this.mH - 1, ny));
+                if (typeof playSnd !== 'undefined') playSnd('sel');
+            }
+
+            if (keysDown.a || moved) {
+                let cell = this.mGrid[ny][nx];
+                if (cell === 'crystal') {
+                    this.mGrid[ny][nx] = 'empty';
+                    this.crystals++;
+                    if (typeof playSnd !== 'undefined') playSnd('combo');
+                    if (typeof screenShake !== 'undefined') screenShake(3);
+                    if (this.crystals >= 5 && this.mEnemies.length === 0) {
+                        // Spawn slime enemies
+                        for (let i = 0; i < 3; i++) {
+                            this.mEnemies.push({
+                                x: Math.floor(Math.random() * this.mW),
+                                y: 0,
+                                tmr: 0
+                            });
+                        }
+                    }
+                    if (this.crystals >= 10) {
+                        this.score += 300;
+                        this.st = 'chclear'; this.tmr = 0;
+                        if (typeof playSnd !== 'undefined') playSnd('combo');
+                        return;
+                    }
+                } else if (cell !== 'rock') {
+                    this.mCur.x = nx;
+                    this.mCur.y = ny;
+                }
+            }
+        }
+
+        // Move enemies
+        if (this.tmr % 30 === 0) {
+            for (let e of this.mEnemies) {
+                let dx = this.mCur.x - e.x;
+                let dy = this.mCur.y - e.y;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    e.x += dx > 0 ? 1 : -1;
+                } else {
+                    e.y += dy > 0 ? 1 : -1;
+                }
+                e.x = Math.max(0, Math.min(this.mW - 1, e.x));
+                e.y = Math.max(0, Math.min(this.mH - 1, e.y));
+                if (e.x === this.mCur.x && e.y === this.mCur.y) {
+                    this.die(); return;
+                }
+            }
+        }
+    },
+
+    // ==================== CH4 UPDATE ====================
+    updateBoss() {
+        this.bTimer++;
+        let phase = this.bossPhase;
+
+        // Move player ship
+        let spd = 3;
+        if (typeof keys !== 'undefined') {
+            if (keys.left)  this.bShip.x -= spd;
+            if (keys.right) this.bShip.x += spd;
+        }
+        this.bShip.x = Math.max(8, Math.min(192, this.bShip.x));
+
+        // Fire player bullet
+        if (this.bShip.shotCd > 0) this.bShip.shotCd--;
+        if (typeof keysDown !== 'undefined' && keysDown.a && this.bShip.shotCd <= 0) {
+            this.playerBullets.push({ x: this.bShip.x, y: this.bShip.y - 10, vy: -8 });
+            this.bShip.shotCd = 12;
+            if (typeof playSnd !== 'undefined') playSnd('jmp');
+        }
+
+        // Update player bullets
+        for (let i = this.playerBullets.length - 1; i >= 0; i--) {
+            let b = this.playerBullets[i];
+            b.y += b.vy;
+            // Hit boss
+            if (b.y < 80 && Math.abs(b.x - 100) < 40) {
+                this.playerBullets.splice(i, 1);
+                this.bossHp -= 10;
+                if (typeof playSnd !== 'undefined') playSnd('hit');
+                if (typeof screenShake !== 'undefined') screenShake(3);
+                if (this.bossHp <= 33 && this.bossPhase < 2) this.bossPhase = 2;
+                else if (this.bossHp <= 66 && this.bossPhase < 1) this.bossPhase = 1;
+                if (this.bossHp <= 0) {
+                    this.score += 500;
+                    this.startStory(4); // ending
+                    return;
+                }
+                continue;
+            }
+            if (b.y < -10) this.playerBullets.splice(i, 1);
+        }
+
+        // Boss fires bullets
+        let fireRate = [60, 40, 20][phase];
+        if (this.bTimer % fireRate === 0) {
+            let count = phase + 1;
+            for (let i = 0; i < count; i++) {
+                let angle = Math.PI / 2 + (i - (count - 1) / 2) * 0.4;
+                this.bullets.push({
+                    x: 100 + (Math.random() - 0.5) * 60,
+                    y: 80,
+                    vx: Math.cos(angle) * (2 + phase),
+                    vy: Math.sin(angle) * (2 + phase)
+                });
+            }
+        }
+
+        // Update boss bullets
+        for (let i = this.bullets.length - 1; i >= 0; i--) {
+            let b = this.bullets[i];
+            b.x += b.vx; b.y += b.vy;
+            if (b.y > 310 || b.x < -10 || b.x > 210) {
+                this.bullets.splice(i, 1); continue;
+            }
+            if (Math.hypot(b.x - this.bShip.x, b.y - this.bShip.y) < 10) {
+                this.bullets.splice(i, 1);
+                this.die(); return;
+            }
+        }
+    },
+
+    // ==================== DRAW ====================
+    draw() {
+        // Starfield background
+        ctx.fillStyle = '#000011'; ctx.fillRect(0, 0, 200, 300);
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 40; i++) {
+            let sx = (i * 37 + this.tmr * 0.2) % 200;
+            let sy = (i * 73 + this.tmr * 0.5) % 300;
+            ctx.fillRect(sx, sy, 1, 1);
+        }
+
+        if (this.st === 'title') {
+            ctx.shadowBlur = 20; ctx.shadowColor = '#4af';
+            ctx.fillStyle = '#4af'; ctx.font = 'bold 20px monospace';
+            ctx.textAlign = 'center'; ctx.fillText('GALAXY', 100, 90);
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 20px monospace';
+            ctx.fillText('BREAK', 100, 115);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#888'; ctx.font = '10px monospace';
+            ctx.fillText('4 Chapter Adventure', 100, 150);
+            ctx.fillStyle = '#fa0'; ctx.font = '10px monospace';
+            ctx.fillText(`BEST: ${this.best}`, 100, 175);
+            ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+            ctx.fillText('LIVES: ' + '★'.repeat(3), 100, 200);
             if (this.tmr % 50 < 25) {
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
-                ctx.fillText('PRESS [A] TO START', 100, 220);
+                ctx.fillText('[A] START', 100, 240);
             }
-            ctx.fillStyle = '#444'; ctx.font = '9px monospace';
-            ctx.fillText('SELECT: 戻る', 100, 260);
             ctx.textAlign = 'left';
             return;
         }
 
         if (this.st === 'story') {
-            ctx.fillStyle = '#000a18'; ctx.fillRect(0, 0, 200, 300);
-            // Starfield BG
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            for (let i = 0; i < 30; i++) ctx.fillRect((i * 71) % 200, (i * 53) % 300, 1, 1);
-
-            let line = this.storyLines[this.storyLineIdx] || { c: '', t: '' };
-            // Character avatar area
-            ctx.fillStyle = '#0a1a2a'; ctx.fillRect(0, 0, 200, 160);
-            ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, 198, 158);
-            // Draw character icon based on name
-            this.drawStoryChar(line.c, 100, 80);
-
-            // Dialog box
-            ctx.fillStyle = 'rgba(0,0,30,0.92)'; ctx.fillRect(5, 165, 190, 120);
-            ctx.strokeStyle = '#4af'; ctx.lineWidth = 2; ctx.strokeRect(5, 165, 190, 120);
-            ctx.fillStyle = line.c === 'PILOT' ? '#0f0' : '#0ff';
-            ctx.font = 'bold 11px monospace'; ctx.fillText(`[ ${line.c} ]`, 12, 182);
-            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
-            let ty = 200, tl = '';
-            for (let ch of this.storyTyped) {
-                tl += ch;
-                if (tl.length > 18) { ctx.fillText(tl, 12, ty); ty += 16; tl = ''; }
+            let lines = this.storyLines[this.storyIdx];
+            if (!lines) return;
+            ctx.fillStyle = '#001122'; ctx.fillRect(0, 0, 200, 300);
+            // Stars
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < 30; i++) {
+                ctx.fillRect((i * 59) % 200, (i * 83) % 300, 1, 1);
             }
-            ctx.fillText(tl, 12, ty);
-            if (this.storyTyped.length === line.t.length && this.tmr % 40 < 20) {
-                ctx.fillStyle = '#ff0'; ctx.fillText('▼', 180, 275);
+            // Planet decoration
+            ctx.fillStyle = '#224';
+            ctx.beginPath(); ctx.arc(160, 60, 40, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#336';
+            ctx.beginPath(); ctx.arc(155, 55, 35, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#48a'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.ellipse(160, 60, 55, 15, -0.4, 0, Math.PI * 2); ctx.stroke();
+            ctx.lineWidth = 1;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(10, 160, 180, 120);
+            ctx.strokeStyle = '#4af'; ctx.strokeRect(10, 160, 180, 120);
+            ctx.fillStyle = '#4af'; ctx.font = 'bold 10px monospace';
+            ctx.fillText(this.storyIdx < 4 ? `CH${this.storyIdx + 1} STORY` : 'ENDING', 20, 180);
+
+            ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+            let lineY = 200;
+            for (let i = 0; i <= this.storyLine && i < lines.length; i++) {
+                let text = i < this.storyLine ? lines[i] : lines[i].substring(0, this.storyChar);
+                ctx.fillText(text, 20, lineY);
+                lineY += 18;
+            }
+            if (this.storyChar >= (lines[this.storyLine] || '').length && this.tmr % 40 < 20) {
+                ctx.fillStyle = '#ff0'; ctx.fillText('▼', 175, 270);
             }
             return;
         }
 
-        if (this.st === 'gameover') {
-            ctx.fillStyle = '#1a0000'; ctx.fillRect(0, 0, 200, 300);
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#f00'; ctx.font = 'bold 24px monospace';
-            ctx.fillText('GAME OVER', 100, 110);
-            ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
-            ctx.fillText(`SCORE: ${this.score}`, 100, 150);
-            ctx.fillStyle = '#ff0'; ctx.fillText(`BEST: ${this.best}`, 100, 175);
+        if (this.st === 'ch1') {
+            // Pipe puzzle
+            ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300);
+            ctx.fillStyle = '#4af'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('CH1: PIPE REPAIR', 100, 25);
+            ctx.fillStyle = '#ff0';
+            ctx.fillText(`TIME: ${Math.ceil(this.pTime / 60)}s`, 100, 45);
+            ctx.textAlign = 'left';
+
+            let cellW = 32, cellH = 32;
+            let offX = (200 - this.pW * cellW) / 2;
+            let offY = 60;
+
+            this.checkPipeFlow(); // update connected flags
+
+            for (let y = 0; y < this.pH; y++) {
+                for (let x = 0; x < this.pW; x++) {
+                    let px = offX + x * cellW, py = offY + y * cellH;
+                    let pipe = this.pipes[y][x];
+                    let isCur = (x === this.pCur.x && y === this.pCur.y);
+
+                    ctx.fillStyle = isCur ? '#224' : '#112';
+                    ctx.fillRect(px, py, cellW - 2, cellH - 2);
+                    if (isCur) {
+                        ctx.strokeStyle = '#fff'; ctx.strokeRect(px, py, cellW - 2, cellH - 2);
+                    }
+
+                    let col = pipe.connected ? '#0f8' : '#46a';
+                    ctx.strokeStyle = col; ctx.lineWidth = 4;
+
+                    let cx2 = px + cellW / 2 - 1, cy2 = py + cellH / 2 - 1;
+                    let conns = this.getPipeConnections(pipe);
+                    ctx.beginPath();
+                    if (pipe.type === 'straight') {
+                        if (conns.includes('left')) { ctx.moveTo(px, cy2); ctx.lineTo(cx2, cy2); }
+                        if (conns.includes('right')) { ctx.moveTo(cx2, cy2); ctx.lineTo(px + cellW - 2, cy2); }
+                        if (conns.includes('up')) { ctx.moveTo(cx2, py); ctx.lineTo(cx2, cy2); }
+                        if (conns.includes('down')) { ctx.moveTo(cx2, cy2); ctx.lineTo(cx2, py + cellH - 2); }
+                    } else {
+                        for (let dir of conns) {
+                            if (dir === 'left') { ctx.moveTo(cx2, cy2); ctx.lineTo(px, cy2); }
+                            if (dir === 'right') { ctx.moveTo(cx2, cy2); ctx.lineTo(px + cellW - 2, cy2); }
+                            if (dir === 'up') { ctx.moveTo(cx2, cy2); ctx.lineTo(cx2, py); }
+                            if (dir === 'down') { ctx.moveTo(cx2, cy2); ctx.lineTo(cx2, py + cellH - 2); }
+                        }
+                    }
+                    ctx.stroke(); ctx.lineWidth = 1;
+
+                    // Center dot
+                    ctx.fillStyle = col;
+                    ctx.beginPath(); ctx.arc(cx2, cy2, 3, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+            // Labels
+            ctx.fillStyle = '#0f8'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('START', offX + cellW / 2 - 1, offY - 5);
+            ctx.fillText('GOAL', offX + (this.pW - 0.5) * cellW - 1, offY + this.pH * cellH + 15);
+            ctx.fillText('[A] ROTATE  [↑↓←→] MOVE', 100, 295);
+            ctx.textAlign = 'left';
+            return;
+        }
+
+        if (this.st === 'ch2') {
+            // Asteroid field
+            ctx.fillStyle = '#000011'; ctx.fillRect(0, 0, 200, 300);
+            ctx.fillStyle = '#4af'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('CH2: ASTEROID FIELD', 100, 20);
+            ctx.fillStyle = '#ff0';
+            ctx.fillText(`TIME: ${Math.ceil(this.aTime / 60)}s`, 100, 38);
+            ctx.textAlign = 'left';
+
+            // Fuel bar
+            ctx.fillStyle = '#333'; ctx.fillRect(10, 48, 120, 8);
+            ctx.fillStyle = this.fuel < 30 ? '#f44' : '#0f8';
+            ctx.fillRect(10, 48, 120 * (this.fuel / 100), 8);
+            ctx.strokeStyle = '#666'; ctx.strokeRect(10, 48, 120, 8);
+            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.fillText('FUEL', 135, 56);
+
+            // Asteroids
+            for (let a of this.asteroids) {
+                if (a.isFuel && !a.picked) {
+                    ctx.fillStyle = '#ff0'; ctx.font = '14px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('⚡', a.x, a.y);
+                    ctx.textAlign = 'left';
+                } else if (!a.picked) {
+                    ctx.fillStyle = '#888';
+                    ctx.beginPath(); ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#666';
+                    ctx.beginPath(); ctx.arc(a.x - 3, a.y - 3, a.r * 0.4, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            // Player ship
+            ctx.fillStyle = '#4af';
+            ctx.beginPath();
+            ctx.moveTo(this.ship.x, this.ship.y - 12);
+            ctx.lineTo(this.ship.x - 8, this.ship.y + 8);
+            ctx.lineTo(this.ship.x + 8, this.ship.y + 8);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#0ff';
+            ctx.fillRect(this.ship.x - 2, this.ship.y + 2, 4, 6);
+
+            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('[←→] MOVE  [A] BOOST', 100, 295);
+            ctx.textAlign = 'left';
+            return;
+        }
+
+        if (this.st === 'ch3') {
+            ctx.fillStyle = '#110a00'; ctx.fillRect(0, 0, 200, 300);
+            ctx.fillStyle = '#4af'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('CH3: STAR MINER', 100, 20);
+            ctx.fillStyle = '#0f8';
+            ctx.fillText(`CRYSTALS: ${this.crystals}/10`, 100, 38);
+            ctx.textAlign = 'left';
+
+            let cellSize = 24;
+            let offX = (200 - this.mW * cellSize) / 2;
+            let offY = 55;
+
+            for (let y = 0; y < this.mH; y++) {
+                for (let x = 0; x < this.mW; x++) {
+                    let px = offX + x * cellSize, py = offY + y * cellSize;
+                    let cell = this.mGrid[y][x];
+                    ctx.fillStyle = '#221a08';
+                    ctx.fillRect(px, py, cellSize - 1, cellSize - 1);
+                    if (cell === 'rock') {
+                        ctx.fillStyle = '#554';
+                        ctx.fillRect(px + 2, py + 2, cellSize - 5, cellSize - 5);
+                    } else if (cell === 'crystal') {
+                        ctx.fillStyle = '#0af';
+                        ctx.beginPath();
+                        ctx.moveTo(px + cellSize/2, py + 2);
+                        ctx.lineTo(px + cellSize - 3, py + cellSize - 3);
+                        ctx.lineTo(px + 3, py + cellSize - 3);
+                        ctx.closePath(); ctx.fill();
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(px + cellSize/2 - 1, py + 4, 2, 3);
+                    }
+                    // Player
+                    if (x === this.mCur.x && y === this.mCur.y) {
+                        ctx.fillStyle = '#ff0';
+                        ctx.beginPath();
+                        ctx.arc(px + cellSize/2, py + cellSize/2, 7, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#000'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+                        ctx.fillText('A', px + cellSize/2, py + cellSize/2 + 3);
+                        ctx.textAlign = 'left';
+                    }
+                }
+            }
+            // Enemies
+            for (let e of this.mEnemies) {
+                let px = offX + e.x * cellSize + cellSize/2;
+                let py2 = offY + e.y * cellSize + cellSize/2;
+                ctx.fillStyle = '#f44';
+                ctx.beginPath(); ctx.arc(px, py2, 6, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+                ctx.fillText('S', px, py2 + 3); ctx.textAlign = 'left';
+            }
+            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('[↑↓←→] MOVE  [A] MINE', 100, 295);
+            ctx.textAlign = 'left';
+            return;
+        }
+
+        if (this.st === 'ch4') {
+            ctx.fillStyle = '#000011'; ctx.fillRect(0, 0, 200, 300);
+            // Stars
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < 30; i++) {
+                ctx.fillRect((i * 43 + this.tmr) % 200, (i * 71) % 280, 1, 1);
+            }
+
+            ctx.fillStyle = '#4af'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('CH4: BOSS BATTLE', 100, 20);
+            ctx.textAlign = 'left';
+
+            // Boss HP bar
+            ctx.fillStyle = '#400'; ctx.fillRect(20, 30, 160, 8);
+            let phase = this.bossPhase;
+            ctx.fillStyle = phase === 2 ? '#f44' : (phase === 1 ? '#fa0' : '#f80');
+            ctx.fillRect(20, 30, 160 * (this.bossHp / this.bossMaxHp), 8);
+            ctx.strokeStyle = '#666'; ctx.strokeRect(20, 30, 160, 8);
+            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('BOSS HP', 100, 28); ctx.textAlign = 'left';
+
+            // Boss ship
+            let bx = 100, by = 60;
+            let flash = phase > 0 && this.tmr % 20 < 10;
+            ctx.fillStyle = flash ? '#f44' : '#a00';
+            ctx.beginPath();
+            ctx.moveTo(bx, by + 20);
+            ctx.lineTo(bx - 30, by - 10);
+            ctx.lineTo(bx - 15, by - 5);
+            ctx.lineTo(bx, by - 20);
+            ctx.lineTo(bx + 15, by - 5);
+            ctx.lineTo(bx + 30, by - 10);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#ff0';
+            ctx.beginPath(); ctx.arc(bx, by, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 10 + Math.sin(this.tmr * 0.1) * 5;
+            ctx.shadowColor = '#f44';
+            ctx.fillStyle = '#f44';
+            ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Boss bullets
+            ctx.fillStyle = '#f88';
+            for (let b of this.bullets) {
+                ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI * 2); ctx.fill();
+            }
+
+            // Player bullets
+            ctx.fillStyle = '#0ff';
+            for (let b of this.playerBullets) {
+                ctx.fillRect(b.x - 2, b.y - 6, 4, 8);
+            }
+
+            // Player ship
+            ctx.fillStyle = '#4af';
+            ctx.beginPath();
+            ctx.moveTo(this.bShip.x, this.bShip.y - 12);
+            ctx.lineTo(this.bShip.x - 9, this.bShip.y + 10);
+            ctx.lineTo(this.bShip.x + 9, this.bShip.y + 10);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#0ff';
+            ctx.fillRect(this.bShip.x - 2, this.bShip.y, 4, 8);
+
+            ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('[←→] MOVE  [A] FIRE', 100, 295);
+            ctx.textAlign = 'left';
+            return;
+        }
+
+        if (this.st === 'chclear') {
+            ctx.fillStyle = 'rgba(0,0,20,0.85)'; ctx.fillRect(0, 0, 200, 300);
+            ctx.shadowBlur = 15; ctx.shadowColor = '#0f8';
+            ctx.fillStyle = '#0f8'; ctx.font = 'bold 18px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('CHAPTER', 100, 120);
+            ctx.fillText('CLEAR!!', 100, 145);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ff0'; ctx.font = '12px monospace';
+            ctx.fillText(`SCORE: ${this.score}`, 100, 175);
+            ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+            ctx.fillText('LIVES: ' + '★'.repeat(this.lives) + '☆'.repeat(3 - this.lives), 100, 200);
             if (this.tmr > 90 && this.tmr % 50 < 25) {
                 ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
-                ctx.fillText('A: RETRY', 100, 220);
+                ctx.fillText('[A] NEXT CHAPTER', 100, 240);
             }
             ctx.textAlign = 'left';
             return;
         }
 
         if (this.st === 'ending') {
-            ctx.fillStyle = '#000012'; ctx.fillRect(0, 0, 200, 300);
-            ctx.fillStyle = '#fff';
-            for (let i = 0; i < 40; i++) ctx.fillRect((i * 71 + this.tmr) % 200, (i * 53) % 300, 2, 2);
-            ctx.textAlign = 'center';
-            ctx.shadowBlur = 20; ctx.shadowColor = '#4af';
-            ctx.fillStyle = '#4af'; ctx.font = 'bold 20px monospace';
+            ctx.fillStyle = '#000011'; ctx.fillRect(0, 0, 200, 300);
+            for (let i = 0; i < 60; i++) {
+                ctx.fillStyle = `rgba(255,255,${Math.floor(Math.random()*100+155)},${Math.random()})` ;
+                ctx.fillRect(Math.random() * 200, Math.random() * 300, 2, 2);
+            }
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff0';
+            ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
             ctx.fillText('MISSION', 100, 100);
-            ctx.fillText('COMPLETE!', 100, 130); ctx.shadowBlur = 0;
-            ctx.fillStyle = '#ff0'; ctx.font = '14px monospace';
-            ctx.fillText(`SCORE: ${this.score}`, 100, 170);
-            if (this.score >= this.best) { ctx.fillStyle = '#f80'; ctx.fillText('★ NEW RECORD! ★', 100, 195); }
-            if (this.tmr % 50 < 25) { ctx.fillStyle = '#0f0'; ctx.font = '11px monospace'; ctx.fillText('A: TITLE', 100, 240); }
+            ctx.fillText('COMPLETE!!', 100, 125);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#0f8'; ctx.font = '12px monospace';
+            ctx.fillText(`FINAL SCORE: ${this.score}`, 100, 160);
+            ctx.fillStyle = '#fa0';
+            ctx.fillText(`BEST: ${this.best}`, 100, 180);
+            ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+            ctx.fillText('LIVES: ' + '★'.repeat(this.lives), 100, 205);
+            if (this.tmr > 120 && this.tmr % 50 < 25) {
+                ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
+                ctx.fillText('[A] TITLE', 100, 250);
+            }
             ctx.textAlign = 'left';
             return;
         }
 
-        if (this.st === 'ch1_pipe') this.drawCh1();
-        else if (this.st === 'ch2_race') this.drawCh2();
-        else if (this.st === 'ch3_mine') this.drawCh3();
-        else if (this.st === 'ch4_boss') this.drawCh4();
-    },
-
-    drawStoryChar(name, cx, cy) {
-        // Simple pixel-art character based on name
-        let col = name === 'PILOT' ? '#0f0' : '#0ff';
-        let col2 = name === 'PILOT' ? '#0a0' : '#048';
-        // Helmet
-        ctx.fillStyle = col2;
-        ctx.beginPath(); ctx.arc(cx, cy - 10, 28, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = col;
-        ctx.beginPath(); ctx.arc(cx, cy - 10, 22, 0, Math.PI * 2); ctx.fill();
-        // Visor
-        ctx.fillStyle = '#001'; ctx.fillRect(cx - 14, cy - 22, 28, 16);
-        ctx.strokeStyle = '#0af'; ctx.lineWidth = 2; ctx.strokeRect(cx - 14, cy - 22, 28, 16);
-        // Reflection
-        ctx.fillStyle = 'rgba(0,255,255,0.2)'; ctx.fillRect(cx - 10, cy - 20, 10, 6);
-        // Body
-        ctx.fillStyle = col2; ctx.fillRect(cx - 20, cy + 16, 40, 30);
-        ctx.fillStyle = col; ctx.fillRect(cx - 14, cy + 18, 28, 22);
-        // Arms
-        ctx.fillStyle = col2; ctx.fillRect(cx - 30, cy + 16, 12, 22); ctx.fillRect(cx + 18, cy + 16, 12, 22);
-        // Name badge
-        ctx.fillStyle = '#fff'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
-        ctx.fillText(name, cx, cy + 34); ctx.textAlign = 'left';
+        if (this.st === 'gameover') {
+            ctx.fillStyle = 'rgba(0,0,0,0.9)'; ctx.fillRect(0, 0, 200, 300);
+            ctx.fillStyle = '#f44'; ctx.font = 'bold 22px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', 100, 110);
+            ctx.fillStyle = '#ff0'; ctx.font = '12px monospace';
+            ctx.fillText(`SCORE: ${this.score}`, 100, 145);
+            ctx.fillStyle = '#fa0';
+            ctx.fillText(`BEST: ${this.best}`, 100, 165);
+            if (this.tmr > 60 && this.tmr % 50 < 25) {
+                ctx.fillStyle = '#0f0'; ctx.font = 'bold 11px monospace';
+                ctx.fillText('[A] TITLE', 100, 210);
+            }
+            ctx.textAlign = 'left';
+        }
     }
 };
