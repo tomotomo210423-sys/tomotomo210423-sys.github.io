@@ -572,7 +572,7 @@ const GalaxyBreak = {
             ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(10, 160, 180, 120);
             ctx.strokeStyle = '#4af'; ctx.strokeRect(10, 160, 180, 120);
             ctx.fillStyle = '#4af'; ctx.font = 'bold 10px monospace';
-            ctx.fillText(`CH${this.storyIdx + 1} STORY`, 20, 180);
+            ctx.fillText(this.storyIdx < 4 ? `CH${this.storyIdx + 1} STORY` : 'ENDING', 20, 180);
 
             ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
             let lineY = 200;
@@ -642,8 +642,8 @@ const GalaxyBreak = {
             }
             // Labels
             ctx.fillStyle = '#0f8'; ctx.font = '8px monospace'; ctx.textAlign = 'center';
-            ctx.fillText('START', offX + cellW / 2 - 1, offY + this.pH * cellH + 15);
-            ctx.fillText('GOAL', offX + (this.pW - 0.5) * cellW - 1, offY - 5);
+            ctx.fillText('START', offX + cellW / 2 - 1, offY - 5);
+            ctx.fillText('GOAL', offX + (this.pW - 0.5) * cellW - 1, offY + this.pH * cellH + 15);
             ctx.fillText('[A] ROTATE  [↑↓←→] MOVE', 100, 295);
             ctx.textAlign = 'left';
             return;
