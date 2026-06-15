@@ -1,6 +1,6 @@
-// === SERVICE WORKER — 11in1 RETRO SYSTEM ===
+// === SERVICE WORKER — 14in1 RETRO SYSTEM ===
 // キャッシュ優先戦略のため、ファイル更新時は必ずバージョンを上げること
-const CACHE_NAME = '11in1-v3';
+const CACHE_NAME = '14in1-v4';
 
 const ASSETS = [
     './',

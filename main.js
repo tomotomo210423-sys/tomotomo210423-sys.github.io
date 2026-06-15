@@ -1,4 +1,4 @@
-// === CORE SYSTEM (11in1 Local Save & SpriteCache Fix Edition) ===
+// === CORE SYSTEM (14in1 Local Save & SpriteCache Fix Edition) ===
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -305,9 +305,9 @@ const Menu = {
   draw() {
     bgThemes[SaveSys.data.bgTheme].draw(ctx);
 
-    // ★ 11in1 に変更！
+    // ★ 14in1 に変更！
     ctx.shadowBlur = 10; ctx.shadowColor = '#0f0'; ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-    ctx.fillText('11in1 RETRO', 50, 25); ctx.shadowBlur = 0;
+    ctx.fillText('14in1 RETRO', 50, 25); ctx.shadowBlur = 0;
     ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.fillText('ULTIMATE v16.3', 45, 40);
 
     let startY = 63;
