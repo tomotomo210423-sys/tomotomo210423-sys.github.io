@@ -52,7 +52,7 @@ const SaveSys = {
         actStage: d.actStage||1, 
         actLives: d.actLives||5, 
         actSeed: d.actSeed||1, 
-        rhythm: Object.assign({easy:0,normal:0,hard:0,expert:0,nightmare:0}, d.rhythm||{}), 
+        rhythm: (() => { const r = Object.assign({easy:0,normal:0,hard:0,expert:0}, d.rhythm||{}); if (r.nightmare !== undefined) { r.expert = r.nightmare; delete r.nightmare; } return r; })(), 
         logs: d.logs||[],
         osFiles: d.osFiles||null,
         trashFiles: d.trashFiles||{},

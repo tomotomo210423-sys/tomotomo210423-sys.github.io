@@ -1,5 +1,5 @@
 // === BEAT BROS - REMASTER V5 ===
-// EXPERT追加 / 難易度調整 / メドレー演出強化 / NIGHTMARE=ダメージノーツ制
+// EXPERT追加 / 難易度調整 / メドレー演出強化 / EXPERT=ダメージノーツ制
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -15,18 +15,17 @@ const Rhythm = {
 
   skins: ['CLASSIC', 'CYBER', 'DOT', 'GEM'],
   spds: [1.0, 1.5, 2.0, 2.5, 3.0, 4.0],
-  modes: ['easy', 'normal', 'hard', 'expert', 'nightmare'],
+  modes: ['easy', 'normal', 'hard', 'expert'],
   // thr: 音量しきい値の倍率(小さいほど密) / gap: 最短ノーツ間隔(秒) / spd: 落下速度
   cfgs: {
     easy:      { thr: 1.5, gap: 0.32, spd: 200 },
     normal:    { thr: 1.1, gap: 0.22, spd: 300 },
     hard:      { thr: 0.7, gap: 0.13, spd: 400 },
-    expert:    { thr: 0.62, gap: 0.115, spd: 440 },
-    nightmare: { thr: 0.7, gap: 0.13, spd: 480 }   // 密度はHARDと同じ
+    expert: { thr: 0.7, gap: 0.13, spd: 480 }   // 密度はHARDと同じ
   },
   hints: {
     easy: 'のんびり遊べる', normal: '標準の難易度', hard: '高密度の譜面',
-    expert: 'HARD超え・時々同時押し', nightmare: '赤い✖は押すな!HP制'
+    expert: '赤い✖は押すな!HP制'
   },
   cfg() { return this.cfgs[this.mode] || this.cfgs.normal; },
 
@@ -212,11 +211,6 @@ const Rhythm = {
           if(lane === lastLane && Math.random() < 0.6) lane = (lane + 1 + Math.floor(Math.random()*2)) % 4;
           this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
 
-          // EXPERT: 強い音では同時押し
-          if(this.mode === 'expert' && amp > threshold * 2.5 && Math.random() < 0.15) {
-            let l2 = (lane + 1 + Math.floor(Math.random()*3)) % 4;
-            this.notes.push({ time: t, lane: l2, hit: false, y: -50, missed: false });
-          }
           lastLane = lane; lastTime = t;
         }
       }
@@ -231,10 +225,10 @@ const Rhythm = {
     this.startPlay();
   },
 
-  // 並べ替え + NIGHTMAREのダメージノーツ配置
+  // 並べ替え + EXPERTのダメージノーツ配置
   finalizeNotes() {
     this.notes.sort((a,b) => a.time - b.time);
-    if(this.mode === 'nightmare') this.addDamageNotes();
+    if(this.mode === 'expert') this.addDamageNotes();
   },
 
   addDamageNotes() {
@@ -305,7 +299,7 @@ const Rhythm = {
        this.st = 'result'; let finalScore = Math.floor(this.score);
 
        if(!this.autoPlay) {
-           let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, expert:0, nightmare:0};
+           let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, expert:0};
            if(finalScore > (rData[this.mode]||0)){ rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
            SaveSys.addLog('BEAT BROS', `${this.playlist.length > 1 ? 'メドレー' : this.mode.toUpperCase()} で スコア${finalScore}`);
        } else {
@@ -314,12 +308,12 @@ const Rhythm = {
     }
   },
 
-  // NIGHTMARE: HPが尽きたら即終了
+  // EXPERT: HPが尽きたら即終了
   failTrack() {
     this.failed = true; this.st = 'result';
     this.stopAudio();
     if(this.video) { this.video.pause(); }
-    SaveSys.addLog('BEAT BROS', `NIGHTMAREで力尽きた…`);
+    SaveSys.addLog('BEAT BROS', `EXPERTで力尽きた…`);
   },
 
   // 曲の現在時刻(音声の出力遅延ぶん補正)
@@ -336,8 +330,8 @@ const Rhythm = {
     if(lane !== undefined) this.hitKey(lane);
   },
 
-  // NIGHTMAREのわずかなレーンゆらぎ(画面揺れは控えめ)
-  laneShift(now) { return this.mode === 'nightmare' ? Math.sin(now * 3) * 6 : 0; },
+  // EXPERTのわずかなレーンゆらぎ(画面揺れは控えめ)
+  laneShift(now) { return this.mode === 'expert' ? Math.sin(now * 3) * 6 : 0; },
 
   hitKey(lane, isAuto=false) {
       if(this.st !== 'play') return;
@@ -353,7 +347,7 @@ const Rhythm = {
 
       // 押せるノーツが無く、ダメージノーツの上で押してしまった
       if(!hitNote) {
-        if(isAuto || this.mode !== 'nightmare') return;
+        if(isAuto || this.mode !== 'expert') return;
         for(let n of this.notes) {
           if(n.bad && !n.hit && !n.missed && n.lane === lane && Math.abs(n.time - now) < 0.12) {
             n.hit = true;
@@ -432,7 +426,7 @@ const Rhythm = {
           if(advance) { this.autoPlay = !this.autoPlay; playSnd('sel'); }
       } else if(this.settingsCur === 5) {
           if(kD.a) {
-              if (this.mode === 'nightmare') {
+              if (this.mode === 'expert') {
                   this.st = 'warning';
                   playSnd('hit');
                   screenShake(10);
@@ -507,7 +501,7 @@ const Rhythm = {
 
       for(let n of this.notes) {
         let tDiff = n.time - now;
-        let wiggle = (this.mode === 'nightmare') ? Math.sin(now * 10 + n.lane) * 10 : 0;
+        let wiggle = (this.mode === 'expert') ? Math.sin(now * 10 + n.lane) * 10 : 0;
         n.y = this.lineY - tDiff * speed + wiggle;
 
         if(!n.hit && !n.missed && tDiff < -0.27) {
@@ -533,7 +527,7 @@ const Rhythm = {
         let t = this.bgTimer * 0.05;
         ctx.fillStyle = '#001'; ctx.fillRect(0, 0, cvs.width, cvs.height);
 
-        if (this.st === 'settings' && this.mode === 'nightmare') {
+        if (this.st === 'settings' && this.mode === 'expert') {
             if (Math.random() < 0.08) {
                 ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,0,0,0.15)' : 'rgba(0,255,255,0.15)';
                 ctx.fillRect(0, Math.random()*300, 200, Math.random()*20);
@@ -570,7 +564,7 @@ const Rhythm = {
 
     ctx.save();
 
-    if(this.mode === 'nightmare' && this.st === 'play') {
+    if(this.mode === 'expert' && this.st === 'play') {
         // 画面のゆらぎは控えめ(回転±2度・拡縮±3%)
         let nNow = Date.now();
         ctx.translate(100, 200);
@@ -603,8 +597,7 @@ const Rhythm = {
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {};
 
       let mStr = `MODE: ${this.mode.toUpperCase()}`;
-      if(this.mode === 'nightmare') { ctx.fillStyle = '#f00'; if(Math.random()<0.4) mStr = 'M%D#: N1GH!M@R&'; }
-      else if(this.mode === 'expert') { ctx.fillStyle = this.settingsCur === 0 ? '#f80' : '#fa5'; }
+      if(this.mode === 'expert') { ctx.fillStyle = '#f00'; if(Math.random()<0.4) mStr = 'M%D#: 3XP3RT!!'; }
       else { ctx.fillStyle = this.settingsCur === 0 ? '#ff0' : '#fff'; }
       ctx.fillText((this.settingsCur===0?'> ':'  ') + mStr, 25, 70);
 
@@ -617,10 +610,10 @@ const Rhythm = {
       ctx.fillStyle = this.settingsCur === 3 ? '#0f0' : '#fff'; ctx.fillText((this.settingsCur===3?'> ':'  ') + `SKIN: ${this.skins[this.noteSkin]}`, 25, 160);
       ctx.fillStyle = this.settingsCur === 4 ? '#ff0' : '#fff'; ctx.fillText((this.settingsCur===4?'> ':'  ') + `AUTO: ${this.autoPlay ? 'ON' : 'OFF'}`, 25, 185);
 
-      ctx.fillStyle = this.settingsCur === 5 ? (this.mode === 'nightmare' ? '#f00' : '#0f0') : '#888';
+      ctx.fillStyle = this.settingsCur === 5 ? (this.mode === 'expert' ? '#f00' : '#0f0') : '#888';
       ctx.fillText((this.settingsCur===5?'> ':'  ') + `[ EXECUTE ]`, 55, 225);
 
-      ctx.fillStyle = this.mode === 'nightmare' ? '#f66' : '#8cf'; ctx.font = '9px monospace';
+      ctx.fillStyle = this.mode === 'expert' ? '#f66' : '#8cf'; ctx.font = '9px monospace';
       ctx.fillText(this.hints[this.mode], 25, 250);
       ctx.fillStyle = '#666'; ctx.fillText('↑↓:選択 A/▶:変更/決定  SEL:戻る', 15, 280);
     }
@@ -759,7 +752,7 @@ const Rhythm = {
         let ghostY = this.lineY - 80;
         if(!n.bad && !n.missed && !n.hit && n.y > ghostY - 20 && n.y < ghostY + 20) {
           let gcx = 25 + n.lane * 50 + laneOffset;
-          if(this.mode === 'nightmare') gcx += Math.sin(ghostY * 0.05 + now * 10) * 10;
+          if(this.mode === 'expert') gcx += Math.sin(ghostY * 0.05 + now * 10) * 10;
           ctx.save();
           ctx.globalAlpha = 0.38;
           ctx.strokeStyle = this.colors[n.lane]; ctx.lineWidth = 2;
@@ -780,7 +773,7 @@ const Rhythm = {
         if(!n.missed && !n.hit && n.y > -30 && n.y < 420) {
            let cx = 25 + n.lane * 50 + laneOffset;
 
-           if (this.mode === 'nightmare') {
+           if (this.mode === 'expert') {
                cx += Math.sin(n.y * 0.05 + now * 10) * 10;
            }
 
@@ -841,8 +834,8 @@ const Rhythm = {
       ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.fillText(`SCORE: ${Math.floor(this.score)}`, 60, 20);
       if (this.autoPlay) { ctx.fillStyle = '#ff0'; ctx.font = '10px monospace'; ctx.fillText('AUTO PLAY', 140, 20); }
 
-      // NIGHTMAREのHPゲージ
-      if (this.mode === 'nightmare' && !this.autoPlay && (this.st === 'play' || this.st === 'intro')) {
+      // EXPERTのHPゲージ
+      if (this.mode === 'expert' && !this.autoPlay && (this.st === 'play' || this.st === 'intro')) {
           ctx.fillStyle = '#300'; ctx.fillRect(60, 26, 130, 6);
           ctx.fillStyle = this.hp > 30 ? '#0f8' : '#f33'; ctx.fillRect(60, 26, 130 * (this.hp / 100), 6);
           ctx.strokeStyle = '#666'; ctx.lineWidth = 1; ctx.strokeRect(60, 26, 130, 6);
