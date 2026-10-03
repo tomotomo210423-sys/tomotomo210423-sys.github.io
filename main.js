@@ -81,6 +81,7 @@ const SaveSys = {
 // ==========================================
 
 const BGM = {
+  extra: {},   // ゲーム側から登録するオリジナル曲 {名前: {t1,t2,t3,n,spd}}
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
   play(type) {
     this.stop(); if (!audioCtx) return;
@@ -97,7 +98,7 @@ const BGM = {
       rhythm:  { t1:[392,0,523,0,659,0,523,0], t2:[196,0,262,0,330,0,262,0], t3:[98,0,131,0,165,0,131,0], n:[1,0,1,0,1,0,1,0], spd:145 },
       gameover:{ t1:[330,294,262,233,208,196], t2:[165,147,131,116,104,98], t3:[82,73,65,58,52,49], n:[0,0,0,0,0,0], spd:260 }
     };
-    const tr = mels[type] || mels.menu; let i = 0;
+    const tr = (this.extra && this.extra[type]) || mels[type] || mels.menu; let i = 0;
     bgmInterval = setInterval(() => {
       if (SaveSys.data.bgmVol <= 0) { i++; return; } 
       const now = audioCtx.currentTime; const d = tr.spd / 1000;
