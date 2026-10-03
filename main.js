@@ -15,6 +15,11 @@ const keysDown = { ...keys };
 let prevKeys = { ...keys };
 const keyPressQueue = { ...keys };
 
+// リズムゲーム用: フレームを待たず、押した瞬間に通知する(高速連打の取りこぼし防止)
+function notePress(k) {
+  if (typeof Rhythm !== 'undefined' && activeApp === Rhythm && Rhythm.onPress) Rhythm.onPress(k);
+}
+
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx, noiseBuffer = null, bgmInterval = null;
 
@@ -496,7 +501,7 @@ const handleDpad = (ev) => {
     if (angle < -22.5 && angle > -157.5) newKeys.up = true;
   }
   
-  ['up', 'down', 'left', 'right'].forEach(k => { if (newKeys[k] && !keys[k]) keyPressQueue[k] = true; keys[k] = newKeys[k]; });
+  ['up', 'down', 'left', 'right'].forEach(k => { if (newKeys[k] && !keys[k]) { keyPressQueue[k] = true; notePress(k); } keys[k] = newKeys[k]; });
 };
 
 const releaseDpad = (ev) => { ev.preventDefault(); dpadActive = false; keys.up = keys.down = keys.left = keys.right = false; };
@@ -545,10 +550,10 @@ canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canv
 
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { keys.up = true; keyPressQueue.up = true; initAudio(); } 
-  if (e.key === 'ArrowDown') { keys.down = true; keyPressQueue.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { keys.left = true; keyPressQueue.left = true; initAudio(); } 
-  if (e.key === 'ArrowRight') { keys.right = true; keyPressQueue.right = true; initAudio(); }
+  if (e.key === 'ArrowUp') { if (!keys.up) notePress('up'); keys.up = true; keyPressQueue.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { if (!keys.down) notePress('down'); keys.down = true; keyPressQueue.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { if (!keys.left) notePress('left'); keys.left = true; keyPressQueue.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { if (!keys.right) notePress('right'); keys.right = true; keyPressQueue.right = true; initAudio(); }
   if (k === 'z' || e.key === ' ') { keys.a = true; keyPressQueue.a = true; initAudio(); } 
   if (k === 'x') { keys.b = true; keyPressQueue.b = true; initAudio(); }
   if (e.key === 'Shift') { keys.select = true; keyPressQueue.select = true; initAudio(); }

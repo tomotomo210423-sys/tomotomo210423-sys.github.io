@@ -322,12 +322,26 @@ const Rhythm = {
     SaveSys.addLog('BEAT BROS', `NIGHTMAREで力尽きた…`);
   },
 
+  // 曲の現在時刻(音声の出力遅延ぶん補正)
+  songTime() {
+    let lat = 0;
+    try { lat = Math.min(0.2, audioCtx.outputLatency || 0); } catch(e) {}
+    return audioCtx.currentTime - lat - this.startTime;
+  },
+
+  // 方向キー/十字キーが押された瞬間に呼ばれる
+  onPress(k) {
+    if(this.st !== 'play' || this.autoPlay) return;
+    const lane = { left: 0, down: 1, up: 2, right: 3 }[k];
+    if(lane !== undefined) this.hitKey(lane);
+  },
+
   // NIGHTMAREのわずかなレーンゆらぎ(画面揺れは控えめ)
   laneShift(now) { return this.mode === 'nightmare' ? Math.sin(now * 3) * 6 : 0; },
 
   hitKey(lane, isAuto=false) {
       if(this.st !== 'play') return;
-      let now = audioCtx.currentTime - this.startTime;
+      let now = this.songTime();
       let hitNote = null, minDiff = 999;
 
       for(let n of this.notes) {
@@ -465,7 +479,7 @@ const Rhythm = {
       }
     }
     else if(this.st === 'play') {
-      let now = audioCtx.currentTime - this.startTime;
+      let now = this.songTime();
 
       if (this.video && now >= 0 && this.video.paused && !this.video.ended) {
           let p = this.video.play();
@@ -486,8 +500,7 @@ const Rhythm = {
               }
           }
       } else {
-          if(kD.left || kD.l0) this.hitKey(0); if(kD.down || kD.l1) this.hitKey(1); if(kD.up || kD.l2) this.hitKey(2); if(kD.right|| kD.l3) this.hitKey(3);
-          if(this.st !== 'play') return; // ダメージで力尽きた
+          // 押下は onPress() が即時に処理する
       }
 
       for(let i=0; i<4; i++) { if(this.laneGlow[i] > 0) this.laneGlow[i] -= 0.05; }
@@ -514,7 +527,7 @@ const Rhythm = {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
 
-    let now = audioCtx.currentTime - this.startTime;
+    let now = this.songTime();
 
     if (this.st === 'menu' || this.st === 'settings') {
         let t = this.bgTimer * 0.05;
