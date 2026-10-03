@@ -237,10 +237,10 @@ const Rhythm = {
     for(let i=0; i<normals.length - 1; i++) {
       let a = normals[i], b = normals[i+1];
       let gap = b.time - a.time;
-      if(gap < 0.22) continue;
+      if(gap < 0.2) continue;
       let t = a.time + gap / 2;
-      if(t - lastBad < 0.8) continue;
-      if(Math.random() > 0.3) continue;
+      if(t - lastBad < 0.5) continue;
+      if(Math.random() > 0.65) continue;
       // 本物のノーツと被らないレーンを選ぶ
       let near = normals.slice(Math.max(0, i - 6), i + 8);
       let free = [0,1,2,3].filter(l => !near.some(n => n.lane === l && Math.abs(n.time - t) < 0.4));

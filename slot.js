@@ -5,7 +5,7 @@ const Slot = {
     jp: 500, free: 0, symH: 32, stoppedCount: 0,
     reels: [{ p: 0, s: 0, st: true, b: 0 }, { p: 0, s: 0, st: true, b: 0 }, { p: 0, s: 0, st: true, b: 0 }],
     winCoins: [],
-    auto: false, autoTmr: 0,
+    auto: false, autoTmr: 0, selHold: 0,
     feverMode: false, feverMult: 1, feverAnim: 0,
     coinDisplay: 100, coinTarget: 100,
 
@@ -104,11 +104,11 @@ const Slot = {
         this.jp = d.jackpotPool || 500; if (this.jp < 500) this.jp = 500;
         this.coinDisplay = this.coinTarget = this.coins;
         this.bet = 1; this.st = 'title'; this.tmr = 0; this.free = 0;
-        this.msg = 'A:PLAY / ▶:SHOP / SEL:AUTO';
+        this.msg = 'A:PLAY ▶:SHOP SEL:AUTO';
         for (let i = 0; i < 3; i++) { this.reels[i].p = Math.floor(Math.random() * 20) * this.symH; this.reels[i].s = 0; this.reels[i].st = true; this.reels[i].b = 0; }
         this.titleReels = [{ p: 0 }, { p: 7 * this.symH }, { p: 13 * this.symH }];
         this.activeItem = null; this.shopCur = 0; this.targetSym = null; this.slipCount = 0;
-        this.winCoins = []; this.auto = false; this.autoTmr = 0; this.stoppedCount = 0;
+        this.winCoins = []; this.auto = false; this.autoTmr = 0; this.selHold = 0; this.stoppedCount = 0;
         this.feverMode = false; this.feverMult = 1; this.feverAnim = 0;
         BGM.stop();
     },
@@ -206,7 +206,14 @@ const Slot = {
             return;
         }
 
-        if (keysDown.select) { this.auto = false; switchApp(Menu); return; }
+        // SELECT: 短押し=オート切替 / 長押し=退出
+        if (keys.select) {
+            this.selHold++;
+            if (this.selHold === 40) { this.auto = false; playSnd('hit'); switchApp(Menu); return; }
+        } else {
+            if (this.selHold > 0 && this.selHold < 40) { this.auto = !this.auto; this.autoTmr = 0; playSnd(this.auto ? 'combo' : 'sel'); }
+            this.selHold = 0;
+        }
 
         if (this.auto) {
             this.autoTmr++;
@@ -320,7 +327,7 @@ const Slot = {
             }
             if (this.tmr > 100) {
                 if (this.coins <= 0 && this.free <= 0) { this.st = 'bank'; this.msg = 'GAME OVER... PRESS A'; this.auto = false; SaveSys.addLog('スロット','全財産をすって破産した…'); }
-                else { this.st = 'bet'; this.bet = Math.min(this.bet, this.coins > 0 ? this.coins : 1); this.msg = 'A:PLAY / ▶:SHOP / SEL:AUTO'; }
+                else { this.st = 'bet'; this.bet = Math.min(this.bet, this.coins > 0 ? this.coins : 1); this.msg = 'A:PLAY ▶:SHOP SEL:AUTO'; }
             }
         } else if (this.st === 'bank') {
             if (keysDown.a) { this.coins = 50; this.coinTarget = 50; SaveSys.data.slotCoins = 50; SaveSys.save(); this.st = 'bet'; this.bet = 1; this.msg = 'BONUS 50 CREDITS!'; playSnd('combo'); }

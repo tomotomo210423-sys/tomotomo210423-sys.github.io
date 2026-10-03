@@ -59,7 +59,8 @@ const SaveSys = {
         tetriHi: d.tetriHi||0,
         chainBest: d.chainBest||0,
         dashBest: d.dashBest||0,
-        dungeonBest: d.dungeonBest||{floor:0,score:0},
+        mq: d.mq||null,
+        mqClear: d.mqClear||0,
         pcBest: d.pcBest||{easy:0,normal:0,hard:0},
         galaxyBest: d.galaxyBest||0
     };
@@ -260,7 +261,7 @@ const bgThemes = [
 const Menu = {
   cur: 0, 
   // ★ CURSED MANOR（ホラー）をメニューに完全に追加！
-  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'オンライン対戦', 'ビートブロス', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'ピクセル生態系', '呪われた洋館', 'チェインブラスト', 'ダンジョン探索', 'ギャラクシーブレイク', 'システム設定'],
+  apps: ['ゲーム解説館', 'テトリベーダー V2', '理不尽ブラザーズ', 'オンライン対戦', 'ビートブロス', 'レトロ・スロット', '無限無双', 'アビス・ジェネラル', '爆音スニーキング', 'ハッカーズ15', 'ピクセル生態系', '呪われた洋館', 'チェインブラスト', 'マイクロクエスト', 'ギャラクシーブレイク', 'システム設定'],
   appColors: ['#0ff', '#ff0', '#f55', '#0f0', '#f0f', '#fd0', '#5af', '#a0f', '#f80', '#08f', '#8f8', '#800', '#f44', '#fa0', '#4af', '#888'],
   holdTimer: 0,
   
