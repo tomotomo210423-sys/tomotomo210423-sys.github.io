@@ -552,10 +552,10 @@ canvas.addEventListener('touchstart', handlePointerDown, {passive: false}); canv
 
 window.addEventListener('keydown', e => {
   let k = e.key.toLowerCase();
-  if (e.key === 'ArrowUp') { if (!keys.up) notePress('up'); keys.up = true; keyPressQueue.up = true; initAudio(); } 
-  if (e.key === 'ArrowDown') { if (!keys.down) notePress('down'); keys.down = true; keyPressQueue.down = true; initAudio(); }
-  if (e.key === 'ArrowLeft') { if (!keys.left) notePress('left'); keys.left = true; keyPressQueue.left = true; initAudio(); } 
-  if (e.key === 'ArrowRight') { if (!keys.right) notePress('right'); keys.right = true; keyPressQueue.right = true; initAudio(); }
+  if (e.key === 'ArrowUp') { if (!e.repeat) notePress('up'); keys.up = true; keyPressQueue.up = true; initAudio(); } 
+  if (e.key === 'ArrowDown') { if (!e.repeat) notePress('down'); keys.down = true; keyPressQueue.down = true; initAudio(); }
+  if (e.key === 'ArrowLeft') { if (!e.repeat) notePress('left'); keys.left = true; keyPressQueue.left = true; initAudio(); } 
+  if (e.key === 'ArrowRight') { if (!e.repeat) notePress('right'); keys.right = true; keyPressQueue.right = true; initAudio(); }
   if (k === 'z' || e.key === ' ') { keys.a = true; keyPressQueue.a = true; initAudio(); } 
   if (k === 'x') { keys.b = true; keyPressQueue.b = true; initAudio(); }
   if (e.key === 'Shift') { keys.select = true; keyPressQueue.select = true; initAudio(); }
@@ -568,6 +568,10 @@ window.addEventListener('keyup', e => {
   if (k === 'z' || e.key === ' ') keys.a = false; if (k === 'x') keys.b = false;
   if (e.key === 'Shift') keys.select = false;
 });
+
+const releaseAllKeys = () => { for (const k in keys) { keys[k] = false; } };
+window.addEventListener('blur', releaseAllKeys);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAllKeys(); });
 
 const unlockAudio = () => {
   if (typeof audioCtx !== 'undefined' && audioCtx !== null) {

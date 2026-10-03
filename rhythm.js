@@ -32,7 +32,7 @@ const Rhythm = {
   init() {
     this.st = 'menu'; this.mode = 'normal'; this.filterType = 0; this.settingsCur = 0;
     this.hiSpeed = 1.0; this.noteSkin = 0; this.autoPlay = false;
-    this.laneTouch = [false,false,false,false]; this.laneGlow = [0,0,0,0];
+    this.laneTouch = [false,false,false,false]; this.laneGlow = [0,0,0,0]; this.touchLane = {}; this.lastPress = [-1,-1,-1,-1];
     this.audioBuffer = null; this.playlist = []; this.trackIndex = 0;
     this.stopAudio();
     if(this.video) { this.video.pause(); this.video.removeAttribute('src'); this.video.load(); this.video = null; }
@@ -44,31 +44,53 @@ const Rhythm = {
 
     if(!this.touchBound) {
       this.touchBound = true;
+      this.touchLane = {};   // タッチID → レーン
+      const laneAt = (t) => {
+        const r = cvs.getBoundingClientRect();
+        const x = (t.clientX - r.left) / r.width * cvs.width;
+        const y = (t.clientY - r.top) / r.height * cvs.height;
+        return { x, y, lane: (y > 100) ? Math.max(0, Math.min(3, Math.floor(x / (cvs.width / 4)))) : -1 };
+      };
+      const sync = () => { const s = [false,false,false,false]; for(const id in this.touchLane) { const l = this.touchLane[id]; if(l >= 0) s[l] = true; } this.laneTouch = s; };
+      // 押した「瞬間」のイベントごとに直接判定する。前回の状態との比較に頼らないので、
+      // 指を離した通知が欠けても以降の入力が無視されない。
       const tH = (e) => {
         if(activeApp !== this) return;
         if(this.st !== 'play' && this.st !== 'result') return;
         if(e.cancelable) e.preventDefault();
-        const r = cvs.getBoundingClientRect();
-        if (e.type === 'touchstart' || e.type === 'mousedown') {
-            let ts = e.type === 'mousedown' ? [e] : e.changedTouches;
+        const isMouse = e.type.indexOf('mouse') === 0;
+        if(e.type === 'touchstart' || e.type === 'mousedown') {
+          const ts = isMouse ? [e] : e.changedTouches;
+          for(let i=0; i<ts.length; i++) {
+            const p = laneAt(ts[i]);
+            if(p.y < 40 && p.x < 60){ this.exitGame(); return; }
+            if(this.st === 'result'){ this.exitGame(); return; }
+            const id = isMouse ? 'm' : ts[i].identifier;
+            this.touchLane[id] = p.lane;
+            if(this.st === 'play' && !this.autoPlay && p.lane >= 0) this.press(p.lane);
+          }
+        } else if(e.type === 'touchmove' || e.type === 'mousemove') {
+          if(isMouse && !(e.buttons > 0)) { delete this.touchLane.m; }
+          else {
+            const ts = isMouse ? [e] : e.changedTouches;
             for(let i=0; i<ts.length; i++) {
-                let x = (ts[i].clientX - r.left) / r.width * cvs.width;
-                let y = (ts[i].clientY - r.top) / r.height * cvs.height;
-                if(y < 40 && x < 60){ this.exitGame(); return; }
-                if(this.st === 'result'){ this.exitGame(); return; }
+              const p = laneAt(ts[i]); const id = isMouse ? 'm' : ts[i].identifier;
+              if(this.touchLane[id] !== p.lane) {            // 指をスライドして別レーンに入ったら押下扱い
+                this.touchLane[id] = p.lane;
+                if(this.st === 'play' && !this.autoPlay && p.lane >= 0) this.press(p.lane);
+              }
             }
+          }
+        } else { // touchend / touchcancel / mouseup / mouseleave
+          if(isMouse) delete this.touchLane.m;
+          else for(let i=0; i<e.changedTouches.length; i++) delete this.touchLane[e.changedTouches[i].identifier];
         }
-        if (this.st === 'play' && !this.autoPlay) {
-            let activeTs = e.type.includes('mouse') ? (e.buttons > 0 ? [e] : []) : e.touches;
-            let nT = [false,false,false,false];
-            for(let i=0; i<activeTs.length; i++) {
-                let x = (activeTs[i].clientX - r.left) / r.width * cvs.width;
-                let y = (activeTs[i].clientY - r.top) / r.height * cvs.height;
-                if(y > 100) { let l = Math.floor(x / (cvs.width / 4)); if(l >= 0 && l <= 3) nT[l] = true; }
-            }
-            for(let l=0; l<4; l++) { if(nT[l] && !this.laneTouch[l]) { this.hitKey(l); } }
-            this.laneTouch = nT;
+        // 実際に触れているタッチだけを残す(取りこぼし対策)
+        if(!isMouse && e.touches) {
+          const alive = {}; for(let i=0; i<e.touches.length; i++) alive[e.touches[i].identifier] = true;
+          for(const id in this.touchLane) { if(id !== 'm' && !alive[id]) delete this.touchLane[id]; }
         }
+        sync();
       };
       ['touchstart','touchmove','touchend','touchcancel','mousedown','mousemove','mouseup','mouseleave'].forEach(E => cvs.addEventListener(E, tH, {passive: false}));
     }
@@ -324,10 +346,19 @@ const Rhythm = {
   },
 
   // 方向キー/十字キーが押された瞬間に呼ばれる
-  onPress(k) {
+  // 同じレーンの二重カウント防止(イベント経由とポーリング経由が重なる場合)
+  press(lane) {
     if(this.st !== 'play' || this.autoPlay) return;
+    const t = audioCtx.currentTime;
+    if(!this.lastPress) this.lastPress = [-1,-1,-1,-1];
+    if(t - this.lastPress[lane] < 0.04) return;
+    this.lastPress[lane] = t;
+    this.hitKey(lane);
+  },
+
+  onPress(k) {
     const lane = { left: 0, down: 1, up: 2, right: 3 }[k];
-    if(lane !== undefined) this.hitKey(lane);
+    if(lane !== undefined) this.press(lane);
   },
 
   // EXPERTのわずかなレーンゆらぎ(画面揺れは控えめ)
@@ -494,7 +525,9 @@ const Rhythm = {
               }
           }
       } else {
-          // 押下は onPress() が即時に処理する
+          // 押下は onPress() が即時に処理する。取りこぼしても拾えるよう、フレームごとの押下もバックアップで見る
+          if(kD.left || kD.l0) this.press(0); if(kD.down || kD.l1) this.press(1); if(kD.up || kD.l2) this.press(2); if(kD.right || kD.l3) this.press(3);
+          if(this.st !== 'play') return;
       }
 
       for(let i=0; i<4; i++) { if(this.laneGlow[i] > 0) this.laneGlow[i] -= 0.05; }
