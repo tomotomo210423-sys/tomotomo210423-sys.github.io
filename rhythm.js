@@ -1,5 +1,5 @@
 // === BEAT BROS - REMASTER V5 ===
-// EXPERT追加 / 難易度調整 / 楽譜(MIDI・テキスト)演奏 / NIGHTMARE=ダメージノーツ制
+// EXPERT追加 / 難易度調整 / メドレー演出強化 / NIGHTMARE=ダメージノーツ制
 
 const Rhythm = {
   st: 'menu', mode: 'normal', filterType: 0, settingsCur: 0, hiSpeed: 1.0, noteSkin: 0, autoPlay: false,
@@ -8,7 +8,7 @@ const Rhythm = {
   score: 0, combo: 0, maxCombo: 0, judgements: [], transformTimer: 0,
   pendingFile: null, playlist: [], trackIndex: 0,
   hp: 100, failed: false,
-  scoreMode: false, isScore: false, scoreEvents: [], scoreIdx: 0, scoreEnd: 0, scoreOut: null,
+  trackStartScore: 0, trackScores: [], medleyBonus: 0,
   touchBound: false, laneTouch: [false,false,false,false], laneGlow: [0,0,0,0],
   arrows: ['←', '↓', '↑', '→'], colors: ['#f0f', '#0ff', '#0f0', '#f00'], lineY: 340,
   video: null, isVideo: false, bgTimer: 0,
@@ -21,12 +21,12 @@ const Rhythm = {
     easy:      { thr: 1.5, gap: 0.32, spd: 200 },
     normal:    { thr: 1.1, gap: 0.22, spd: 300 },
     hard:      { thr: 0.7, gap: 0.13, spd: 400 },
-    expert:    { thr: 0.5, gap: 0.09, spd: 440 },
+    expert:    { thr: 0.62, gap: 0.115, spd: 440 },
     nightmare: { thr: 0.7, gap: 0.13, spd: 480 }   // 密度はHARDと同じ
   },
   hints: {
     easy: 'のんびり遊べる', normal: '標準の難易度', hard: '高密度の譜面',
-    expert: 'HARD超え・同時押しあり', nightmare: '赤い✖は押すな!HP制'
+    expert: 'HARD超え・時々同時押し', nightmare: '赤い✖は押すな!HP制'
   },
   cfg() { return this.cfgs[this.mode] || this.cfgs.normal; },
 
@@ -35,7 +35,6 @@ const Rhythm = {
     this.hiSpeed = 1.0; this.noteSkin = 0; this.autoPlay = false;
     this.laneTouch = [false,false,false,false]; this.laneGlow = [0,0,0,0];
     this.audioBuffer = null; this.playlist = []; this.trackIndex = 0;
-    this.scoreMode = false; this.isScore = false; this.scoreEvents = [];
     this.stopAudio();
     if(this.video) { this.video.pause(); this.video.removeAttribute('src'); this.video.load(); this.video = null; }
     this.isVideo = false; this.bgTimer = 0;
@@ -77,42 +76,19 @@ const Rhythm = {
   },
 
   // ---------- ファイル選択UI ----------
-  makeLoadButton(text, grad, shadow, accept, isScore) {
-    let label = document.createElement('label');
-    label.style.display = 'inline-block'; label.style.background = grad;
-    label.style.color = '#000'; label.style.padding = '8px 10px'; label.style.fontFamily = 'monospace';
-    label.style.fontWeight = 'bold'; label.style.fontSize = '10px'; label.style.borderRadius = '5px';
-    label.style.cursor = 'pointer'; label.style.boxShadow = shadow;
-    label.style.marginBottom = '8px';
-    label.innerHTML = text;
-
-    let input = document.createElement('input'); input.type = 'file';
-    if(accept) input.accept = accept;
-    input.multiple = true; input.style.display = 'none';
-    label.onclick = () => { initAudio(); }; label.ontouchstart = () => { initAudio(); };
-    input.onchange = (e) => {
-      if(e.target.files.length > 0) {
-        initAudio(); this.hideFileUI();
-        this.scoreMode = isScore;
-        this.playlist = Array.from(e.target.files); this.trackIndex = 0;
-        this.pendingFile = this.playlist[0];
-        e.target.value = ''; this.st = 'settings'; this.settingsCur = 0;
-      }
-    };
-    label.appendChild(input);
-    return label;
-  },
-
   showFileUI() {
     let ui = document.getElementById('rhythm-file-ui');
     if(!ui) {
       ui = document.createElement('div'); ui.id = 'rhythm-file-ui';
 
+      // 画面サイズに関わらず大きさが変わらないよう、px固定
       ui.style.position = 'absolute'; ui.style.bottom = '40px'; ui.style.left = '50%';
-      ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100'; ui.style.textAlign = 'center';
-      ui.style.width = '85%';
-      ui.style.maxWidth = '170px';
+      ui.style.transform = 'translateX(-50%)'; ui.style.zIndex = '100';
+      ui.style.width = '170px'; ui.style.height = '96px'; ui.style.flex = 'none';
       ui.style.boxSizing = 'border-box';
+      ui.style.display = 'flex'; ui.style.flexDirection = 'column';
+      ui.style.alignItems = 'center'; ui.style.justifyContent = 'center';
+      ui.style.textAlign = 'center'; ui.style.whiteSpace = 'nowrap';
       ui.style.background = 'rgba(0, 0, 20, 0.85)';
       ui.style.border = '2px solid #0ff'; ui.style.borderRadius = '10px';
       ui.style.padding = '10px';
@@ -125,15 +101,29 @@ const Rhythm = {
       title.innerHTML = '>> SELECT TRACK DATA <<';
       ui.appendChild(title);
 
-      ui.appendChild(this.makeLoadButton('📁 LOAD AUDIO / VIDEO', 'linear-gradient(90deg, #0ff, #08f)', '0 4px 0 #005, 0 0 15px #0ff', 'audio/*, video/*', false));
-      ui.appendChild(document.createElement('br'));
-      // 楽譜(MIDI / テキスト譜)。端末によってはaccept指定で選べなくなるため絞らない
-      ui.appendChild(this.makeLoadButton('🎼 LOAD SCORE (MIDI/TXT)', 'linear-gradient(90deg, #fd0, #f80)', '0 4px 0 #530, 0 0 15px #f80', '', true));
+      let label = document.createElement('label');
+      label.style.display = 'block'; label.style.background = 'linear-gradient(90deg, #0ff, #08f)';
+      label.style.color = '#000'; label.style.padding = '8px 10px'; label.style.fontFamily = 'monospace';
+      label.style.fontWeight = 'bold'; label.style.fontSize = '10px'; label.style.borderRadius = '5px';
+      label.style.cursor = 'pointer'; label.style.boxShadow = '0 4px 0 #005, 0 0 15px #0ff';
+      label.innerHTML = '📁 LOAD AUDIO / VIDEO';
+
+      let input = document.createElement('input'); input.type = 'file'; input.accept = 'audio/*, video/*'; input.multiple = true; input.style.display = 'none';
+      label.onclick = () => { initAudio(); }; label.ontouchstart = () => { initAudio(); };
+      input.onchange = (e) => {
+        if(e.target.files.length > 0) {
+          initAudio(); this.hideFileUI();
+          this.playlist = Array.from(e.target.files); this.trackIndex = 0;
+          this.pendingFile = this.playlist[0];
+          e.target.value = ''; this.st = 'settings'; this.settingsCur = 0;
+        }
+      };
+      label.appendChild(input); ui.appendChild(label);
 
       const container = document.getElementById('screen-container');
       if(container) container.appendChild(ui); else document.body.appendChild(ui);
     }
-    ui.style.display = 'block';
+    ui.style.display = 'flex';
   },
 
   hideFileUI() { let ui = document.getElementById('rhythm-file-ui'); if(ui) ui.style.display = 'none'; },
@@ -144,7 +134,6 @@ const Rhythm = {
       try { this.source.disconnect(); } catch(e) {}
       this.source = null;
     }
-    if(this.scoreOut) { try { this.scoreOut.disconnect(); } catch(e) {} this.scoreOut = null; }
   },
 
   exitGame() {
@@ -174,23 +163,7 @@ const Rhythm = {
 
     const reader = new FileReader();
 
-    // --- 楽譜 ---
-    if(this.scoreMode) {
-      this.isScore = true; this.isVideo = false; this.audioBuffer = null;
-      reader.onload = e => {
-        let ev = null;
-        try { ev = this.parseScore(e.target.result); } catch(err) { console.error(err); }
-        if(!ev || ev.length === 0) { this.abortLoad('楽譜を読み込めませんでした。'); return; }
-        this.scoreEvents = ev;
-        if(!this.buildScoreChart()) { this.abortLoad('楽譜の音符が少なすぎます。'); return; }
-        this.startPlay();
-      };
-      reader.readAsArrayBuffer(file);
-      return;
-    }
-
     // --- 音声 / 動画 ---
-    this.isScore = false;
     this.isVideo = file.type.startsWith('video/');
     if (this.isVideo) {
       this.video = document.createElement('video');
@@ -240,7 +213,7 @@ const Rhythm = {
           this.notes.push({ time: t, lane: lane, hit: false, y: -50, missed: false });
 
           // EXPERT: 強い音では同時押し
-          if(this.mode === 'expert' && amp > threshold * 2.2 && Math.random() < 0.35) {
+          if(this.mode === 'expert' && amp > threshold * 2.5 && Math.random() < 0.15) {
             let l2 = (lane + 1 + Math.floor(Math.random()*3)) % 4;
             this.notes.push({ time: t, lane: l2, hit: false, y: -50, missed: false });
           }
@@ -284,235 +257,23 @@ const Rhythm = {
     this.notes.sort((a,b) => a.time - b.time);
   },
 
-  // ---------- 楽譜の解析 ----------
-  // 戻り値: [{t(秒), dur(秒), pitch(MIDI番号), vel, trk, drum}] を時刻順に
-  parseScore(buf) {
-    const u8 = new Uint8Array(buf);
-    if(u8.length >= 4 && u8[0] === 0x4D && u8[1] === 0x54 && u8[2] === 0x68 && u8[3] === 0x64) return this.parseMidi(buf);
-    let text = '';
-    try { text = new TextDecoder('utf-8').decode(u8); } catch(e) { for(let i=0; i<u8.length; i++) text += String.fromCharCode(u8[i]); }
-    return this.parseTextScore(text);
-  },
-
-  parseMidi(buf) {
-    const d = new DataView(buf); let p = 0;
-    const tag = () => { let s = ''; for(let i=0; i<4; i++) s += String.fromCharCode(d.getUint8(p + i)); p += 4; return s; };
-    const vlq = (end) => { let v = 0, b; do { b = d.getUint8(p++); v = (v << 7) | (b & 0x7f); } while((b & 0x80) && p < end); return v; };
-
-    if(tag() !== 'MThd') return null;
-    const hlen = d.getUint32(p); p += 4;
-    const division = d.getUint16(p + 4); // ヘッダ: format(2) ntrks(2) division(2)
-    p = 8 + hlen;
-
-    let fixedSpt = 0, tpq = division;
-    if(division & 0x8000) { const fps = 256 - (division >> 8); const tpf = division & 0xff; fixedSpt = 1 / (fps * tpf); }
-    if(!fixedSpt && tpq <= 0) tpq = 480;
-
-    const tempos = [{ tick: 0, uspq: 500000 }];
-    const raws = [];
-
-    while(p + 8 <= d.byteLength) {
-      const t = tag(); const len = d.getUint32(p); p += 4;
-      const end = Math.min(p + len, d.byteLength);
-      if(t === 'MTrk') {
-        let tick = 0, run = 0; const open = {};
-        while(p < end) {
-          tick += vlq(end);
-          if(p >= end) break;
-          let st = d.getUint8(p);
-          if(st === 0xFF) {
-            p++; const type = d.getUint8(p++); const l = vlq(end);
-            if(type === 0x51 && l === 3) tempos.push({ tick, uspq: (d.getUint8(p) << 16) | (d.getUint8(p+1) << 8) | d.getUint8(p+2) });
-            p += l;
-            if(type === 0x2F) break;
-            continue;
-          }
-          if(st === 0xF0 || st === 0xF7) { p++; const l = vlq(end); p += l; continue; }
-          if(st & 0x80) { run = st; p++; }
-          const kind = run >> 4, ch = run & 15;
-          if(kind === 0xC || kind === 0xD) { p += 1; continue; }
-          const a = d.getUint8(p++), c = d.getUint8(p++);
-          const key = ch * 128 + a;
-          if(kind === 0x9 && c > 0) { (open[key] = open[key] || []).push({ tick, vel: c }); }
-          else if(kind === 0x8 || (kind === 0x9 && c === 0)) {
-            const stack = open[key];
-            if(stack && stack.length) { const s = stack.shift(); raws.push({ t0: s.tick, t1: tick, pitch: a, vel: s.vel, ch }); }
-          }
-        }
-        for(const key in open) for(const s of open[key]) raws.push({ t0: s.tick, t1: Math.max(tick, s.tick + 1), pitch: key % 128, vel: s.vel, ch: Math.floor(key / 128) });
-      }
-      p = end;
-    }
-
-    // テンポマップ(tick→秒)
-    tempos.sort((a, b) => a.tick - b.tick);
-    const segs = [];
-    for(const tp of tempos) {
-      const spt = fixedSpt || (tp.uspq / 1e6 / tpq);
-      if(segs.length && segs[segs.length - 1].tick === tp.tick) { segs[segs.length - 1].spt = spt; continue; }
-      let sec = 0;
-      if(segs.length) { const q = segs[segs.length - 1]; sec = q.sec + (tp.tick - q.tick) * q.spt; }
-      segs.push({ tick: tp.tick, sec, spt });
-    }
-    const toSec = (tick) => {
-      let s = segs[0];
-      for(let i = segs.length - 1; i >= 0; i--) { if(segs[i].tick <= tick) { s = segs[i]; break; } }
-      return s.sec + (tick - s.tick) * s.spt;
-    };
-
-    const ev = raws.map(r => {
-      const t = toSec(r.t0);
-      return { t, dur: Math.max(0.05, toSec(r.t1) - t), pitch: r.pitch, vel: r.vel, trk: r.ch, drum: r.ch === 9 };
-    });
-    ev.sort((a, b) => a.t - b.t);
-    return ev;
-  },
-
-  // テキスト譜: 1行=1パート(同時進行)。例) TEMPO 120 / C4:4 D4:4 E4:2 R:4 [C4 E4 G4]:2 / C5:8. ※ ':'の後ろは音価(4=四分,8=八分,2=二分) 末尾'.'で付点
-  parseTextScore(text) {
-    let tempo = 120; const lines = [];
-    for(let line of text.split(/\r?\n/)) {
-      line = line.replace(/(\/\/|;).*$/, '').trim();
-      if(!line) continue;
-      const m = line.match(/^(?:TEMPO|BPM)\s*[:=]?\s*(\d+)/i);
-      if(m) { tempo = Math.max(30, Math.min(300, +m[1])); continue; }
-      lines.push(line);
-    }
-    const spb = 60 / tempo;
-    const base = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
-    const toMidi = (s) => {
-      const m = s.match(/^([A-Ga-g])([#b]?)(-?\d*)$/);
-      if(!m) return null;
-      const oct = m[3] === '' ? 4 : parseInt(m[3], 10);
-      return 12 * (oct + 1) + base[m[1].toLowerCase()] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
-    };
-    const ev = [];
-    const re = /\[([^\]]+)\]\s*:\s*(\d+)(\.?)|([A-Ga-gRr][#b]?-?\d*)\s*:\s*(\d+)(\.?)/g;
-    lines.forEach((line, vi) => {
-      let t = 0, m; re.lastIndex = 0;
-      while((m = re.exec(line)) !== null) {
-        const chord = m[1] !== undefined;
-        const n = parseInt(chord ? m[2] : m[5], 10) || 4;
-        const dot = chord ? m[3] : m[6];
-        const sec = (4 / n) * (dot ? 1.5 : 1) * spb;
-        const names = chord ? m[1].split(/[\s,]+/).filter(Boolean) : [m[4]];
-        for(const nm of names) {
-          if(/^r$/i.test(nm)) continue;
-          const pitch = toMidi(nm);
-          if(pitch !== null) ev.push({ t, dur: sec * 0.9, pitch, vel: 100, trk: vi, drum: false });
-        }
-        t += sec;
-      }
-    });
-    ev.sort((a, b) => a.t - b.t);
-    return ev;
-  },
-
-  // ---------- 譜面生成(楽譜) ----------
-  buildScoreChart() {
-    const cfg = this.cfg();
-    const mel = this.scoreEvents.filter(e => !e.drum);
-    let endT = 0;
-    for(const e of this.scoreEvents) endT = Math.max(endT, e.t + e.dur);
-    this.scoreEnd = endT + 1.5;
-
-    // 同時刻の音をまとめる(最高音/最低音を記録)
-    const on = [];
-    for(const e of mel) {
-      const last = on[on.length - 1];
-      if(last && e.t - last.t < 0.03) { last.hi = Math.max(last.hi, e.pitch); last.lo = Math.min(last.lo, e.pitch); last.n++; }
-      else on.push({ t: e.t, hi: e.pitch, lo: e.pitch, n: 1 });
-    }
-    if(on.length === 0) return false;
-
-    // 音の高さ → レーン(高さの四分位で振り分け)
-    const ps = on.map(o => o.hi).sort((a, b) => a - b);
-    const q = [ps[Math.floor(ps.length * 0.25)], ps[Math.floor(ps.length * 0.5)], ps[Math.floor(ps.length * 0.75)]];
-    const flat = q[0] === q[2];
-    let idx = 0;
-    const laneOf = (p) => flat ? (idx % 4) : (p <= q[0] ? 0 : p <= q[1] ? 1 : p <= q[2] ? 2 : 3);
-
-    this.notes = [];
-    let lastT = -9;
-    for(const o of on) {
-      idx++;
-      if(o.t - lastT < cfg.gap) continue;
-      const lane = laneOf(o.hi);
-      this.notes.push({ time: o.t, lane, hit: false, y: -50, missed: false });
-      // EXPERT: 和音は低音も同時押し
-      if(this.mode === 'expert' && o.n >= 2 && o.hi - o.lo >= 3) {
-        const l2 = laneOf(o.lo);
-        if(l2 !== lane) this.notes.push({ time: o.t, lane: l2, hit: false, y: -50, missed: false });
-      }
-      lastT = o.t;
-    }
-    if(this.notes.length < 4) return false;
-    this.finalizeNotes();
-    return true;
-  },
-
-  // ---------- 楽譜の演奏(シンセ) ----------
-  scheduleScore(now) {
-    const ev = this.scoreEvents;
-    while(this.scoreIdx < ev.length && ev[this.scoreIdx].t < now + 1.0) {
-      this.playScoreNote(ev[this.scoreIdx]);
-      this.scoreIdx++;
-    }
-  },
-
-  playScoreNote(e) {
-    if(!this.scoreOut) return;
-    const t0 = Math.max(audioCtx.currentTime, this.startTime + e.t);
-    const v = e.vel / 127;
-    if(e.drum) {
-      const g = audioCtx.createGain();
-      if(e.pitch === 35 || e.pitch === 36) { // キック
-        const o = audioCtx.createOscillator(); o.type = 'sine';
-        o.frequency.setValueAtTime(150, t0); o.frequency.exponentialRampToValueAtTime(40, t0 + 0.12);
-        g.gain.setValueAtTime(0.35 * v, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.15);
-        o.connect(g); g.connect(this.scoreOut); o.start(t0); o.stop(t0 + 0.2);
-      } else if(noiseBuffer) {               // スネア / ハット
-        const snare = e.pitch === 38 || e.pitch === 40;
-        const s = audioCtx.createBufferSource(); s.buffer = noiseBuffer;
-        const dur = snare ? 0.12 : 0.04;
-        g.gain.setValueAtTime((snare ? 0.2 : 0.08) * v, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-        s.connect(g); g.connect(this.scoreOut); s.start(t0); s.stop(t0 + dur + 0.05);
-      }
-      return;
-    }
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = ['square', 'triangle', 'sawtooth', 'sine'][e.trk % 4];
-    o.frequency.value = 440 * Math.pow(2, (e.pitch - 69) / 12);
-    const vol = 0.09 * v * (o.type === 'sawtooth' ? 0.6 : 1);
-    const dur = Math.max(0.08, Math.min(e.dur, 4));
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    o.connect(g); g.connect(this.scoreOut);
-    o.start(t0); o.stop(t0 + dur + 0.05);
-  },
-
   startPlay() {
     this.st = 'intro'; this.transformTimer = 0;
 
     if(this.trackIndex === 0) {
        this.score = 0; this.combo = 0; this.maxCombo = 0; this.judgements = [];
        this.hp = 100; this.failed = false;
+       this.trackScores = []; this.medleyBonus = 0;
     }
+    this.trackStartScore = this.score;
 
     this.stopAudio();
     this.analyser = audioCtx.createAnalyser();
     this.analyser.fftSize = 64;
     this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
 
-    let lastNode;
-    if(this.isScore) {
-      this.scoreOut = audioCtx.createGain(); this.scoreOut.gain.value = 0.6;
-      this.scoreIdx = 0; lastNode = this.scoreOut;
-    } else {
-      this.source = audioCtx.createBufferSource(); this.source.buffer = this.audioBuffer;
-      lastNode = this.source;
-    }
+    this.source = audioCtx.createBufferSource(); this.source.buffer = this.audioBuffer;
+    let lastNode = this.source;
 
     if(this.filterType === 1) { let filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 1.5; lastNode.connect(filter); lastNode = filter; }
     else if(this.filterType === 2) { let filter = audioCtx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 400; lastNode.connect(filter); lastNode = filter; }
@@ -530,14 +291,23 @@ const Rhythm = {
     this.stopAudio();
 
     if(this.trackIndex < this.playlist.length - 1) {
+       this.trackScores.push(Math.floor(this.score - this.trackStartScore));
        this.st = 'intermission'; this.transformTimer = 180;
+       playSnd('combo'); screenShake(10);
+       for(let i=0; i<12; i++) addParticle(Math.random()*200, 60 + Math.random()*200, ['#ff0','#0ff','#f0f','#0f0'][i%4], 'explosion');
     } else {
+       if(this.playlist.length > 1 && !this.failed) {
+          this.trackScores.push(Math.floor(this.score - this.trackStartScore));
+          this.medleyBonus = 500 * (this.playlist.length - 1);
+          this.score += this.medleyBonus;
+          playSnd('combo');
+       }
        this.st = 'result'; let finalScore = Math.floor(this.score);
 
        if(!this.autoPlay) {
            let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {easy:0, normal:0, hard:0, expert:0, nightmare:0};
            if(finalScore > (rData[this.mode]||0)){ rData[this.mode] = finalScore; SaveSys.data.rhythm = rData; SaveSys.save(); }
-           SaveSys.addLog('BEAT BROS', `${this.playlist.length > 1 ? 'メドレー' : this.mode.toUpperCase()}${this.isScore ? '(楽譜)' : ''} で スコア${finalScore}`);
+           SaveSys.addLog('BEAT BROS', `${this.playlist.length > 1 ? 'メドレー' : this.mode.toUpperCase()} で スコア${finalScore}`);
        } else {
            SaveSys.addLog('BEAT BROS', `AUTO PLAY で最高にチルった`);
        }
@@ -676,6 +446,9 @@ const Rhythm = {
     }
     else if(this.st === 'intermission') {
       this.transformTimer--;
+      if(this.transformTimer % 8 === 0) addParticle(20 + Math.random()*160, 100 + Math.random()*160, ['#ff0','#0ff','#f0f','#0f0'][Math.floor(Math.random()*4)], 'star');
+      if(this.transformTimer === 120 || this.transformTimer === 60) playSnd('sel');
+      if(typeof updateParticles === 'function') updateParticles();
       if(this.transformTimer <= 0) {
           this.trackIndex++;
           this.pendingFile = this.playlist[this.trackIndex];
@@ -699,24 +472,14 @@ const Rhythm = {
           if(p !== undefined) p.catch(e => console.log("Video AutoPlay Blocked", e));
       }
 
-      if(this.isScore) {
-          this.scheduleScore(now);
-          if(now > this.scoreEnd) { this.handleTrackEnd(); return; }
-      }
-
       let speed = this.cfg().spd * this.hiSpeed;
-
-      // NIGHTMAREの音程ゆらぎ(控えめ)
-      if(this.source) {
-          this.source.playbackRate.value = (this.mode === 'nightmare' && !this.autoPlay) ? 1.0 + Math.sin(Date.now()/300) * 0.08 : 1.0;
-      }
 
       if (this.autoPlay) {
           for (let i=0; i<4; i++) this.laneTouch[i] = false;
           for (let n of this.notes) {
-              if (!n.bad && !n.hit && !n.missed && n.y > -30 && n.y < 420) {
+              if (!n.bad && !n.hit && !n.missed) {
                   let tDiff = n.time - now;
-                  if (tDiff <= 0.05 && tDiff > -0.1) {
+                  if (tDiff <= 0.02 && tDiff > -0.25) {
                       this.laneTouch[n.lane] = true;
                       this.hitKey(n.lane, true);
                   }
@@ -734,7 +497,7 @@ const Rhythm = {
         let wiggle = (this.mode === 'nightmare') ? Math.sin(now * 10 + n.lane) * 10 : 0;
         n.y = this.lineY - tDiff * speed + wiggle;
 
-        if(!n.hit && !n.missed && n.y > 420) {
+        if(!n.hit && !n.missed && tDiff < -0.27) {
            n.missed = true;
            if(n.bad) continue; // ダメージノーツは避ければOK
            this.combo = 0;
@@ -816,12 +579,12 @@ const Rhythm = {
       ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText('REMASTER V5', 62, 100);
       ctx.fillStyle = '#ff0'; ctx.fillText('↓画面下部でファイルをロード↓', 20, 140);
       ctx.fillStyle = '#aaa'; ctx.font = '9px monospace';
-      ctx.fillText('音楽ファイル or 楽譜(MIDI/TXT)', 22, 160);
+      ctx.fillText('複数選ぶとメドレー再生!', 40, 160);
       ctx.fillStyle = '#888'; ctx.fillText('SELECT: 戻る', 65, 280);
     }
     else if(this.st === 'settings') {
       ctx.fillStyle = '#0f0'; ctx.font = 'bold 16px monospace';
-      ctx.fillText(this.scoreMode ? 'SCORE LOADED' : 'TRACK LOADED', 40, 40);
+      ctx.fillText('TRACK LOADED', 40, 40);
       ctx.fillStyle = '#fff'; ctx.font = '12px monospace';
 
       let rData = (SaveSys.data && SaveSys.data.rhythm) ? SaveSys.data.rhythm : {};
@@ -874,8 +637,52 @@ const Rhythm = {
       ctx.fillStyle = `rgba(0, 255, 255, ${Math.random()*0.3})`; ctx.fillRect(0, 0, cvs.width, cvs.height);
     }
     else if(this.st === 'intermission') {
-      ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText(`TRACK ${this.trackIndex + 1} CLEARED!`, 30, 150);
-      ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText('NEXT TRACK LOADING...', 30, 180);
+      const tt = 180 - this.transformTimer;                 // 経過フレーム
+      const W = cvs.width, H = cvs.height;
+      ctx.fillStyle = '#001'; ctx.fillRect(0, 0, W, H);
+      // 放射状の光線
+      ctx.save(); ctx.translate(W/2, 150);
+      for(let i=0; i<16; i++) {
+        ctx.rotate(Math.PI * 2 / 16);
+        ctx.fillStyle = `hsla(${(i*22 + tt*3) % 360},100%,60%,0.13)`;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, 320); ctx.lineTo(18, 320); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+      drawParticles();
+      // 弾むタイトル
+      const pop = tt < 20 ? 1 + (20 - tt) * 0.05 : 1 + Math.sin(tt * 0.2) * 0.03;
+      ctx.save(); ctx.translate(W/2, 90); ctx.scale(pop, pop);
+      ctx.textAlign = 'center';
+      ctx.shadowBlur = 16; ctx.shadowColor = `hsl(${(tt*6)%360},100%,60%)`;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 18px monospace'; ctx.fillText(`TRACK ${this.trackIndex + 1}`, 0, 0);
+      ctx.fillStyle = `hsl(${(tt*6)%360},100%,65%)`; ctx.font = 'bold 17px monospace'; ctx.fillText('CLEARED!!', 0, 24);
+      ctx.restore();
+      ctx.textAlign = 'left';
+      // 成績パネル
+      ctx.fillStyle = 'rgba(0,0,30,0.8)'; ctx.fillRect(15, 135, 170, 110); ctx.strokeStyle = '#0ff'; ctx.lineWidth = 2; ctx.strokeRect(15, 135, 170, 110);
+      const shown = Math.min(1, tt / 40);
+      const ts = this.trackScores[this.trackScores.length - 1] || 0;
+      ctx.fillStyle = '#fff'; ctx.font = '11px monospace';
+      ctx.fillText(`TRACK SCORE ${Math.floor(ts * shown)}`, 25, 160);
+      ctx.fillText(`TOTAL       ${Math.floor(this.score)}`, 25, 180);
+      ctx.fillText(`MAX COMBO   ${this.maxCombo}`, 25, 200);
+      // 進行ドット
+      for(let i=0; i<this.playlist.length && i<12; i++) {
+        const dx = W/2 - (Math.min(this.playlist.length,12) * 14) / 2 + i * 14 + 7;
+        ctx.fillStyle = i <= this.trackIndex ? '#0f8' : (i === this.trackIndex + 1 && tt % 20 < 10 ? '#ff0' : '#335');
+        ctx.beginPath(); ctx.arc(dx, 228, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      // 次の曲
+      const nx = this.playlist[this.trackIndex + 1];
+      ctx.fillStyle = '#ff0'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+      ctx.fillText(`NEXT  ${this.trackIndex + 2} / ${this.playlist.length}`, W/2, 275);
+      ctx.fillStyle = '#fff'; ctx.font = '10px monospace';
+      let nm = nx ? nx.name : ''; if(nm.length > 24) nm = nm.slice(0, 23) + '…';
+      ctx.fillText(nm, W/2, 295);
+      // カウントダウンバー
+      ctx.fillStyle = '#123'; ctx.fillRect(30, 310, 140, 6);
+      ctx.fillStyle = '#0ff'; ctx.fillRect(30, 310, 140 * (tt / 180), 6);
+      ctx.textAlign = 'left';
     }
     else if(this.st === 'loading' || this.st === 'intro' || this.st === 'play' || this.st === 'result') {
 
@@ -1072,7 +879,21 @@ const Rhythm = {
       if(h > 0) {
           ctx.fillStyle = '#112'; ctx.fillRect(0, 0, 200, h); ctx.fillRect(0, 400 - h, 200, h);
           ctx.fillStyle = '#0ff'; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff'; ctx.fillRect(0, h - 2, 200, 4); ctx.fillRect(0, 400 - h - 2, 200, 4); ctx.shadowBlur = 0;
-          if(this.st === 'loading') { ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 170, 180, 60); ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText(this.scoreMode ? 'READING SCORE...' : 'ANALYZING TRACK...', 20, 195); ctx.fillRect(50, 210, (Date.now()%1000)/1000*100, 5); }
+          if(this.st === 'loading') { ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(10, 170, 180, 60); ctx.fillStyle = '#0ff'; ctx.font = 'bold 14px monospace'; ctx.fillText('ANALYZING TRACK...', 20, 195); ctx.fillRect(50, 210, (Date.now()%1000)/1000*100, 5); }
+      }
+
+      // メドレー: 曲の頭に「TRACK n / N」バナー
+      if(this.playlist.length > 1 && (this.st === 'intro' || (this.st === 'play' && now < 0))) {
+        const slide = this.st === 'intro' ? Math.min(1, this.transformTimer / 30) : 1;
+        ctx.save(); ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0,0,40,0.85)'; ctx.fillRect(0, 120, 200, 56 * slide);
+        ctx.fillStyle = '#0ff'; ctx.fillRect(0, 120, 200, 2); ctx.fillRect(0, 120 + 56 * slide - 2, 200, 2);
+        if(slide >= 1) {
+          ctx.fillStyle = '#ff0'; ctx.font = 'bold 16px monospace'; ctx.fillText(`TRACK ${this.trackIndex + 1} / ${this.playlist.length}`, 100, 145);
+          let nm = (this.playlist[this.trackIndex] || {name:''}).name; if(nm.length > 24) nm = nm.slice(0, 23) + '…';
+          ctx.fillStyle = '#fff'; ctx.font = '10px monospace'; ctx.fillText(nm, 100, 166);
+        }
+        ctx.restore();
       }
 
       if(this.st === 'result') {
@@ -1083,9 +904,10 @@ const Rhythm = {
         if (this.failed) {
             ctx.fillStyle = '#f33'; ctx.font = 'bold 16px monospace'; ctx.fillText('FAILED...', 55, 130);
         } else {
-            ctx.fillStyle = '#0ff'; ctx.font = 'bold 16px monospace'; ctx.fillText('TRACK CLEARED!', 30, 130);
+            ctx.fillStyle = '#0ff'; ctx.font = 'bold 16px monospace'; ctx.fillText(this.playlist.length > 1 ? 'MEDLEY COMPLETE!' : 'TRACK CLEARED!', this.playlist.length > 1 ? 22 : 30, 130);
         }
         ctx.fillStyle = '#fff'; ctx.font = '12px monospace'; ctx.fillText(`SCORE:    ${Math.floor(this.score)}`, 25, 170); ctx.fillText(`MAX COMBO:${this.maxCombo}`, 25, 190);
+        if (this.medleyBonus > 0) { ctx.fillStyle = '#ff0'; ctx.font = 'bold 10px monospace'; ctx.fillText(`MEDLEY x${this.playlist.length}  BONUS +${this.medleyBonus}`, 22, 212); }
 
         if (this.autoPlay) {
             ctx.fillStyle = '#ff0'; ctx.font = 'bold 24px monospace'; ctx.fillText(`AUTO PLAY`, 30, 240);
