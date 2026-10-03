@@ -47,7 +47,7 @@ const SaveSys = {
         actStage: d.actStage||1, 
         actLives: d.actLives||5, 
         actSeed: d.actSeed||1, 
-        rhythm: d.rhythm||{easy:0,normal:0,hard:0,nightmare:0}, 
+        rhythm: Object.assign({easy:0,normal:0,hard:0,expert:0,nightmare:0}, d.rhythm||{}), 
         logs: d.logs||[],
         osFiles: d.osFiles||null,
         trashFiles: d.trashFiles||{},
