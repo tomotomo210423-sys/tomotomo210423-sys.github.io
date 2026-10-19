@@ -480,3 +480,12 @@ calibrate();
            render, renderSong, playPcm, prepare, shout,
            get enabled(){ return enabled; }, set enabled(v){ enabled = !!v; } };
 })();
+
+// Web Worker として読み込まれた場合: メインスレッドから受け取ったテキストを合成して返す
+if (typeof window === 'undefined' && typeof self !== 'undefined' && typeof importScripts === 'function') {
+  self.onmessage = e => {
+    const d = e.data; let pcm;
+    try { const r = KOE.render(d.text, d.o); pcm = r ? r.pcm : new Float32Array(0); } catch (err) { pcm = new Float32Array(0); }
+    self.postMessage({ id: d.id, pcm }, [pcm.buffer]);
+  };
+}

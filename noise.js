@@ -9,6 +9,8 @@ const CommSys = {
         if (Noise.st === 'play' || Noise.st === 'gameover') {
             this.msg = char === 'ミュート' ? '……' : `【${char}】 ${txt}`;
             this.msgLife = 180; 
+            // 無線の声(無線らしい音質で)
+            if (char !== 'ミュート' && typeof Voice !== 'undefined') Voice.talk(txt, char, { radio: true });
         }
     }
 };
@@ -207,7 +209,7 @@ const Noise = {
 
     startStory(sIdx) {
         if(sIdx >= SCENARIOS.length) { this.st = 'result'; this.tmr = 0; return; }
-        this.st = 'story'; this.scIdx = sIdx; this.msgIdx = 0; this.tmr = 0; this.strToShow = '';
+        this.st = 'story'; this.scIdx = sIdx; this.msgIdx = 0; this.tmr = 0; this.strToShow = ''; this.voiceKey = null;
     },
 
     wL(x,y,w,h) { this.walls.push({x,y,w,h}); },
@@ -366,6 +368,9 @@ const Noise = {
         if (this.st === 'story') {
             if (!SCENARIOS[this.scIdx] || !SCENARIOS[this.scIdx][this.msgIdx]) return;
             let msg = SCENARIOS[this.scIdx][this.msgIdx];
+            // 会話の声: メッセージが切り替わったら読み上げる
+            const vk = this.scIdx + ':' + this.msgIdx;
+            if (this.voiceKey !== vk) { this.voiceKey = vk; if (typeof Voice !== 'undefined') Voice.talk(msg.t, msg.c); }
             if (this.tmr % 2 === 0 && this.strToShow.length < msg.t.length) {
                 this.strToShow += msg.t[this.strToShow.length];
                 if (this.strToShow.length % 3 === 0) playSE('sel');
@@ -375,7 +380,7 @@ const Noise = {
                 this.dialogSkipHold++;
                 if (this.dialogSkipHold >= 15) {
                     this.dialogSkipHold = 0;
-                    playSE('hit');
+                    playSE('hit'); if (typeof Voice !== 'undefined') Voice.stop();
                     if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; }
                     else { this.loadLevel(); }
                     return;
@@ -389,6 +394,7 @@ const Noise = {
                     this.msgIdx++;
                     if (this.msgIdx < SCENARIOS[this.scIdx].length) { this.strToShow = ''; }
                     else {
+                        if (typeof Voice !== 'undefined') Voice.stop();
                         if (this.scIdx === SCENARIOS.length - 1) { this.st = 'result'; this.tmr = 0; }
                         else { this.loadLevel(); }
                     }

@@ -69,8 +69,9 @@ const GalaxyBreak = {
         this.storyIdx = idx;
         this.storyLine = 0;
         this.storyChar = 0;
-        this.storyTmr = 0;
+        this.storyTmr = 0; this.voiceKey = null;
         if (typeof BGM !== 'undefined') BGM.play('puzzle');
+        if (typeof Voice !== 'undefined') (this.storyLines[idx] || []).forEach(l => Voice.prefetch(l, 'gal_narr'));
     },
 
     startChapter(ch) {
@@ -307,6 +308,9 @@ const GalaxyBreak = {
             let lines = this.storyLines[this.storyIdx];
             if (!lines) { this.nextAfterStory(); return; }
             let line = lines[this.storyLine] || '';
+            // ナレーション: 行が変わったら読み上げる
+            const vk = this.storyIdx + ':' + this.storyLine;
+            if (this.voiceKey !== vk && line) { this.voiceKey = vk; if (typeof Voice !== 'undefined') Voice.talk(line, 'gal_narr'); }
             if (this.storyTmr % 2 === 0 && this.storyChar < line.length) {
                 this.storyChar++;
             }
@@ -347,6 +351,7 @@ const GalaxyBreak = {
     },
 
     nextAfterStory() {
+        if (typeof Voice !== 'undefined') Voice.stop();
         if (this.storyIdx === 4) {
             // Ending
             this.st = 'ending'; this.tmr = 0;

@@ -147,6 +147,8 @@ const MQ_INT = {
 };
 const MQ_INT_NAME = { a: '酒場', b: '宿屋', c: '道具屋', d: '長老の家' };
 const MQ_SOLID = '#T~hBpcokb';
+// 街の人の声
+const MQ_NPC_VOICE = { '村の子供': 'mq_child', 'おばさん': 'mq_woman', '旅の人': 'mq_man', '旅の商人': 'mq_merchant', '女の子': 'mq_girl', '老人': 'mq_old', '老兵': 'mq_old', '村の子': 'mq_child', '魔女': 'mq_witch', '常連客': 'mq_man' };
 
 // 章ごとの設定
 const MQ_CH = [
@@ -416,7 +418,7 @@ const DungeonCrawl = {
     this.goMap('t' + c, 6, 10);
     this.st = 'map';
     this.saveGame();
-    this.say([MQ_CH[c].title].concat(MQ_CH[c].intro));
+    this.say([MQ_CH[c].title].concat(MQ_CH[c].intro), null, { voice: 'mq_narr' });
   },
 
   saveGame() {
@@ -474,23 +476,30 @@ const DungeonCrawl = {
   say(pages, cb, opt) {
     opt = opt || {};
     if (typeof pages === 'string') pages = [pages];
-    const wrapped = [], fns = [];
+    const wrapped = [], fns = [], srcs = [];
     pages.forEach((p, i) => {
       const ls = this.wrap(p);
-      for (let k = 0; k < ls.length; k += 5) { wrapped.push(ls.slice(k, k + 5)); fns.push(k === 0 && opt.fns ? opt.fns[i] : null); }
+      for (let k = 0; k < ls.length; k += 5) { wrapped.push(ls.slice(k, k + 5)); fns.push(k === 0 && opt.fns ? opt.fns[i] : null); srcs.push(k === 0 ? { t: p, y: opt.yomi ? opt.yomi[i] : undefined } : null); }
     });
     if (wrapped.length === 0) { if (cb) cb(); return; }
-    this.dlg = { pages: wrapped, fns, pi: 0, ci: 0, cb, auto: !!opt.auto, wait: 0, started: false };
+    // voice: 配役を指定するとページごとに読み上げる(戦闘メッセージは声なし)
+    this.dlg = { pages: wrapped, fns, srcs, voice: opt.voice || null, pi: 0, ci: 0, cb, auto: !!opt.auto, wait: 0, started: false };
+    if (opt.voice && typeof Voice !== 'undefined') pages.forEach((p, i) => { if (!(opt.yomi && opt.yomi[i])) Voice.prefetch(p, opt.voice); });
   },
 
   updDlg() {
     const d = this.dlg;
-    if (!d.started) { d.started = true; if (d.fns[d.pi]) d.fns[d.pi](); }
+    if (!d.started) {
+      d.started = true; if (d.fns[d.pi]) d.fns[d.pi]();
+      const s = d.srcs[d.pi];
+      if (d.voice && s && typeof Voice !== 'undefined') Voice.talk(s.t, d.voice, s.y ? { yomi: s.y } : undefined);
+    }
     const total = d.pages[d.pi].join('').length;
     if (d.ci < total) { d.ci += 2; if (keysDown.a) d.ci = total; return; }
     d.wait++;
     if (keysDown.a || (d.auto && d.wait > 38)) {
       d.pi++;
+      if (d.voice && typeof Voice !== 'undefined' && (d.pi >= d.pages.length || d.srcs[d.pi])) Voice.stop();
       if (d.pi >= d.pages.length) { const cb = d.cb; this.dlg = null; if (cb) cb(); }
       else { d.ci = 0; d.wait = 0; d.started = false; playSnd('sel'); }
     }
@@ -582,11 +591,13 @@ const DungeonCrawl = {
   talkNpc(npc) {
     if (npc.role === 'tavern') this.tavernMenu();
     else if (npc.role === 'inn') this.innMenu();
-    else if (npc.role === 'shop') this.shopMenu(0);
-    else if (npc.role === 'elder') { const cfg = MQ_CH[this.ch]; this.say(this.flags['b' + this.ch] ? cfg.elderDone : cfg.elder); }
-    else if (npc.rumor) { this.say(npc.name + '「' + npc.lines[Math.floor(Math.random() * npc.lines.length)] + '」'); }
-    else this.say(npc.name + '「' + npc.lines.join('\n') + '」');
+    else if (npc.role === 'shop') this.say('道具屋へ ようこそ！ 何に しますか？', () => this.shopMenu(0), { voice: 'mq_shop' });
+    else if (npc.role === 'elder') { const cfg = MQ_CH[this.ch]; this.say(this.flags['b' + this.ch] ? cfg.elderDone : cfg.elder, null, { voice: 'mq_elder' }); }
+    else if (npc.rumor) { const l = npc.lines[Math.floor(Math.random() * npc.lines.length)]; this.say(npc.name + '「' + l + '」', null, { voice: MQ_NPC_VOICE[npc.name] || 'mq_man', yomi: [this.yomi(l)] }); }
+    else this.say(npc.name + '「' + npc.lines.join('\n') + '」', null, { voice: MQ_NPC_VOICE[npc.name] || 'mq_man', yomi: [this.yomi(npc.lines.join('\n'))] });
   },
+
+  yomi(t) { return typeof Voice !== 'undefined' ? Voice.yomiStr(t) : undefined; },
 
   handleEvent(ev) {
     if (ev.type === 'warp') {
@@ -681,19 +692,20 @@ const DungeonCrawl = {
   // ---------- 宿屋・酒場・道具屋 ----------
   innMenu() {
     const price = MQ_CH[this.ch].inn * this.party.length;
+    const innY = typeof Voice !== 'undefined' ? 'いらっしゃいませ！ ひとばん ' + Voice.num(price) + ' ごーるどです。 おとまりに なりますか？' : undefined;
     this.say('いらっしゃいませ！\n一晩 ' + price + 'ゴールドです。 お泊まりになりますか？', () => {
       this.openMenu('泊まる？ (' + this.gold + 'G)', [{ l: 'はい', v: 1, off: this.gold < price }, { l: 'いいえ', v: 0 }], it => {
-        if (!it.v) { this.say('また どうぞ！'); return; }
+        if (!it.v) { this.say('また どうぞ！', null, { voice: 'mq_inn' }); return; }
         this.gold -= price;
         for (const c of this.party.concat(this.reserve)) { c.hp = c.mhp; c.mp = c.mmp; }
         this.flash = 30; playSnd('combo'); this.saveGame();
-        this.say(['…… ………', 'おはようございます！\n体力も 魔力も 全回復しました！', '冒険の書に 記録しました。']);
+        this.say(['…… ………', 'おはようございます！\n体力も 魔力も 全回復しました！', '冒険の書に 記録しました。'], null, { voice: 'mq_inn' });
       }, () => {});
-    });
+    }, { voice: 'mq_inn', yomi: [innY] });
   },
 
   tavernMenu() {
-    this.say('いらっしゃい！\nここは 冒険者の 集まる 酒場さ。\n今日は どんな 顔ぶれかな…', () => this.tavernTop(0));
+    this.say('いらっしゃい！\nここは 冒険者の 集まる 酒場さ。\n今日は どんな 顔ぶれかな…', () => this.tavernTop(0), { voice: 'mq_master' });
   },
   tavernTop(cur) {
     this.openMenu('酒場 (' + this.gold + 'G)', [
@@ -702,7 +714,7 @@ const DungeonCrawl = {
     ], (it) => {
       if (it.v === 'hire') this.tavernHire();
       else if (it.v === 'leave') this.tavernLeave();
-      else if (it.v === 'talk') { const r = MQ_CH[this.ch].rumors; this.say(r[Math.floor(Math.random() * r.length)], () => this.tavernTop(2)); }
+      else if (it.v === 'talk') { const r = MQ_CH[this.ch].rumors; this.say(r[Math.floor(Math.random() * r.length)], () => this.tavernTop(2), { voice: 'mq_master' }); }
     }, () => {}, cur);
   },
   // 候補は入店のたびに完全ランダムで再抽選される
@@ -718,9 +730,9 @@ const DungeonCrawl = {
     const items = [];
     for (const r of this.reserve) items.push({ l: r.name + ' ' + MQ_CLS[r.cls].name + ' Lv' + r.lv + ' 再会', v: { reserve: r } });
     for (const cd of this.cands) if (!cd.hired) items.push({ l: cd.name + ' ' + MQ_CLS[cd.cls].name + ' Lv' + cd.lv + ' ' + cd.fee + 'G', v: { cd } });
-    if (!items.length) { this.say('今は 誰も いないようだ。', () => this.tavernTop(0)); return; }
+    if (!items.length) { this.say('今は 誰も いないようだ。', () => this.tavernTop(0), { voice: 'mq_master' }); return; }
     this.openMenu('誰を 誘う？', items, it => {
-      if (this.party.length >= 4) { this.say('パーティは いっぱいだ！\n誰かと 別れてから 誘おう。', () => this.tavernTop(0)); return; }
+      if (this.party.length >= 4) { this.say('パーティは いっぱいだ！\n誰かと 別れてから 誘おう。', () => this.tavernTop(0), { voice: 'mq_master' }); return; }
       const v = it.v;
       if (v.reserve) {
         this.reserve = this.reserve.filter(c => c !== v.reserve); this.party.push(v.reserve); playSnd('combo');
@@ -728,7 +740,7 @@ const DungeonCrawl = {
         return;
       }
       const cd = v.cd;
-      if (this.gold < cd.fee) { this.say('お金が 足りないな…', () => this.tavernTop(0)); return; }
+      if (this.gold < cd.fee) { this.say('お金が 足りないな…', () => this.tavernTop(0), { voice: 'mq_master' }); return; }
       const ch = MQ.buildFromCandidate(cd);
       const n = this.party.length;
       ch.wlv = Math.max(0, Math.round(this.party.reduce((s, c) => s + c.wlv, 0) / n) - 1);
@@ -786,7 +798,7 @@ const DungeonCrawl = {
 
   startBoss() {
     const cfg = MQ_CH[this.ch];
-    this.say(cfg.boss.pre, () => { this.startBattle(cfg.boss.ids, { stage: 0 }); });
+    this.say(cfg.boss.pre, () => { this.startBattle(cfg.boss.ids, { stage: 0 }); }, { voice: 'mq_boss' + this.ch });
   },
 
   startBattle(ids, boss) {
@@ -1040,15 +1052,18 @@ const DungeonCrawl = {
   afterBoss(bs) {
     const cfg = MQ_CH[this.ch];
     if (cfg.boss.second && bs.stage === 0) {
-      this.say(cfg.boss.post, () => this.startBattle(cfg.boss.second.ids, { stage: 1 }));
+      this.say(cfg.boss.post, () => this.startBattle(cfg.boss.second.ids, { stage: 1 }), { voice: 'mq_narr' });
       return;
     }
     const post = cfg.boss.second ? cfg.boss.second.post : cfg.boss.post;
     this.flags['b' + this.ch] = true;
     if (this.ch < 2) {
-      this.say(post.concat(cfg.end), () => { this.flash = 40; this.startChapter(this.ch + 1); });
+      this.say(post.concat(cfg.end), () => { this.flash = 40; this.startChapter(this.ch + 1); }, { voice: 'mq_narr' });
     } else {
-      this.say(post, () => { this.st = 'ending'; this.endTmr = 0; SaveSys.data.mqClear = (SaveSys.data.mqClear || 0) + 1; SaveSys.save(); this.playBGM('mq_end'); });
+      this.say(post, () => {
+        this.st = 'ending'; this.endTmr = 0; SaveSys.data.mqClear = (SaveSys.data.mqClear || 0) + 1; SaveSys.save(); this.playBGM('mq_end');
+        if (typeof Voice !== 'undefined') Voice.talk('世界に 平和が 戻った…\n勇者と 仲間たちの\n冒険は ここに 終わる。', 'mq_narr');
+      }, { voice: 'mq_narr' });
     }
   },
 
@@ -1060,8 +1075,8 @@ const DungeonCrawl = {
       this.endBattle();
       this.goMap('t' + this.ch, 6, 10);
       this.flash = 30;
-      this.say('おお 勇者よ 死んでしまうとは 情けない…\nお金の 半分を 失った。\nさあ もう一度 旅立つのじゃ！');
-    });
+      this.say('おお 勇者よ 死んでしまうとは 情けない…\nお金の 半分を 失った。\nさあ もう一度 旅立つのじゃ！', null, { voice: 'mq_elder' });
+    }, { voice: 'mq_narr' });
   },
 
   // ===================== 描画 =====================

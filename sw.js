@@ -1,6 +1,6 @@
 // === SERVICE WORKER — 14in1 RETRO SYSTEM ===
 // キャッシュ優先戦略のため、ファイル更新時は必ずバージョンを上げること
-const CACHE_NAME = '14in1-v12';
+const CACHE_NAME = '14in1-v13';
 
 const ASSETS = [
     './',
@@ -16,6 +16,8 @@ const ASSETS = [
     './online.js',
     './rhythm.js',
     './slot.js',
+    './koe.js',
+    './koe_voice.js',
     './musou.js',
     './musou_draw.js',
     './abyss.js',

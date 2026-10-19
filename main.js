@@ -46,7 +46,8 @@ const SaveSys = {
         rankings: d.rankings || { n: [], h: [] }, 
         bgTheme: d.bgTheme || 0, 
         bgmVol: d.bgmVol !== undefined ? d.bgmVol : 0.5, 
-        seVol: d.seVol !== undefined ? d.seVol : 0.8,    
+        seVol: d.seVol !== undefined ? d.seVol : 0.8,
+        voiceVol: d.voiceVol !== undefined ? d.voiceVol : 0.9,    
         slotCoins: d.slotCoins !== undefined ? d.slotCoins : 100, 
         jackpotPool: d.jackpotPool || 1000, 
         actStage: d.actStage||1, 
@@ -82,6 +83,7 @@ const SaveSys = {
 
 const BGM = {
   extra: {},   // ゲーム側から登録するオリジナル曲 {名前: {t1,t2,t3,n,spd}}
+  duck: 1,     // ボイス再生中はBGMを下げる
   stop() { if (bgmInterval) { clearInterval(bgmInterval); bgmInterval = null; } },
   play(type) {
     this.stop(); if (!audioCtx) return;
@@ -105,7 +107,7 @@ const BGM = {
       const playNote = (f, w, baseV) => {
         if (!f) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
         o.type = w; o.frequency.value = f; 
-        g.gain.setValueAtTime(baseV * SaveSys.data.bgmVol, now); 
+        g.gain.setValueAtTime(baseV * SaveSys.data.bgmVol * BGM.duck, now); 
         g.gain.exponentialRampToValueAtTime(0.001, now + d);
         o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now + d + 0.1); 
       };
@@ -114,7 +116,7 @@ const BGM = {
       playNote(tr.t3[i % tr.t3.length], 'triangle', 0.08);
       if (tr.n[i % tr.n.length] > 0 && noiseBuffer) {
         const src = audioCtx.createBufferSource(); const g = audioCtx.createGain(); src.buffer = noiseBuffer; 
-        g.gain.setValueAtTime(0.05 * SaveSys.data.bgmVol, now); 
+        g.gain.setValueAtTime(0.05 * SaveSys.data.bgmVol * BGM.duck, now); 
         g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         src.connect(g); g.connect(audioCtx.destination); src.start(now); src.stop(now + 0.2); 
       }
@@ -138,6 +140,7 @@ function resetShake() { if (isShaking) { ctx.restore(); isShaking = false; } }
 
 function switchApp(app) { 
     nextApp = app; transTimer = 20; playSnd('sel'); 
+    if (typeof Voice !== 'undefined') Voice.stop();
     document.body.className = '';
     document.getElementById('gameboy').className = '';
 }
@@ -354,8 +357,8 @@ const Settings = {
   update() {
     this.tmr++;
     if (keysDown.select || keysDown.b) { switchApp(Menu); return; }
-    if (keysDown.up) { this.cur = (this.cur - 1 + 3) % 3; playSnd('sel'); } 
-    if (keysDown.down) { this.cur = (this.cur + 1) % 3; playSnd('sel'); }
+    if (keysDown.up) { this.cur = (this.cur - 1 + 4) % 4; playSnd('sel'); } 
+    if (keysDown.down) { this.cur = (this.cur + 1) % 4; playSnd('sel'); }
     
     if (this.cur === 0) {
         if (keysDown.left) { SaveSys.data.bgTheme = (SaveSys.data.bgTheme - 1 + bgThemes.length) % bgThemes.length; SaveSys.save(); playSnd('combo'); }
@@ -369,6 +372,12 @@ const Settings = {
         if (keys.left && this.tmr % 4 === 0) { SaveSys.data.seVol = Math.max(0, SaveSys.data.seVol - 0.1); SaveSys.save(); playSnd('sel'); }
         if (keys.right && this.tmr % 4 === 0) { SaveSys.data.seVol = Math.min(1.0, SaveSys.data.seVol + 0.1); SaveSys.save(); playSnd('sel'); }
     }
+    else if (this.cur === 3) {
+        let ch = false;
+        if (keys.left && this.tmr % 4 === 0) { SaveSys.data.voiceVol = Math.max(0, Math.round((SaveSys.data.voiceVol - 0.1) * 10) / 10); SaveSys.save(); ch = true; }
+        if (keys.right && this.tmr % 4 === 0) { SaveSys.data.voiceVol = Math.min(1.0, Math.round((SaveSys.data.voiceVol + 0.1) * 10) / 10); SaveSys.save(); ch = true; }
+        if ((ch || keysDown.a) && typeof Voice !== 'undefined') Voice.talk('', 'mq_narr', { yomi: 'こえの おおきさわ これくらいです。' });
+    }
   },
   draw() {
     ctx.fillStyle = '#001'; ctx.fillRect(0, 0, 200, 300); 
@@ -378,7 +387,8 @@ const Settings = {
     let items = [
       { label: 'BACKGROUND', val: `< ${bgThemes[SaveSys.data.bgTheme].name} >` },
       { label: 'BGM VOLUME', val: `< ${Math.round(SaveSys.data.bgmVol * 100).toString().padStart(3,' ')}% >` },
-      { label: 'SE  VOLUME', val: `< ${Math.round(SaveSys.data.seVol * 100).toString().padStart(3,' ')}% >` }
+      { label: 'SE  VOLUME', val: `< ${Math.round(SaveSys.data.seVol * 100).toString().padStart(3,' ')}% >` },
+      { label: 'VOICE VOL', val: SaveSys.data.voiceVol <= 0 ? '< OFF >' : `< ${Math.round(SaveSys.data.voiceVol * 100).toString().padStart(3,' ')}% >` }
     ];
     
     for (let i = 0; i < items.length; i++) {

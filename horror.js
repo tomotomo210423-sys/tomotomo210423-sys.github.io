@@ -225,12 +225,16 @@ const Horror = {
         else if (this.st === 'novel') {
             this.novelTimer++;
             let cur = diaryStory[this.novelDiaryIdx][this.novelLine];
+            // 日記の朗読(ささやき声)
+            const vk = this.novelDiaryIdx + ':' + this.novelLine;
+            if (this.voiceKey !== vk) { this.voiceKey = vk; if (typeof Voice !== 'undefined') Voice.talk(cur, 'diary'); }
             if (this.novelChar<cur.length && this.novelTimer%3===0) { playHSnd('type'); this.novelChar++; }
             if (kD.a||kD.b) {
                 if (this.novelChar<cur.length) { this.novelChar=cur.length; }
                 else {
                     this.novelLine++; this.novelChar=0; this.novelTimer=0;
                     if (this.novelLine>=diaryStory[this.novelDiaryIdx].length) {
+                        this.voiceKey = null; if (typeof Voice !== 'undefined') Voice.stop();
                         this.st='play'; this.map[this.targetTy*this.mapW+this.targetTx]=0; this.diaries++;
                     }
                 }

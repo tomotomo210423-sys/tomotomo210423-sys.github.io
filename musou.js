@@ -71,6 +71,15 @@ const MU_STAGES = [
     post: ['黒蓮を 倒した…！ 最後の門が 閉じていく。', '乱世に 平和が 戻った。\n三人の 武将の 名は 永く 語り継がれるだろう。\n── 完 ──'] }
 ];
 
+// ---------- ボイス (読みは ひらがな。配役は koe_voice.js の KOE_CAST) ----------
+const MU_VOICE = {
+  ult: { whirl: 'せんぷう らんぶ！', thunder: 'てんらい らんぶ！', arrows: 'せんぼんや！' },
+  boss: { bk1: ['われこそわ おにむしゃ！ かかってこい！', 'onimusha'], bk2: ['もりを けがす ものどもよ。 くちはてるが よい。', 'juyou'], bk3: ['よかろう。 ぜつぼうを おしえてやる。', 'kokuren'] },
+  second: ['これが わたしの しんの ちからだ！', 'kokuren'],
+  clear: { jin: 'まだまだ！ つぎだ！', rin: 'さくせん どおりね。', ao: 'みごとな いくさだった。' }
+};
+const muShout = (y, cast, vol) => { if (typeof Voice !== 'undefined') Voice.shout(y, cast, vol); };
+
 // ---------- 永続強化 ----------
 const MU_SHOP = {
   atk:    { name: '攻撃力',     desc: '与ダメージ +8%',     base: 60, max: 10 },
@@ -191,6 +200,7 @@ const Musou = {
     this.st = 'play';
     this.bgm(mode === 'endless' ? 'mu_endless' : 'mu_s' + (stageIdx + 1));
     if (mode === 'endless') this.themeIdx = 0;
+    if (typeof Voice !== 'undefined') { Voice.render(MU_VOICE.ult[this.hero.ult], this.hero.id); if (mode === 'stage') { const b = MU_VOICE.boss[this.S.boss]; Voice.render(b[0], b[1]); } }
   },
 
   recalc() {
@@ -360,6 +370,7 @@ const Musou = {
     e.elite = true;
     this.boss = e; this.bossName = bid === 'bk1' ? '鬼武者' : bid === 'bk2' ? '樹妖の主' : '魔王・黒蓮';
     this.msg = '── ' + this.bossName + ' ──'; this.msgT = 150; this.se('boss');
+    muShout(MU_VOICE.boss[bid][0], MU_VOICE.boss[bid][1]);
     this.bgm(bid === 'bk1' ? 'mu_boss1' : bid === 'bk2' ? 'mu_boss2' : 'mu_boss3');
     // 雑魚を一部残して緊張感
     this.enemies.forEach(x => { if (!x.boss && Math.random() < 0.5) { x.hp = 0; x.dead = true; } });
@@ -375,9 +386,10 @@ const Musou = {
     if (e.bid === 'bk3' && this.mode === 'stage' && !e.second) {
       const e2 = this.spawn('mini', Math.random() * 6.283, 100, { boss: true, bid: 'bk3', second: true, hp: Math.round(e.mhp * 0.8), mhp: Math.round(e.mhp * 0.8), r: 19, dmg: e.dmg * 1.2, spd: 0.8, bt: 0, ph: 0, pal: ['#fff', '#fff'] });
       e2.elite = true; this.boss = e2; this.bossName = '真・黒蓮'; this.msg = '── 真・黒蓮 ──'; this.msgT = 150;
+      muShout(MU_VOICE.second[0], MU_VOICE.second[1]);
       this.bgm('mu_boss3'); return;
     }
-    if (this.mode === 'stage') { this.clearT = 1; this.bgm('mu_clear'); this.msg = 'STAGE CLEAR!!'; this.msgT = 200; }
+    if (this.mode === 'stage') { this.clearT = 1; this.bgm('mu_clear'); this.msg = 'STAGE CLEAR!!'; this.msgT = 200; muShout(MU_VOICE.clear[this.hero.id], this.hero.id); }
     else { this.bossCycle++; this.bgm('mu_endless'); this.msg = '撃破！ さらに強い敵が来る…'; this.msgT = 150; }
   },
 
@@ -637,6 +649,7 @@ const Musou = {
     this.gauge = 0; this.se('ult'); this.shake = 10; this.flash = 8;
     const k = this.hero.ult;
     this.ult = { k, t: 0, dur: k === 'whirl' ? 130 : k === 'thunder' ? 100 : 70 };
+    muShout(MU_VOICE.ult[k], this.hero.id, 1.1);
     this.ebul.length = 0;
   },
   updUlt() {
@@ -737,7 +750,10 @@ const Musou = {
     sv.rec.endless.nw = false;
     this.st = 'result'; this.tmr = 0; this.bgm(cleared ? 'mu_clear' : 'mu_over');
   },
-  openStory(pages, cb) { this.story = { pages, i: 0, ci: 0, cb }; this.st = 'story'; },
+  openStory(pages, cb) {
+    this.story = { pages, i: 0, ci: 0, cb, vi: -1 }; this.st = 'story';
+    if (typeof Voice !== 'undefined') pages.forEach(p => Voice.prefetch(p, 'mu_narr'));
+  },
 
   // ===================== メイン更新 =====================
   update() {
@@ -807,8 +823,9 @@ const Musou = {
   shopCost(k) { const it = MU_SHOP[k], lv = this.sv.shop[k]; return Math.round(it.base * (1 + lv * 0.9)); },
   updStory(kd) {
     const s = this.story; const len = s.pages[s.i].length;
+    if (s.vi !== s.i) { s.vi = s.i; if (typeof Voice !== 'undefined') Voice.talk(s.pages[s.i], 'mu_narr'); }
     if (s.ci < len) { s.ci += 1.5; if (kd.a) s.ci = len; return; }
-    if (kd.a) { s.i++; s.ci = 0; this.se('sel'); if (s.i >= s.pages.length) { const cb = s.cb; this.story = null; if (cb) cb(); } }
+    if (kd.a) { s.i++; s.ci = 0; this.se('sel'); if (s.i >= s.pages.length) { if (typeof Voice !== 'undefined') Voice.stop(); const cb = s.cb; this.story = null; if (cb) cb(); } }
   },
   updPause(kd) {
     if (kd.up || kd.down) { this.pcur = ((this.pcur || 0) + 1) % 2; this.se('sel'); }
